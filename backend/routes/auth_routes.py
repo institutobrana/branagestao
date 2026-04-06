@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -181,15 +182,31 @@ def login(
     db: Session = Depends(get_db)
 ):
     email = normalize_email(form_data.username or "")
+    print(f"[LOGIN_DEBUG] normalized_email={email!r}")
     if not email:
         raise HTTPException(status_code=400, detail="Usuario nao encontrado")
 
     usuario = db.query(Usuario).filter(
         Usuario.email == email
     ).first()
+    print(f"[LOGIN_DEBUG] user_found={bool(usuario)}")
 
     if not usuario:
         raise HTTPException(status_code=400, detail="Usuario nao encontrado")
+
+    hash_value = str(usuario.senha_hash or "")
+    print(
+        "[LOGIN_DEBUG] user_email=%r hash_prefix=%r hash_len=%s"
+        % (usuario.email, hash_value[:30], len(hash_value))
+    )
+    try:
+        db_info = db.execute(text("SELECT current_database(), current_user")).first()
+        if db_info:
+            print(f"[LOGIN_DEBUG] db_name={db_info[0]!r} db_user={db_info[1]!r}")
+        else:
+            print("[LOGIN_DEBUG] db_name/current_user query returned no rows")
+    except Exception as exc:
+        print(f"[LOGIN_DEBUG] db_info_query_error={exc}")
 
     if is_system_user(usuario):
         raise HTTPException(status_code=403, detail="Conta sistêmica sem login interativo.")
