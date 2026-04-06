@@ -1,0 +1,38 @@
+# Ambiente virtual
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Segredos
+.env
+.env.*
+
+# Banco local
+*.db
+*.sqlite
+*.sqlite3
+
+# Backups
+backups/
+*.zip
+*.rar
+*.7z
+
+# Logs e temporários
+*.log
+*.tmp
+*.bak
+
+# IDE
+.vscode/
+.idea/
+
+# Build
+build/
+dist/

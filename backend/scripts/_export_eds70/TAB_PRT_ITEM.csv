@@ -1,0 +1,249 @@
+NROPRO;NROSER;DESCRICAO;NROIND;PRECO;PRAZO
+3;1;ACRILIZAÇÕES - Prótese parcial acrílica com grampos provisóra;255;190.0;5
+3;2;ACRILIZAÇÕES - ROLETE;255;50.0;5
+4;1;ACRILIZAÇÕES - Acrilização de P.P.R.;255;230.0;5
+4;2;ACRILIZAÇÕES - Acrilização de P.P.R. caracterizada;255;538.5;5
+4;3;ACRILIZAÇÕES - Acrilização de P.P.R. com Attach ou bisagra;255;240.0;5
+4;4;ACRILIZAÇÕES - Acrilização de P.P.R. com dentes importados;255;336.0;5
+4;5;ACRILIZAÇÕES - Acrilização de protocolo;255;740.0;5
+4;6;ACRILIZAÇÕES - Base de prova;255;56.0;5
+4;7;ACRILIZAÇÕES - Conserto de P.P.R.;255;110.0;5
+4;8;ACRILIZAÇÕES - Conserto de prótese totais;255;110.0;5
+4;9;ACRILIZAÇÕES - Guia cirúrgico;255;205.0;5
+4;10;ACRILIZAÇÕES - Mantenedor de espaço;255;205.0;5
+4;11;ACRILIZAÇÕES - Moldeira individual;255;56.5;5
+4;12;ACRILIZAÇÕES - Overdenture;255;370.0;5
+4;13;ACRILIZAÇÕES - Placa de bruxismo;255;240.0;5
+4;14;ACRILIZAÇÕES - Placa Erkoflex (VALOR A COMBINAR)*;255;0.0;5
+4;15;ACRILIZAÇÕES - Placa mio-relaxante (silicone);255;110.0;5
+4;16;ACRILIZAÇÕES - Placa para apneia + kit (VALOR A COMBINAR);255;0.0;5
+4;17;ACRILIZAÇÕES - Placa para enxerto;255;215.0;5
+4;18;ACRILIZAÇÕES - Placa para Ortose;255;560.0;5
+4;19;ACRILIZAÇÕES - Prótese parcial acrílica;255;200.5;5
+4;20;ACRILIZAÇÕES - Prótese parcial acrílica com grampos;255;230.0;5
+4;21;ACRILIZAÇÕES - Prótese total caracterizada;255;320.0;5
+4;22;ACRILIZAÇÕES - Prótese total com base resiliente (Soft Liner);255;786.5;5
+4;23;ACRILIZAÇÕES - Prótese total com palato incolor;255;320.0;5
+4;24;ACRILIZAÇÕES - Prótese total com palato rosa;255;320.0;5
+4;25;ACRILIZAÇÕES - Protetor Bucal Playsafe (VALOR A COMBINAR)*;255;0.0;5
+4;26;ACRILIZAÇÕES - Protetor Bucal Playsafe Personalizado (VALOR A COMBINAR);255;0.0;5
+4;27;ACRILIZAÇÕES - Protocolo sobre 5 implantes;255;2115.0;5
+4;28;ACRILIZAÇÕES - Reembasamento;255;150.0;5
+4;29;ACRILIZAÇÕES - Reembasamento de Overdenture;255;175.5;5
+4;30;ACRILIZAÇÕES - Reembasamento em Soft Liner;255;605.0;5
+4;31;ARMAÇÕES DE P.P.R. - Armação de P.P.R. bilateral;255;277.5;5
+4;32;ARMAÇÕES DE P.P.R. - Armação de P.P.R. bilateral em metal importado (VALOR A COMBINAR);255;0.0;5
+4;33;ARMAÇÕES DE P.P.R. - Armação de P.P.R. bilateral em ouro (A COMBINAR);255;0.0;5
+4;34;ARMAÇÕES DE P.P.R. - Armação de P.P.R. unilateral;255;277.5;5
+4;35;ARMAÇÕES DE P.P.R. - Armação de P.P.R. unilateral em metal importado (VALOR A COMBINAR);255;0.0;5
+4;36;ARMAÇÕES DE P.P.R. - Armação de P.P.R. unilateral em ouro ( VALOR A COMBINAR);255;0.0;5
+4;37;ARMAÇÕES DE P.P.R. - Barra bipartida (VALOR A COMBINAR);255;0.0;5
+4;38;ARMAÇÕES DE P.P.R. - Chapeado rugoso;255;351.0;5
+4;39;ARMAÇÕES DE P.P.R. - Chapeado rugoso em metal importado (VALOR A COMBINAR);255;0.0;5
+4;40;ARMAÇÕES DE P.P.R. - Oclusão em metal (VALOR A COMBINAR);255;0.0;5
+4;41;ARMAÇÕES DE P.P.R. - Rede de reforço para prótese total;255;278.0;5
+4;42;ARMAÇÕES DE P.P.R. - Solda sobre P.P.R.;255;90.0;5
+4;43;CERÂMICA - Aplicação de porcelana;255;259.0;5
+4;44;CERÂMICA - Aplicação de porcelana ombro;255;273.0;5
+4;45;CERÂMICA - Aplicação de porcelana sobre Ceram Press E-max;255;339.0;5
+4;46;CERÂMICA - Aplicação de porcelana sobre Cercon Zirconia;255;339.0;5
+4;47;CERÂMICA - Aplicação de porcelana sobre implante;255;275.0;5
+4;48;CERÂMICA - Aplicação de porcelana sobre In-Ceram;255;339.0;5
+4;49;CERÂMICA - Faceta Incisivo Central Unitário;255;850.0;5
+4;50;CERÂMICA - Gengiva artificial em porcelana;255;218.0;5
+4;51;CERÂMICA - Incisivo Central Unitário Personalizado ( Aplicação);255;850.0;5
+4;52;CERÂMICA - Inlay / Onlay em porcelana;255;532.5;5
+4;53;CERÂMICA - Jaqueta pura em porcelana;255;645.5;5
+4;54;METAL - Adesiva (01 pontico + 02 braços);255;258.5;5
+4;55;METAL - Barra para overdentures sobre 4 implantes;255;741.0;5
+4;56;METAL - Coping - Estrutura metálica;255;176.0;5
+4;57;METAL - Coroa fresada;255;226.0;5
+4;58;METAL - Coroa total ou incrustação;255;176.0;5
+4;59;METAL - Coroa veneer - fase metálica;255;176.0;5
+4;60;METAL - Estrutura metálica sobre implante;255;202.5;5
+4;61;METAL - Fundição direta;255;90.0;5
+4;62;METAL - Infra estrutura metálica sobre implante;255;202.5;5
+4;63;METAL - Núcleo metálico;255;90.0;5
+4;64;METAL - Núcleo metálico bipartido;255;133.5;5
+4;65;METAL - Núcleo metálico estojado;255;134.0;5
+4;66;METAL - Ponto de solda;255;90.0;5
+4;67;METAL - Ponto de solda a laser;255;200.0;5
+4;68;METAL - Ponto de solda em ouro (VALOR A COMBINAR);255;0.0;5
+4;69;METAL - Ponto de solda sobre implante;255;103.0;5
+4;70;METAL - Preparo de componente;255;60.5;5
+4;71;METAL FREE - Adesiva em fibra de vidro;255;411.5;5
+4;72;METAL FREE - Adesiva em Zirconia;255;1577.5;5
+4;73;METAL FREE - Coping de Inceram;255;306.5;5
+4;74;METAL FREE - Coping em fibra de vidro;255;150.5;5
+4;75;METAL FREE - Coping em Zirconia - Procera CAD/CAM;255;306.5;5
+4;76;METAL FREE - Coping E-MAX (CAD/CAM);255;306.5;5
+4;77;METAL FREE - Empress Esthetic II  (E-MAX) - Faceta estraticada;255;645.5;5
+4;78;METAL FREE - Empress Esthetic II  (E-MAX) - Inlay / Onlay;255;532.5;5
+4;79;METAL FREE - Empress Esthetic II  (E-MAX) - Faceta laminada - Lente de contato;255;600.0;5
+4;80;METAL FREE - Empress Esthetic II  (E-MAX) - Jaqueta pura;255;600.0;5
+4;81;METAL FREE - Faceta laminada (CAD/CAM);255;665.5;5
+4;82;METAL FREE - Inlay/Onlay (CAD/CAM);255;665.5;5
+4;83;METAL FREE - Jaqueta Pura (CAD/CAM);255;665.5;5
+4;84;METAL FREE - Munhão Personalizado com Base Co-Cr;255;387.0;5
+4;85;METAL FREE - Munhão Personalizado em Zircônia;255;387.0;5
+4;86;METAL FREE - Núcleo estético;255;170.5;5
+4;87;MODELOS, TROQUEL E OUTROS - Banho de ouro (VALOR A COMBINAR);255;0.0;5
+4;88;MODELOS, TROQUEL E OUTROS - Enceramento diagnóstico;255;49.5;5
+4;89;MODELOS, TROQUEL E OUTROS - Fresagem;255;98.0;5
+4;90;MODELOS, TROQUEL E OUTROS - Guia para implante;255;50.0;5
+4;91;MODELOS, TROQUEL E OUTROS - Modelo com gengiva artificial;255;41.5;5
+4;92;MODELOS, TROQUEL E OUTROS - Modelo de gesso especial;255;73.0;5
+4;93;MODELOS, TROQUEL E OUTROS - Modelo troquelado;255;97.0;5
+4;94;MODELOS, TROQUEL E OUTROS - Placa de clareamento;255;110.0;5
+4;95;MODELOS, TROQUEL E OUTROS - Posicionamento de oring;255;107.0;5
+4;96;MODELOS, TROQUEL E OUTROS - Troquel Giroform;255;37.5;5
+4;97;REPETIR TRABALHO;255;0.0;5
+4;98;RESINA FOTO - Aplicação de faceta fotopolimerizavel;255;177.0;5
+4;99;RESINA FOTO - Aplicação de resina Sinfony sobre implante;255;259.0;5
+4;100;RESINA FOTO - Faceta laminada em resina Ceromero;255;351.0;5
+4;101;RESINA FOTO - Inlay / Onlay em resina Ceromero;255;318.0;5
+4;102;RESINA FOTO - Jaqueta pura em resina Ceromero;255;351.0;5
+4;103;RESINA FOTO - Aplicação de resina Sinfony;255;242.0;5
+4;104;RESINAS ACRÍLICAS - Casquete para moldagem;255;39.5;5
+4;105;RESINAS ACRÍLICAS - Provisório;255;86.0;5
+4;106;RESINAS ACRÍLICAS - Provisório com base para reforço;255;149.5;5
+4;107;RESINAS ACRÍLICAS - Provisório para implante;255;115.5;5
+4;108;RETORNO PARA AJUSTES;255;0.0;5
+4;109;RESINA  FOTO - Aplicação de Resina Sinfony Incisivo Central Unitário (coroa, facetas,laminados);255;439.5;5
+4;110;CERÂMICA - Aplicação de Porcelana dentogengival (Metalo Cerâmica);255;537.5;5
+4;111;CERÂMICA - Aplicação de Porcelana dentogengival  (Zircônia);255;556.5;5
+4;112;ARMAÇÕES DE P.P.R. - Prótese Parcial Flexível (VALOR A COMBINAR);255;0.0;5
+4;113;CAD/CAM DIGITAL - Coping Metálico Sintron;255;231.0;5
+4;114;CAD/CAM DIGITAL - Provisório Fresado;255;161.0;5
+4;115;CAD/CAM DIGITAL - Placa de Bruxismo Impressa;255;248.0;5
+4;116;CAD/CAM DIGITAL - Guia para Gengivoplastia;255;186.5;5
+4;117;CAD/CAM DIGITAL  - Enceramento de Diagnótico Digital (Por Elemento);255;49.5;5
+4;118;CAD/CAM DIGITAL - Modelo Impresso Rígido;255;120.0;5
+4;119;CAD/CAM DIGITAL - Modelo Impresso Implante;255;120.0;5
+4;120;CAD/CAM DIGITAL - Modelo Impresso Troquelado (12,00 por troquel);255;13.5;5
+4;121;ACRLIZAÇÕES - Montagem de dentes;255;65.0;5
+4;122;RESINAS ACRÍLICAS - Reembasamento;255;150.0;5
+4;123;RESINAS ACRÍLICAS - Reembasamento de protocolo;255;175.5;5
+4;124;METAL - Barra de protocolo;255;1375.0;5
+4;125;CAD/CAM DIGITAL - Placa de bruxismo fresada;255;605.5;5
+4;126;CAD/CAM DIGITAL - Mockup shell;255;96.0;5
+4;127;METAL - Coroa Fresada para PPR;255;226.0;5
+4;128;METAL - Fresagem para PPR;255;98.0;5
+4;129;ACRILIZAÇÕES - Placa para Apnéia  Acrílica com fio ortodôntico;255;600.0;5
+4;130;ACRILIZAÇÕES - Placa para Apnéia Erkoflex (VALOR A COMBINAR);255;545.0;5
+4;131;ACRILIZAÇÕES - Placa para Apnéia Erkoflex / fio ortodôntico (VALOR A COMBINAR);255;0.0;5
+4;132;ACRILIZAÇÕES - Placa para Apnéia / Expanso Hyrax;255;726.0;5
+4;133;CAD/CAM DIGITAL - Coping metálico sintron  sobre implante;255;306.0;5
+4;134;CAD/CAM DIGITAL - Guia cirúrgico impresso;255;186.5;5
+4;135;METAL FREE - Vonlay E- Max - Vestibular+ Oculsal);255;580.5;5
+4;136;ACRILIZAÇÕES - Reembasamento de Protocolo;255;190.0;5
+51;1;ACRILIZAÇÕES - Prótese parcial acrílica com grampos provisóra;255;65.0;5
+51;2;Arco lingual de Nance;255;35.0;5
+51;3;Barra transpalatina;255;35.0;5
+51;4;Bihélice ou quadrihélice;255;40.0;5
+51;5;Bimler A (classe I e II);255;150.0;5
+51;6;Bimler C (classe III);255;180.0;5
+51;7;Bionator de Balters;255;65.0;5
+51;8;Bite Block;255;70.0;5
+51;9;Botão de Nance;255;40.0;5
+51;10;Bumper;255;45.0;5
+51;11;Confecção de bandas;255;6.0;5
+51;12;Disjuntor Hass;255;60.0;5
+51;13;Disjuntor Hyrax ( com torno já incluso);255;700.0;5
+51;14;Disjuntor Mc Namara;255;85.0;5
+51;15;Distalizador de molar Pendex ( c/ expansor );255;75.0;5
+51;16;Distalizador de molares  Pêndulo;255;70.0;5
+51;17;Equilibrador de Planas (Equiplan);255;75.0;5
+51;18;Frankel;255;280.0;5
+51;19;Grade fixa;255;40.0;5
+51;20;Hass tipo borboleta (expansor em leque);255;85.0;5
+51;21;Klammt;255;85.0;5
+51;22;Mantenedor banda-alça;255;20.0;5
+51;23;Placa bruxismo;255;65.0;5
+51;24;Placa clareamento;255;45.0;5
+51;25;Placa com expansor unilateral;255;65.0;5
+51;26;Placa com Platô anterior;255;40.0;5
+51;27;Placa contenção arco de begg  + 3x3 inferior higiênica;255;45.0;5
+51;28;Placa de acetato;255;45.0;5
+51;29;Placa de Schwars;255;45.0;5
+51;30;Placa expansor Bilateral;255;55.0;5
+51;31;Placa Hawley grade;255;50.0;5
+51;32;Placa mantenedora estética ou funcional;255;50.0;5
+51;33;Planas Composto;255;160.0;5
+51;34;Planas Simples;255;140.0;5
+51;35;Quadrihélice modificado;255;45.0;5
+51;36;SN I;255;140.0;5
+51;37;SN III;255;120.0;5
+51;38;Splint Maxilar de Thurow;255;75.0;5
+108;1;PROTOCOLO - Placa Base + Plano de Orientação;255;0.0;5
+108;2;PROTOCOLO - Montagem de Dentes;255;0.0;5
+108;3;PROTOCOLO - Guia Multifuncional;255;0.0;5
+108;4;PROTOCOLO - Barra;255;0.0;5
+108;5;PROTOCOLO - Acrilização;255;2200.0;5
+108;6;PROTESE TOTAL - Provisória;255;420.0;5
+108;7;PROTESE TOTAL - Nacional;255;600.0;5
+108;8;REEMBASAMENTO;255;180.0;5
+108;9;PROTESE PARCIAL - Provisória;255;320.0;5
+108;10;PROTESE PARCIAL REMOVÍVEL - 1 placa de dente;255;535.0;5
+108;11;PROTESE PARCIAL REMOVÍVEL - 2 placas de dentes;255;580.0;5
+108;12;ACRILIZAÇÃO - Ivobase;255;2500.0;5
+108;13;REACRILIZAÇÃO - Protocolo;255;850.0;5
+108;14;PROVISORIO;255;90.0;5
+108;15;PROVISORIO SOBRE IMPLANTE;255;110.0;5
+108;16;PLACA DE BRUXISMO;255;330.0;5
+108;17;CONSERTO;255;150.0;5
+108;18;PLACA CLAREAMENTO;255;170.0;5
+108;19;MODELO DIGITAL IMPRESSO;255;50.0;5
+108;20;PROTESE FIXA SOBRE IMPLANTES - Acrílico;255;0.0;5
+108;21;PROTOCOLO - Base de prova;255;0.0;5
+109;1;METAL - Estrutura metálica;255;120.0;7
+109;2;METAL - Estrutura metálica sobre implante;255;133.0;7
+109;3;METAL - Estrutura de PPR;255;240.0;7
+109;4;METAL - Adesiva;255;160.0;7
+109;5;METAL - Coroa total;255;173.0;7
+109;6;METAL - Núcleo Metálico;255;115.0;7
+109;7;METAL - Barra de protocolo até 5 implantes;255;690.0;7
+109;8;METALOCERÂMICA - Aplicação convencional;255;174.0;7
+109;9;METALOCERÂMICA - Aplicação sobre implante;255;174.0;7
+109;10;METALOCERÂMICA - Aplicação de ombro cerâmico;255;198.0;7
+109;11;METALOCERÂMICA - Aplicação de gengiva cerâmica;255;126.0;7
+109;12;METAL FREE - Facetas/Lentes maquiadas;255;500.0;7
+109;13;METAL FREE - Facetas estratificadas;255;575.0;7
+109;14;METAL FREE - Coroa maquiada;255;500.0;7
+109;15;METAL FREE - Onlay/Inlay;255;500.0;7
+109;16;METAL FREE - Coroa estratificada;255;575.0;7
+109;17;METAL FREE - Coping;255;325.0;7
+109;18;METAL FREE - Aplicação;255;250.0;7
+109;19;ACRILIZAÇÕES - Prótese total (gengiva rosa/palato incolor);255;345.0;7
+109;20;ACRILIZAÇÕES - Prótese total caracterizada (STG);255;425.0;7
+109;21;ACRILIZAÇÕES - Moldeira Individual;255;23.0;7
+109;22;ACRILIZAÇÕES - Montagem/Remontagem;255;69.0;7
+109;23;ACRILIZAÇÕES - Rolete de Cera;255;17.0;7
+109;24;ACRILIZAÇÕES - Overdenture;255;425.0;7
+109;25;ACRILIZAÇÕES - PPR provisória com grampos;255;207.0;7
+109;26;ACRILIZAÇÕES - Acrilização de Protocolo;255;840.0;7
+109;27;ACRILIZAÇÕES - PPR com estrutura metálica (montagem+acrilização);255;207.0;7
+109;28;ACRILIZAÇÕES - Reembasamento;255;138.0;7
+109;29;ACRILIZAÇÕES - Placa de bruxismo;255;195.0;7
+109;30;ACRILIZAÇÕES - Placa miorelaxante;255;138.0;7
+109;31;ACRILIZAÇÕES - Placa de clareamento;255;92.0;7
+109;32;ACRILIZAÇÕES - Guia cirurgico;255;195.0;7
+109;33;ACRILIZAÇÕES - Provisório;255;92.0;7
+109;34;ACRILIZAÇÕES - Provisório sobre implante;255;92.0;7
+109;35;CERÔMERO - Coroa Pura;255;126.0;7
+109;36;CERÔMERO - Inlay/onlay;255;126.0;7
+109;37;CERÔMERO - Facetas;255;138.0;7
+109;38;CERÔMERO - Sobre metal;255;126.0;7
+109;39;MODELOS, TROQUEL E OUTROS - Enceramento diagnóstico;255;20.0;7
+109;40;MODELOS, TROQUEL E OUTROS - Enceramento diagnóstico gengival;255;5.0;7
+109;41;MODELOS, TROQUEL E OUTROS - Mockup;255;20.0;7
+109;42;MODELOS, TROQUEL E OUTROS - Placa de clareamento;255;92.0;7
+109;43;MODELOS, TROQUEL E OUTROS - Gengiva provisória;255;15.0;7
+109;44;MODELOS, TROQUEL E OUTROS - Modelo de estudo;255;30.0;7
+109;45;METAL FREE - Adesiva estratificada;255;887.0;5
+109;46;METAL FREE - Adesiva maquiada;255;813.0;7
+109;47;METAL - Nucleo metálico bipartido;255;138.0;7
+109;48;ACRILIZAÇÕES - Conserto protese total;255;115.0;5
+109;49;ACRILIZAÇÕES - Conserto PPR provisória;255;60.0;5
+109;50;ACRILIZAÇÕES - Conserto PPR metalica;255;115.0;5
+109;51;REPETIR TRABALHO;255;0.0;7
