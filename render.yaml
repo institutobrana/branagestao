@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: brana-saas
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT}
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: BRANA_SKIP_BOOTSTRAP
+        value: "1"
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_TLS
+        sync: false
+      - key: OWNER_BYPASS_EMAILS
+        sync: false
+      - key: MERCADOPAGO_ACCESS_TOKEN
+        sync: false

@@ -607,7 +607,7 @@ BASE_DIR = Path(__file__).resolve().parent
 SAAS_DIR = BASE_DIR.parent
 PROJECT_DIR = SAAS_DIR.parent
 FRONTEND_DIR = SAAS_DIR / "frontend"
-DESKTOP_ASSETS_DIR = PROJECT_DIR / "assets"
+DESKTOP_ASSETS_DIR = SAAS_DIR / "assets"
 MODEL_STORAGE_DIR = SAAS_DIR / "storage" / "modelos"
 
 MODELO_TIPOS_DIR = (
