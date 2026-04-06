@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -1398,4 +1398,9 @@ def favicon():
 
 @app.get("/")
 def home():
+    return RedirectResponse(url="/app", status_code=307)
+
+
+@app.get("/health")
+def health():
     return {"status": "Brana SaaS conectado ao banco"}
