@@ -7241,18 +7241,54 @@ async function agendaLegadoCarregarCombos(){
   agendaLegadoRenderAuxSelect(agendaLegado.modalTipFone2,agendaLegadoTiposContatoCache,"(tipo)");
   agendaLegadoRenderAuxSelect(agendaLegado.modalTipFone3,agendaLegadoTiposContatoCache,"(tipo)");
 }
+let agendaLegadoPacientesCache=[];
+let agendaLegadoPacientesMap=new Map();
 async function agendaLegadoCarregarContatos(){
+  const agendaLegadoNomeKey=(nome)=>{
+    let t=String(nome||"").trim().toLowerCase();
+    if(!t)return"";
+    t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    t=t.replace(/\s+/g," ");
+    return t;
+  };
   const{res,data}=await requestJson("GET","/agenda-contatos?limit=5000",undefined,true);
+  const{res:resPac,data:pacData}=await requestJson("GET","/agenda-legado/pacientes?limit=5000",undefined,true);
   const contatos=res.ok&&Array.isArray(data)?data:[];
+  const pacientes=resPac.ok&&Array.isArray(pacData)?pacData:[];
   agendaLegadoContatosCache=contatos;
+  agendaLegadoPacientesCache=pacientes;
   agendaLegadoContatosMap=new Map();
+  agendaLegadoPacientesMap=new Map();
   const list=document.getElementById("agenda-legado-contatos");
   if(list){
-    list.innerHTML=contatos.map(c=>{const nome=String(c.nome||"").trim();if(nome)agendaLegadoContatosMap.set(nome.toLowerCase(),c);return nome?`<option value="${esc(nome)}"></option>`:""}).join("");
+    const datalist=[];
+    contatos.forEach(c=>{
+      const nome=String(c.nome||"").trim();
+      const key=agendaLegadoNomeKey(nome);
+      if(!nome||!key)return;
+      if(!agendaLegadoContatosMap.has(key))agendaLegadoContatosMap.set(key,c);
+      datalist.push(`<option value="${esc(nome)}"></option>`);
+    });
+    pacientes.forEach(p=>{
+      const nome=String(p.nome_completo||p.nome||"").trim();
+      const key=agendaLegadoNomeKey(nome);
+      if(!nome||!key)return;
+      if(!agendaLegadoPacientesMap.has(key))agendaLegadoPacientesMap.set(key,p);
+      datalist.push(`<option value="${esc(nome)}"></option>`);
+    });
+    list.innerHTML=[...new Set(datalist)].join("");
   }
 }
 function agendaLegadoAplicarContato(nome){
-  const item=agendaLegadoContatosMap.get(String(nome||"").trim().toLowerCase());
+  const nomeKey=((raw)=>{
+    let t=String(raw||"").trim().toLowerCase();
+    if(!t)return"";
+    t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    t=t.replace(/\s+/g," ");
+    return t;
+  })(nome);
+  if(!nomeKey)return;
+  const item=agendaLegadoContatosMap.get(nomeKey)||agendaLegadoPacientesMap.get(nomeKey)||null;
   if(!item)return;
   const normalizarTipoFone=(v)=>{
     let t=String(v||"").trim();
