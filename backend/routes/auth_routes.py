@@ -200,7 +200,12 @@ def login(
     if not usuario.ativo and not owner:
         raise HTTPException(status_code=403, detail="Usuario inativo")
 
-    if not verify_password(form_data.password, usuario.senha_hash):
+    try:
+        password_ok = verify_password(form_data.password, usuario.senha_hash)
+    except Exception:
+        password_ok = False
+
+    if not password_ok:
         raise HTTPException(status_code=400, detail="Senha incorreta")
 
     if owner and (not usuario.is_admin or not usuario.ativo):
