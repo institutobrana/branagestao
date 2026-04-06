@@ -1,0 +1,3832 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Brana Sistema de Precificação</title>
+    <link rel="icon" href="/desktop-assets/brana.png">
+    <style>
+      :root {
+        --bg: #eef3f8;
+        --card: #ffffff;
+        --line: #cfd8e3;
+        --line-soft: #e6edf5;
+        --text: #1f2937;
+        --muted: #5b6b7e;
+        --accent: #008080;
+        --accent-2: #0f766e;
+        --danger: #c62828;
+        --good: #dffce2;
+        --bad: #ffe6e6;
+        --shadow: 0 10px 24px rgba(20, 45, 70, 0.12);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: Tahoma, Segoe UI, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(900px 440px at -10% -20%, #d9eaf7 0%, transparent 70%),
+          radial-gradient(820px 420px at 110% -30%, #d8f2ea 0%, transparent 70%),
+          var(--bg);
+        min-height: 100vh;
+      }
+      img {
+        display: inline-block;
+        vertical-align: middle;
+      }
+      button {
+        cursor: pointer;
+      }
+      input, select, textarea {
+        font: 12px Tahoma, sans-serif;
+      }
+      .hidden {
+        display: none !important;
+      }
+      .status {
+        margin: 6px 0 12px;
+        font: 12px Tahoma, sans-serif;
+      }
+      .status.ok {
+        color: #0a7a00;
+      }
+      .status.err {
+        color: #b00020;
+      }
+      .login-wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: linear-gradient(180deg, #c9cdd3 0%, #2b3647 40%, #0d1220 100%);
+      }
+      .login-card {
+        width: min(520px, 92vw);
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+        padding: 22px;
+      }
+      .login-logo {
+        width: min(240px, 70%);
+        display: block;
+        margin: 6px auto 12px;
+      }
+      .login-title {
+        font: 700 18px Tahoma, sans-serif;
+        text-align: center;
+        color: #2f3946;
+        margin-bottom: 12px;
+      }
+      .login-sub {
+        display: none;
+      }
+      .login-panel {
+        display: grid;
+        gap: 10px;
+      }
+      .login-panel label {
+        font: 14px Tahoma, sans-serif;
+        color: #6b7280;
+      }
+      .login-panel input {
+        height: 44px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        padding: 0 12px;
+        width: 100%;
+        font-size: 15px;
+      }
+      .login-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 6px;
+        align-items: start;
+      }
+      .login-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 44px;
+        min-width: 140px;
+        border-radius: 10px;
+        background: #0f766e;
+        border: none;
+        color: #ffffff;
+        font: 700 15px Tahoma, sans-serif;
+        padding: 0 16px;
+      }
+      .login-btn:hover {
+        background: #0b5f58;
+      }
+      .login-google {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        height: 44px;
+        border-radius: 10px;
+        background: #e6f0fb;
+        border: none;
+        color: #1d4ed8;
+        font: 700 15px Tahoma, sans-serif;
+        width: 100%;
+      }
+      .login-links {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 6px;
+      }
+      .login-link {
+        background: none;
+        border: none;
+        color: #0f766e;
+        text-decoration: underline;
+        font: 600 14px Tahoma, sans-serif;
+        padding: 0;
+      }
+      .btn {
+        border: 1px solid #adbdd0;
+        border-radius: 8px;
+        padding: 6px 10px;
+        background: #f2f7fc;
+        font: 700 12px Tahoma, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 32px;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+      .btn.danger {
+        background: #fbe9e7;
+        border-color: #f2b8b5;
+        color: #7a1c1c;
+      }
+      .shell {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f8fafc;
+        overflow: hidden;
+      }
+      .toolbar-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 10px 14px;
+        background: #ffffff;
+        border-bottom: 1px solid var(--line);
+        position: sticky;
+        top: 36px;
+        z-index: 1900;
+      }
+      .toolbar-left {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .toolbar-right {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .toolbar-user {
+        text-align: right;
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+        line-height: 1.2;
+        min-width: 140px;
+      }
+      .toolbar-btn {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px;
+        margin: 2px;
+        width: 56px;
+        height: 56px;
+        display: grid;
+        place-items: center;
+        box-sizing: border-box;
+      }
+      .toolbar-btn img {
+        width: 48px;
+        height: 48px;
+      }
+      .toolbar-btn svg {
+        width: 32px;
+        height: 32px;
+        display: block;
+      }
+      .toolbar-btn:hover {
+        background: #f0fdfa;
+        border: 2px solid #2dd4bf;
+        color: #0f766e;
+      }
+      .toolbar-btn.exit {
+        background: rgb(24, 173, 159);
+        color: #ffffff;
+        border-radius: 10px;
+        min-width: 150px;
+        min-height: 45px;
+        width: auto;
+        height: auto;
+        padding: 8px 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font: 700 12px Tahoma, sans-serif;
+      }
+      .toolbar-btn.exit:hover {
+        background: #fda4af;
+        border: 2px solid #e11d48;
+        color: #ffffff;
+      }
+      .menu-bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 6px 12px;
+        background: linear-gradient(180deg, #f5f7fa 0%, #edf1f5 100%);
+        border-bottom: 1px solid #cfd6de;
+        box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+        position: sticky;
+        top: 0;
+        z-index: 2000;
+        min-height: 36px;
+      }
+      .menu-dd {
+        position: relative;
+      }
+      .menu-btn {
+        border: 1px solid transparent;
+        background: transparent;
+        padding: 5px 10px 6px;
+        border-radius: 6px;
+        font: 600 13px "Segoe UI", Tahoma, sans-serif;
+        color: #1f2937;
+        letter-spacing: 0;
+        cursor: pointer;
+        transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+      }
+      .menu-pop {
+        position: absolute;
+        top: calc(100% + 2px);
+        left: 0;
+        background: #ffffff;
+        border: 1px solid #cfd6de;
+        border-radius: 8px;
+        min-width: 230px;
+        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.18);
+        padding: 4px;
+        display: none;
+        z-index: 50;
+      }
+      .menu-pop.right {
+        left: auto;
+        right: 0;
+      }
+      .menu-dd.open > .menu-pop {
+        display: grid;
+        gap: 1px;
+      }
+      .menu-dd.submenu > .menu-pop.right {
+        top: -5px;
+        left: calc(100% + 4px);
+        right: auto;
+      }
+      .menu-dd.submenu:hover > .menu-pop.right {
+        display: grid;
+        gap: 1px;
+      }
+      .menu-action {
+        border: 1px solid transparent;
+        background: transparent;
+        text-align: left;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font: 12px/1.2 "Segoe UI", Tahoma, sans-serif;
+        width: 100%;
+        white-space: nowrap;
+        cursor: pointer;
+        color: #1f2937;
+        min-height: 24px;
+      }
+      .menu-action.disabled {
+        color: #9aa3af;
+        cursor: default;
+        background: transparent;
+        border-color: transparent;
+        opacity: 0.55;
+        pointer-events: none;
+      }
+      .menu-action.disabled .menu-shortcut {
+        color: #9aa3af;
+      }
+      .menu-action.with-shortcut {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .menu-shortcut {
+        color: #6b7280;
+        font: 11px/1.1 "Segoe UI", Tahoma, sans-serif;
+      }
+      .menu-sep {
+        height: 1px;
+        margin: 4px 4px;
+        background: #e2e8f0;
+      }
+      .menu-submenu-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .menu-submenu-btn::after {
+        content: ">";
+        color: #6b7280;
+        font: 700 12px "Segoe UI", Tahoma, sans-serif;
+      }
+      .menu-btn:hover,
+      .menu-dd.open > .menu-btn {
+        background: #e8f0fb;
+        border-color: #c8d5e6;
+        color: #1f2937;
+      }
+      .menu-action:hover {
+        background: #e8f0fb;
+        border-color: #c8d5e6;
+        color: #0f172a;
+      }
+      .menu-action:hover .menu-shortcut,
+      .menu-dd.submenu:hover > .menu-submenu-btn .menu-shortcut {
+        color: #334155;
+      }
+      .menu-dd.submenu:hover > .menu-submenu-btn,
+      .menu-dd.submenu.open > .menu-submenu-btn {
+        background: #e8f0fb;
+        border-color: #c8d5e6;
+        color: #0f172a;
+      }
+      .menu-dd.submenu:hover > .menu-submenu-btn::after,
+      .menu-dd.submenu.open > .menu-submenu-btn::after {
+        color: #334155;
+      }
+      .workspace {
+        flex: 1;
+        padding: 14px 16px 16px;
+        display: block;
+        overflow: auto;
+        background: linear-gradient(180deg, #f4f7fb 0%, #eef3f8 100%);
+      }
+      .panel {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        padding: 12px;
+        width: min(980px, 100%);
+        margin: 0 auto;
+      }
+      #workspace-empty {
+        width: 100%;
+        max-width: none;
+        min-height: calc(100vh - 126px);
+        border-radius: 0;
+        border: 1px solid #d4dde7;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,.92), rgba(246,249,252,.96)),
+          repeating-linear-gradient(0deg, transparent 0, transparent 27px, rgba(15,23,42,.035) 28px),
+          repeating-linear-gradient(90deg, transparent 0, transparent 27px, rgba(15,23,42,.035) 28px);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.8);
+        padding: 0;
+      }
+      #workspace-empty .panel-title,
+      #workspace-empty p {
+        display: none;
+      }
+      .workspace > section[id$="-panel"] {
+        position: relative;
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .panel-standardized {
+        --panel-pad-x: 12px;
+        --panel-pad-top: 12px;
+      }
+      .panel-standard-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: calc(-1 * var(--panel-pad-top)) calc(-1 * var(--panel-pad-x)) 8px;
+        padding: 6px 10px 7px;
+        background: #008080;
+        color: #fff;
+        border-radius: 12px 12px 0 0;
+      }
+      #ficha-menu-backdrop .ficha-menu-modal,
+      #cc-modal-backdrop .cc-modal,
+      #cad-modal-backdrop .cad-modal {
+        border-radius: 12px;
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .panel-title {
+        font: 700 14px Tahoma, sans-serif;
+        margin-bottom: 8px;
+      }
+      .panel-standard-header .panel-title,
+      .panel-standard-header .panel-standard-title,
+      .panel-standard-header .pgen-title,
+      .panel-standard-header .aux-window-title {
+        margin: 0;
+        padding: 0;
+        font: 700 13px Tahoma, sans-serif;
+        line-height: 1.1;
+        color: #fff;
+        background: transparent;
+        flex: 1 1 auto;
+      }
+      #aux-panel .panel-standard-header .aux-window-title {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        color: inherit;
+        font: 700 13px Tahoma, sans-serif;
+      }
+      .panel-close-x {
+        width: 28px;
+        height: 28px;
+        border: 1px solid #b9c7d7;
+        border-radius: 50%;
+        background: #eef4fa;
+        color: #46627f;
+        font: 700 14px/1 Tahoma, sans-serif;
+        line-height: 1;
+        display: inline-grid;
+        place-items: center;
+        cursor: pointer;
+        margin-left: auto;
+        box-sizing: border-box;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .panel-close-x:hover {
+        background: #fef2f2;
+        border-color: #f3a8a8;
+        color: #b42318;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.18);
+      }
+      #ficha-btn-x,
+      #ficha-menu-close {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid #b9c7d7;
+        border-radius: 50%;
+        background: #eef4fa;
+        color: #46627f;
+        display: inline-grid;
+        place-items: center;
+        box-sizing: border-box;
+        line-height: 1;
+        font: 700 14px/1 Tahoma, sans-serif;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      #ficha-btn-x {
+        flex: 0 0 28px;
+      }
+      #ficha-btn-x:hover,
+      #ficha-menu-close:hover {
+        background: #fef2f2;
+        border-color: #f3a8a8;
+        color: #b42318;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.18);
+      }
+      .panel-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      #users-panel .panel-toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+      }
+      .materiais-btn {
+        border: 1px solid #adbdd0;
+        border-radius: 8px;
+        padding: 0 8px;
+        background: #f2f7fc;
+        font: 700 11px Tahoma, sans-serif;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        height: 30px;
+        min-height: 30px;
+        box-sizing: border-box;
+        white-space: nowrap;
+      }
+      .materiais-btn img {
+        width: 18px;
+        height: 18px;
+        flex: 0 0 18px;
+      }
+      .panel-toolbar .materiais-btn,
+      .modal-actions .materiais-btn,
+      .cad-modal-actions .materiais-btn,
+      .filter-row .materiais-btn,
+      .plano-toolbar .materiais-btn,
+      .proc-tabela-actions .materiais-btn {
+        min-width: 88px;
+        padding: 0 10px;
+        justify-content: center;
+      }
+      .filter-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(140px, 1fr));
+        gap: 8px;
+        margin-bottom: 10px;
+        align-items: end;
+      }
+      .filter-row label {
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .filter-row input,
+      .filter-row select {
+        height: 26px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0 8px;
+        width: 100%;
+      }
+      .table-wrap {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: auto;
+        background: #ffffff;
+      }
+      table.tbl {
+        width: 100%;
+        border-collapse: collapse;
+        font: 12px Tahoma, sans-serif;
+      }
+      table.tbl th,
+      table.tbl td {
+        border-bottom: 1px solid var(--line-soft);
+        padding: 6px 8px;
+        text-align: left;
+      }
+      table.tbl thead th {
+        background: #f2f6fb;
+        font: 700 12px Tahoma, sans-serif;
+      }
+      table.tbl tr.selected {
+        background: #d9e8fb;
+      }
+      .panel-total {
+        margin-top: 8px;
+        font: 12px Tahoma, sans-serif;
+        color: var(--muted);
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.24);
+        display: grid;
+        place-items: center;
+        z-index: 1000;
+      }
+      #users-panel-backdrop.modal-backdrop {
+        background: rgba(0, 0, 0, 0);
+        z-index: 1100;
+      }
+      #users-modal-backdrop.modal-backdrop,
+      #users-pass-backdrop.modal-backdrop,
+      #users-perm-backdrop.modal-backdrop,
+      #protected-pass-backdrop.modal-backdrop {
+        z-index: 1600;
+      }
+      .panel-floating {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(980px, 96vw);
+        max-height: 88vh;
+        overflow: auto;
+        z-index: 1101;
+        background: #ffffff;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+      }
+      .modal {
+        width: min(680px, 96vw);
+        background: #ffffff;
+        border: 1px solid #bfc9d6;
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .modal-standardized {
+        --modal-pad-x: 12px;
+        --modal-pad-top: 12px;
+      }
+      .modal-header {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        gap: 10px;
+      }
+      .modal-standardized > .modal-header,
+      .modal-standardized > .modal-standard-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: calc(-1 * var(--modal-pad-top)) calc(-1 * var(--modal-pad-x)) 10px;
+        padding: 6px 10px 7px;
+        background: #008080;
+        color: #fff;
+        border-radius: 12px 12px 0 0;
+      }
+      .modal-standardized > .modal-header {
+        justify-content: flex-start;
+      }
+      .modal-standardized > .modal-standard-header {
+        justify-content: space-between;
+      }
+      .modal-title {
+        font: 700 14px Tahoma, sans-serif;
+      }
+      .modal-standardized .modal-title,
+      .modal-standardized .cc-modal-title,
+      .modal-standardized .cad-modal-title,
+      .modal-standardized .modal-standard-title {
+        margin: 0;
+        font: 700 13px Tahoma, sans-serif;
+        line-height: 1.1;
+        color: #fff;
+      }
+      .modal-close-x {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border: 1px solid #b9c7d7;
+        border-radius: 50%;
+        background: #eef4fa;
+        color: #46627f;
+        display: inline-grid;
+        place-items: center;
+        box-sizing: border-box;
+        line-height: 1;
+        font: 700 14px/1 Tahoma, sans-serif;
+        cursor: pointer;
+        margin-left: auto;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .modal-close-x:hover {
+        background: #fef2f2;
+        border-color: #f3a8a8;
+        color: #b42318;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.18);
+      }
+      .modal-tabs {
+        display: flex;
+        gap: 6px;
+      }
+      .modal-tab-btn {
+        border: 1px solid #bfc9d6;
+        background: #f1f5f9;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      .modal-tab-btn.active {
+        background: #ffffff;
+        border-color: #94a3b8;
+      }
+      #users-perm-backdrop .modal-tabs {
+        gap: 2px;
+        padding-bottom: 2px;
+        border-bottom: 1px solid #9fb0c0;
+      }
+      #users-perm-backdrop .modal-tab-btn {
+        border-radius: 0;
+        padding: 3px 10px;
+        background: #e9edf2;
+        border-color: #9fb0c0;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      #users-perm-backdrop .modal-tab-btn.active {
+        background: #ffffff;
+        border-bottom-color: #ffffff;
+      }
+      #users-perm-backdrop .modal {
+        max-width: 740px !important;
+        width: min(720px, 96vw);
+        background: #f2f2f2;
+        border: 1px solid #9aa7b4;
+        border-radius: 2px;
+        padding: 8px 10px 10px;
+      }
+      #users-perm-backdrop .modal-title {
+        font: 700 12px Tahoma, sans-serif;
+        color: #111827;
+      }
+      #users-perm-backdrop .modal-actions {
+        display: none;
+      }
+      .users-perm-top {
+        display: none;
+      }
+      .users-perm-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 6px 0 4px;
+      }
+      .users-perm-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin: 0;
+        font: 11px Tahoma, sans-serif;
+      }
+      .users-perm-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 6px;
+        border: 1px solid #9aa7b4;
+        border-radius: 2px;
+        background: #f8fafc;
+        font: 11px Tahoma, sans-serif;
+        cursor: pointer;
+      }
+      .users-perm-action:hover {
+        background: #eef2f6;
+      }
+      .users-perm-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .users-perm-fechar {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 6px;
+        border: 1px solid #9aa7b4;
+        border-radius: 2px;
+        background: #f8fafc;
+        font: 11px Tahoma, sans-serif;
+        cursor: pointer;
+      }
+      .users-perm-fechar img {
+        width: 14px;
+        height: 14px;
+      }
+      .users-perm-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.45);
+        display: inline-block;
+        box-sizing: border-box;
+      }
+      .users-perm-key {
+        width: 12px;
+        height: 12px;
+        display: inline-block;
+        vertical-align: middle;
+      }
+      .users-perm-dot.habilitado { background: #22c55e; }
+      .users-perm-dot.desabilitado { background: #e11d48; }
+      .users-perm-dot.protegido { background: #f5b400; }
+      .users-perm-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+      .users-perm-section-title {
+        font: 700 11px Tahoma, sans-serif;
+        color: #334155;
+        margin-bottom: 2px;
+      }
+      .users-perm-table-wrap {
+        border: 1px solid #9aa7b4;
+        border-radius: 2px;
+        overflow: auto;
+        background: #ffffff;
+      }
+      .users-perm-table-wrap.modules {
+        max-height: 180px;
+      }
+      .users-perm-table-wrap.functions {
+        height: 150px;
+        max-height: 150px;
+      }
+      .users-perm-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin-top: 4px;
+        font: 11px Tahoma, sans-serif;
+      }
+      #users-perm-function-actions {
+        margin: 6px 0 6px;
+      }
+      .users-perm-actions label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        user-select: none;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 4px 8px;
+        background: #ffffff;
+      }
+      .users-perm-actions label:hover {
+        background: #f2f7fc;
+      }
+      .users-perm-actions input {
+        display: none;
+      }
+      #users-perm-backdrop table.tbl thead {
+        display: none;
+      }
+      #users-perm-backdrop table.tbl {
+        font: 11px Tahoma, sans-serif;
+      }
+      #users-perm-backdrop table.tbl td {
+        padding: 3px 6px;
+      }
+      #users-perm-tbody tr[data-module],
+      #users-perm-func-tbody tr[data-func] {
+        cursor: pointer;
+      }
+      #users-perm-backdrop table.tbl tr.selected,
+      #users-perm-tbody tr[data-module].selected {
+        background: #0b5ed7;
+      }
+      #users-perm-backdrop table.tbl tr.selected td {
+        color: #ffffff;
+      }
+      .users-perf-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+        margin-top: 8px;
+      }
+      .users-perm-table-wrap.perfis {
+        max-height: 220px;
+      }
+      .users-perm-table-wrap.prestadores {
+        max-height: 220px;
+      }
+      .users-perf-checklist {
+        padding: 6px;
+        display: grid;
+        gap: 4px;
+        font: 11px Tahoma, sans-serif;
+      }
+      .users-perf-checklist label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      .users-perf-checklist label.inativo {
+        color: #7c8794;
+      }
+      #users-perm-tbody td.perm-icon,
+      #users-perm-func-tbody td.perm-icon,
+      #users-perm-profile-preview-tbody td.perm-icon {
+        width: 26px;
+        text-align: center;
+      }
+      #users-perm-tbody td.perm-label,
+      #users-perm-func-tbody td.perm-label,
+      #users-perm-profile-preview-tbody td.perm-label {
+        padding-right: 6px;
+      }
+      .users-perm-profile-bar {
+        display: flex;
+        gap: 8px;
+        align-items: end;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+      .users-perm-profile-bar > div {
+        min-width: 260px;
+        flex: 1 1 320px;
+      }
+      .users-perm-profile-note {
+        margin-top: 8px;
+        color: #64748b;
+        font: 11px Tahoma, sans-serif;
+      }
+      #users-perm-profile-preview-tbody td.perm-icon {
+        width: 26px;
+        text-align: center;
+      }
+      .modal-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 10px;
+        margin-top: 10px;
+      }
+      .modal-grid label {
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .modal-grid input,
+      .modal-grid select,
+      .modal-grid textarea {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 4px 6px;
+        width: 100%;
+      }
+      .modal-grid textarea {
+        min-height: 64px;
+      }
+      .modal-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .pgen-mat-edit-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.18);
+        display: grid;
+        place-items: center;
+        z-index: 5100;
+      }
+      .pgen-mat-edit-modal {
+        width: 365px;
+        background: #f7fafc;
+        border: 1px solid #b9c7d7;
+        border-radius: 14px;
+        box-sizing: border-box;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+        overflow: hidden;
+      }
+      .pgen-mat-edit-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 7px 10px 8px;
+        background: #008080;
+        color: #fff;
+      }
+      .pgen-mat-edit-title {
+        font: 700 13px Tahoma, sans-serif;
+      }
+      .pgen-mat-edit-close {
+        width: 24px;
+        height: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        border-radius: 4px;
+        background: #e9f9fb;
+        color: #024f54;
+        font: 700 14px/1 Tahoma, sans-serif;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .pgen-mat-edit-close:hover {
+        background: #c62828;
+        border-color: #f1b2b2;
+        color: #fff;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.28);
+      }
+      .pgen-mat-edit-body {
+        padding: 10px;
+        background: #fff;
+      }
+      .pgen-mat-edit-grid {
+        display: grid;
+        gap: 8px;
+      }
+      .pgen-mat-edit-grid label {
+        font: 12px Tahoma, sans-serif;
+        display: block;
+        margin-bottom: 2px;
+      }
+      .pgen-mat-edit-grid input,
+      .pgen-mat-edit-grid select {
+        width: 100%;
+        height: 24px;
+        border: 1px solid #bfc9d6;
+        padding: 0 6px;
+        box-sizing: border-box;
+        font: 12px Tahoma, sans-serif;
+      }
+      .pgen-mat-edit-search {
+        display: block;
+      }
+      .pgen-mat-edit-metric {
+        display: grid;
+        grid-template-columns: 1fr 84px;
+        gap: 8px;
+        align-items: center;
+      }
+      .pgen-mat-edit-metric label {
+        margin-bottom: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .pgen-mat-edit-metric input {
+        background: #22e8f0;
+        text-align: right;
+      }
+      .pgen-mat-edit-metric input[readonly] {
+        color: #000;
+      }
+      .pgen-mat-edit-metric input.metric-qtd {
+        background: #fff;
+      }
+      .pgen-mat-edit-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        padding: 0 10px 10px;
+        background: #fff;
+      }
+      .pgen-mat-edit-actions .materiais-btn {
+        min-width: 88px;
+        justify-content: center;
+      }
+      #materiais-panel.panel {
+        width: min(676px, 100%);
+        min-height: 0;
+        height: fit-content;
+        align-self: start;
+        padding: 10px 10px 6px;
+      }
+      #materiais-panel .panel-title {
+        min-height: 0;
+        display: block;
+        margin-bottom: 0;
+        padding-right: 0;
+      }
+      #materiais-panel .panel-close-x {
+        margin-left: auto;
+      }
+      .materiais-top-group {
+        border: 1px solid #c7d2df;
+        border-radius: 4px;
+        padding: 4px 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 41px;
+      }
+      .materiais-inline-label {
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+        white-space: nowrap;
+      }
+      .materiais-lista-select {
+        width: 171px;
+        height: 22px;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 0 4px;
+        background: #fff;
+      }
+      .materiais-top-actions,
+      .materiais-action-row {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .materiais-action-row {
+        margin: 8px 0 4px;
+      }
+      #materiais-btn-nova-tabela,
+      #materiais-btn-altera-tabela,
+      #materiais-btn-excluir-tabela {
+        width: 101px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      #materiais-btn-fechar {
+        width: 75px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      #materiais-btn-novo,
+      #materiais-btn-editar,
+      #materiais-btn-excluir {
+        width: 110px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      .materiais-divider {
+        border-top: 1px solid #d3dbe5;
+        margin: 8px 0 6px;
+      }
+      .materiais-filters {
+        display: grid;
+        grid-template-columns: 191px 1fr;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 2px;
+      }
+      #procedimentos-panel.panel {
+        width: min(780px, 100%);
+        min-height: 0;
+        height: fit-content;
+        align-self: start;
+        padding: 10px 10px 8px;
+      }
+      #procedimentos-panel .panel-title {
+        min-height: 0;
+        display: block;
+        margin-bottom: 0;
+        padding-right: 0;
+      }
+      #procedimentos-panel .panel-close-x {
+        margin-left: auto;
+      }
+      .proc-top-group {
+        border: 1px solid #c7d2df;
+        border-radius: 4px;
+        padding: 4px 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 41px;
+      }
+      .proc-inline-label {
+        font: 11px Tahoma, sans-serif;
+        color: #617588;
+      }
+      .proc-lista-select {
+        width: 180px;
+        height: 22px;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 0 4px;
+        background: #fff;
+      }
+      .proc-top-actions,
+      .proc-action-row {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .proc-top-actions {
+        margin-left: auto;
+      }
+      .proc-action-row {
+        margin: 8px 0 4px;
+      }
+      .proc-vdivider {
+        width: 1px;
+        height: 22px;
+        background: #d3dbe5;
+        flex: 0 0 auto;
+      }
+      .proc-divider {
+        border-top: 1px solid #d3dbe5;
+        margin: 8px 0 6px;
+      }
+      .proc-filters {
+        display: grid;
+        grid-template-columns: 191px 1fr;
+        gap: 12px;
+        align-items: end;
+        margin-bottom: 8px;
+      }
+      .proc-field label,
+      .proc-search label {
+        font: 11px Tahoma, sans-serif;
+        color: #233549;
+        margin-bottom: 2px;
+        display: block;
+      }
+      .proc-field select,
+      .proc-search input {
+        width: 100%;
+        height: 22px;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 0 6px;
+        font: 11px Tahoma, sans-serif;
+        color: #233549;
+        background: #fff;
+        box-sizing: border-box;
+      }
+      .proc-table-wrap {
+        width: 100%;
+        max-width: 100%;
+        height: 331px;
+        border: 1px solid #c7d2df;
+        border-radius: 4px;
+        overflow: auto;
+        background: #fff;
+      }
+      .proc-table-wrap table.tbl th {
+        white-space: nowrap;
+      }
+      #proc-btn-nova-tabela,
+      #proc-btn-altera-tabela,
+      #proc-btn-excluir-tabela,
+      #proc-btn-imprimir,
+      #proc-btn-fechar {
+        height: 30px;
+        min-height: 30px;
+        font-size: 11px;
+        border-radius: 8px;
+        line-height: normal;
+        white-space: nowrap;
+      }
+      #proc-btn-nova-tabela,
+      #proc-btn-altera-tabela,
+      #proc-btn-excluir-tabela {
+        width: 101px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      #proc-btn-imprimir {
+        width: 82px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      #proc-btn-fechar {
+        width: 75px;
+        justify-content: center;
+        padding: 0 6px;
+      }
+      .proc-top-actions .proc-vdivider {
+        height: 30px;
+      }
+      #proc-btn-novo,
+      #proc-btn-editar,
+      #proc-btn-excluir,
+      #proc-btn-reajuste {
+        height: 30px;
+        min-height: 30px;
+        font-size: 11px;
+        border-radius: 8px;
+        line-height: normal;
+        white-space: nowrap;
+        min-width: 88px;
+        justify-content: center;
+        padding: 0 10px;
+      }
+      .proc-action-row .proc-vdivider {
+        height: 30px;
+      }
+      .materiais-field label,
+      .materiais-search label {
+        display: block;
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+        margin-bottom: 2px;
+      }
+      .materiais-field select,
+      .materiais-search input {
+        width: 100%;
+        height: 22px;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 0 6px;
+        background: #fff;
+      }
+      .materiais-head {
+        display: grid;
+        grid-template-columns: 60px 300px 90px 90px 90px;
+        gap: 0;
+        width: 100%;
+        max-width: 651px;
+        padding: 0 8px 0 10px;
+        margin: 0 auto 1px;
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+      }
+      .materiais-head span {
+        display: flex;
+        align-items: center;
+        min-height: 20px;
+      }
+      .materiais-head span:nth-child(n + 3) {
+        justify-content: center;
+        text-align: center;
+      }
+      .materiais-table-wrap {
+        width: 100%;
+        max-width: 651px;
+        height: 331px;
+        border: 1px solid #c7d2df;
+        border-radius: 4px;
+        overflow: auto;
+        background: #fff;
+        margin: 0 auto;
+      }
+      .materiais-table {
+        width: 630px;
+        min-width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        font: 12px Tahoma, sans-serif;
+      }
+      .materiais-table col:nth-child(1) {
+        width: 60px;
+      }
+      .materiais-table col:nth-child(2) {
+        width: 300px;
+      }
+      .materiais-table col:nth-child(3),
+      .materiais-table col:nth-child(4),
+      .materiais-table col:nth-child(5) {
+        width: 90px;
+      }
+      .materiais-table td {
+        height: 18px;
+        border-bottom: 1px solid #edf1f6;
+        padding: 0 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .materiais-table td:nth-child(n + 3) {
+        text-align: center;
+      }
+      .materiais-table tr.selected {
+        background: #d9e8fb;
+      }
+      .materiais-total {
+        margin-top: 8px;
+        margin-left: 70px;
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+      }
+      #materiais-modal-backdrop .modal {
+        width: min(374px, 96vw);
+        border-radius: 6px;
+        padding: 10px;
+      }
+      #materiais-modal-backdrop .modal-header {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        justify-content: start;
+        gap: 8px;
+      }
+      #materiais-modal-backdrop .modal-tabs {
+        gap: 4px;
+      }
+      #materiais-modal-backdrop .modal-standardized > .modal-header .modal-tabs {
+        grid-column: 1 / -1;
+      }
+      #materiais-modal-backdrop .modal-standardized > .modal-header .modal-close-x {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+      }
+      .materiais-modal-stack {
+        margin-top: 8px;
+      }
+      .materiais-modal-top {
+        display: grid;
+        grid-template-columns: 191px 131px;
+        gap: 10px;
+        margin-bottom: 8px;
+      }
+      .materiais-modal-name {
+        margin-bottom: 6px;
+      }
+      .materiais-modal-line {
+        border-top: 1px solid #d3dbe5;
+        margin: 6px 0 8px;
+      }
+      .materiais-modal-form-row {
+        display: grid;
+        grid-template-columns: 1fr 121px;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      .materiais-modal-form-row.compact {
+        grid-template-columns: 1fr 42px auto;
+      }
+      .materiais-modal-form-row label,
+      .materiais-modal-top label,
+      .materiais-modal-name label,
+      .materiais-modal-detail label {
+        display: block;
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+        margin-bottom: 2px;
+      }
+      .materiais-modal-form-row > label {
+        margin-bottom: 0;
+      }
+      .materiais-modal-top input,
+      .materiais-modal-top select,
+      .materiais-modal-name input,
+      .materiais-modal-form-row input,
+      .materiais-modal-form-row select,
+      .materiais-modal-detail input,
+      .materiais-modal-detail select,
+      .materiais-modal-detail textarea {
+        width: 100%;
+        border: 1px solid #bfc9d6;
+        border-radius: 4px;
+        padding: 0 6px;
+        background: #fff;
+      }
+      .materiais-modal-top input,
+      .materiais-modal-top select,
+      .materiais-modal-name input,
+      .materiais-modal-form-row input,
+      .materiais-modal-form-row select,
+      .materiais-modal-detail select {
+        height: 22px;
+      }
+      .materiais-modal-form-row input[readonly] {
+        background: #f7fafc;
+      }
+      .materiais-modal-day-label {
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+      }
+      .materiais-modal-preferido {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+        margin-top: 2px;
+      }
+      .materiais-modal-preferido input {
+        width: auto;
+        height: auto;
+        margin: 0;
+      }
+      .materiais-modal-detail {
+        margin-top: 8px;
+      }
+      .materiais-modal-detail + .materiais-modal-detail {
+        margin-top: 4px;
+      }
+      .materiais-modal-detail textarea {
+        min-height: 201px;
+        padding: 6px;
+        resize: none;
+      }
+      #materiais-modal-backdrop .modal-actions {
+        margin-top: 10px;
+      }
+      #materiais-tabela-modal-backdrop .modal {
+        width: min(338px, 96vw);
+        border-radius: 6px;
+        padding: 10px 12px 12px;
+      }
+      .materiais-tabela-modal-body {
+        margin-top: 8px;
+      }
+      .materiais-tabela-modal-frame {
+        border: 1px solid #c1ccd9;
+        border-radius: 3px;
+        background: #f7fafc;
+        padding: 10px;
+      }
+      .materiais-tabela-modal-grid {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        gap: 8px 10px;
+        align-items: center;
+      }
+      .materiais-tabela-modal-grid label {
+        font: 12px Tahoma, sans-serif;
+        color: #233549;
+      }
+      .materiais-tabela-modal-grid input,
+      .materiais-tabela-modal-grid select {
+        width: 100%;
+        height: 22px;
+        border: 1px solid #bfc9d6;
+        border-radius: 3px;
+        padding: 0 6px;
+        background: #fff;
+      }
+      #materiais-tabela-modal-backdrop .modal-actions {
+        margin-top: 10px;
+      }
+      #materiais-tabela-modal-close {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        border-radius: 50%;
+        justify-content: center;
+        font-size: 14px;
+        line-height: 1;
+      }
+      #materiais-tabela-modal-close:hover {
+        background: #fef2f2;
+        border-color: #f3a8a8;
+        color: #b42318;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.18);
+      }
+      #proc-tabela-modal-backdrop .modal {
+        width: min(306px, 96vw);
+        border-radius: 10px;
+        padding: 0 11px 12px;
+        overflow: hidden;
+        border: 1px solid #c7d9cd;
+        box-shadow: 0 14px 32px rgba(20, 45, 70, 0.16);
+      }
+      .proc-tabela-titlebar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin: 0 -11px 8px;
+        padding: 10px 11px 9px;
+        background: linear-gradient(90deg, #eaf9f1 0%, #f3fbf7 56%, #f3f8fc 100%);
+        border-bottom: 1px solid #d7e7dd;
+      }
+      .proc-tabela-titlebar .modal-title {
+        font: 700 14px Tahoma, sans-serif;
+        color: #14724a;
+      }
+      .proc-tabela-x {
+        width: 28px;
+        height: 28px;
+        border: 1px solid #b9c7d7;
+        border-radius: 50%;
+        background: #ffffff;
+        color: #5b6f84;
+        font: 700 14px Tahoma, sans-serif;
+        line-height: 1;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      .proc-tabela-x:hover {
+        background: #fef2f2;
+        border-color: #f3a8a8;
+        color: #b42318;
+        box-shadow: 0 0 10px rgba(220, 38, 38, 0.18);
+      }
+      .proc-tabela-frame {
+        margin-top: 8px;
+        border: 1px solid #bcbcbc;
+        padding: 9px 8px 10px;
+        background: #ffffff;
+      }
+      .proc-tabela-fields {
+        width: 245px;
+        max-width: 100%;
+        margin: 0 auto;
+      }
+      .proc-tabela-row {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 12px;
+      }
+      .proc-tabela-inline-grid {
+        display: grid;
+        grid-template-columns: 98px 126px;
+        gap: 9px;
+        margin-bottom: 12px;
+      }
+      .proc-tabela-col,
+      .proc-tabela-cred-row {
+        display: grid;
+        gap: 4px;
+      }
+      .proc-tabela-cred-row {
+        margin-bottom: 12px;
+      }
+      .proc-tabela-frame label {
+        font: 400 12px Tahoma, sans-serif;
+        color: #2a2a2a;
+      }
+      .proc-tabela-frame input[type="text"],
+      .proc-tabela-frame select {
+        width: 100%;
+        height: 23px;
+        border: 1px solid #bdbdbd;
+        border-radius: 0;
+        background: #ffffff;
+        padding: 0 6px;
+        font: 400 12px Tahoma, sans-serif;
+        color: #1f1f1f;
+      }
+      .proc-tabela-frame input[disabled],
+      .proc-tabela-frame select:disabled {
+        background: #ececec;
+        color: #6b7280;
+      }
+      .proc-tabela-divider {
+        border-top: 1px solid #d0d0d0;
+        margin: 9px 0 10px;
+      }
+      .proc-tabela-check-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 400 12px Tahoma, sans-serif;
+        color: #2a2a2a;
+      }
+      .proc-tabela-check-row input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        margin: 0;
+      }
+      .proc-tabela-copy-row {
+        display: grid;
+        grid-template-columns: 105px 126px;
+        gap: 14px;
+        align-items: center;
+      }
+      .proc-tabela-copy-row.disabled select {
+        background: #ececec;
+      }
+      .proc-tabela-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        width: 245px;
+        max-width: 100%;
+        margin: 12px auto 0;
+      }
+      .proc-tabela-btn {
+        width: 90px;
+        justify-content: center;
+        padding: 0 8px;
+      }
+      @media (max-width: 760px) {
+        #materiais-panel.panel {
+          min-height: 0;
+        }
+        .materiais-top-group,
+        .materiais-action-row,
+        .materiais-top-actions,
+        .proc-top-group,
+        .proc-action-row,
+        .proc-top-actions {
+          flex-wrap: wrap;
+        }
+        .materiais-filters {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .proc-filters {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        #procedimentos-panel.panel {
+          min-height: 0;
+        }
+        .materiais-head {
+          min-width: 630px;
+        }
+        .materiais-table-wrap {
+          max-width: 100%;
+        }
+        #materiais-modal-backdrop .modal {
+          width: min(374px, 98vw);
+        }
+        .materiais-modal-top {
+          grid-template-columns: 1fr;
+        }
+        #proc-tabela-modal-backdrop .modal {
+          width: min(306px, 98vw);
+        }
+        .proc-tabela-fields,
+        .proc-tabela-actions {
+          width: 100%;
+        }
+      }
+      @media (max-width: 360px) {
+        .proc-tabela-inline-grid,
+        .proc-tabela-copy-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .cenario-panel {
+        width: min(820px, 100%);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: 0 16px 34px rgba(20, 45, 70, 0.10);
+      }
+      .cenario-panel .panel-title {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.1;
+        padding-right: 0;
+        color: #fff;
+      }
+      .cenario-subtitle {
+        margin: 0 0 12px;
+        color: var(--muted);
+        font: 12px Tahoma, sans-serif;
+      }
+      .cenario-panel .tabs {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #dbe4ee;
+        padding: 0 2px 8px;
+      }
+      .tab-btn {
+        border: 1px solid #bfcbd9;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font: 700 12px Tahoma, sans-serif;
+        background: #e8eef5;
+        color: #334a61;
+      }
+      .tab-btn.active {
+        background: #ffffff;
+        border-color: #9eafc3;
+      }
+      .tab-body {
+        padding: 10px 4px;
+      }
+      .cenario-top-with-note,
+      .cenario-cost-block,
+      .cenario-fixo-bottom {
+        display: grid;
+        grid-template-columns: fit-content(470px) 190px;
+        justify-content: start;
+        gap: 14px;
+        align-items: start;
+      }
+      .cenario-grid2 {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        max-width: 360px;
+      }
+      .cenario-grid2.compact {
+        max-width: 260px;
+      }
+      .cenario-form-stack {
+        display: grid;
+        grid-template-columns: 182px 72px;
+        gap: 10px 12px;
+        width: fit-content;
+        max-width: none;
+        align-items: center;
+      }
+      .cenario-form-stack .cenario-lbl {
+        min-width: 0;
+      }
+      .cenario-form-stack .mini,
+      .cenario-form-stack .metric,
+      .cenario-form-stack .cenario-wide {
+        width: 72px;
+        min-width: 72px;
+      }
+      .cenario-cost-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        max-width: 470px;
+      }
+      .cenario-lbl {
+        font: 700 12px Tahoma, sans-serif;
+        color: #283b50;
+        align-self: center;
+      }
+      .mini {
+        width: 56px;
+        height: 34px;
+        border: 1px solid #bdc9d8;
+        border-radius: 8px;
+        text-align: center;
+        font: 700 12px Tahoma, sans-serif;
+        background: #ffffff;
+        padding: 4px;
+      }
+      .metric {
+        width: 74px;
+        min-width: 74px;
+        height: 32px;
+        border: 1px solid #9beaf3;
+        border-radius: 8px;
+        background: #dffcff;
+        display: grid;
+        place-items: center;
+        font: 700 12px Tahoma, sans-serif;
+      }
+      .cenario-wide {
+        width: 120px;
+        min-width: 120px;
+        height: 32px;
+        border: 1px solid #9beaf3;
+        border-radius: 8px;
+        background: #dffcff;
+        display: grid;
+        place-items: center;
+        font: 700 12px Tahoma, sans-serif;
+        text-align: center;
+      }
+      .cenario-input {
+        width: 110px;
+        height: 32px;
+        border: 1px solid #bdc9d8;
+        border-radius: 8px;
+        text-align: center;
+        font: 700 12px Tahoma, sans-serif;
+        background: #ffffff;
+        padding: 0 8px;
+      }
+      .cenario-year-stack {
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+      }
+      .cenario-year-input {
+        width: 72px;
+      }
+      .cenario-note {
+        width: 190px;
+        border: 1px solid #b9c7d7;
+        border-radius: 10px;
+        background: #f8fbff;
+        padding: 10px;
+        font: 12px Calibri, sans-serif;
+        line-height: 1.2;
+        color: #44596e;
+      }
+      .cenario-line,
+      .line-block {
+        border-top: 1px solid var(--line-soft);
+        margin: 12px 0;
+      }
+      .cenario-table-wrap {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: auto;
+        background: #ffffff;
+      }
+      .cenario-table {
+        width: 100%;
+        border-collapse: collapse;
+        font: 700 12px Tahoma, sans-serif;
+      }
+      .cenario-table th,
+      .cenario-table td {
+        border: 1px solid var(--line);
+        padding: 5px;
+        text-align: center;
+        vertical-align: middle;
+      }
+      .cenario-table thead th {
+        background: #eef3f9;
+      }
+      .cenario-table .rowlabel {
+        background: #f6f9fc;
+        text-align: left;
+        padding-left: 8px;
+        min-width: 110px;
+      }
+      .cenario-table .mini,
+      .cenario-table .metric {
+        margin: 0 auto;
+      }
+      .cenario-table .metric {
+        width: 56px;
+        min-width: 56px;
+      }
+      .cenario-flex-bottom {
+        display: grid;
+        grid-template-columns: 220px 244px;
+        justify-content: start;
+        gap: 14px;
+        align-items: start;
+      }
+      .cenario-spin {
+        width: 52px;
+        min-width: 52px;
+        height: 24px;
+        padding: 0 4px;
+        text-align: left;
+        appearance: auto;
+      }
+      .cenario-flex-lower {
+        display: grid;
+        grid-template-columns: 96px 52px 96px 60px;
+        grid-template-areas:
+          "consult-label consult-input horas-label horas-value"
+          ". . minutos-label minutos-value"
+          ". . turnos-label turnos-value";
+        gap: 10px 10px;
+        align-items: center;
+        width: fit-content;
+        margin-left: 68px;
+      }
+      .cenario-flex-lower .consult-label {
+        grid-area: consult-label;
+      }
+      .cenario-flex-lower .consult-input {
+        grid-area: consult-input;
+      }
+      .cenario-flex-lower .horas-label {
+        grid-area: horas-label;
+      }
+      .cenario-flex-lower .horas-value {
+        grid-area: horas-value;
+      }
+      .cenario-flex-lower .minutos-label {
+        grid-area: minutos-label;
+      }
+      .cenario-flex-lower .minutos-value {
+        grid-area: minutos-value;
+      }
+      .cenario-flex-lower .turnos-label {
+        grid-area: turnos-label;
+      }
+      .cenario-flex-lower .turnos-value {
+        grid-area: turnos-value;
+      }
+      .cenario-flex-lower .cenario-wide {
+        width: 60px;
+        min-width: 60px;
+        height: 25px;
+      }
+      #tab-fixo .cenario-top-with-note {
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        margin-top: 4px;
+      }
+      #tab-fixo .cenario-fixo-bottom {
+        gap: 8px;
+        justify-content: center;
+      }
+      #tab-fixo .cenario-fixo-bottom {
+        grid-template-columns: fit-content(470px);
+      }
+      #tab-fixo .cenario-fixo-bottom > :last-child {
+        display: none;
+      }
+      #tab-fixo .cenario-note {
+        width: 320px;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 6px 10px;
+        line-height: 1.08;
+      }
+      #tab-fixo .cenario-form-stack {
+        gap: 6px 12px;
+      }
+      #tab-fixo .cenario-line {
+        margin: 6px 0;
+      }
+      #tab-fixo .cenario-note {
+        padding: 6px 8px;
+        line-height: 1.08;
+      }
+      #tab-fixo .mini {
+        height: 30px;
+      }
+      #tab-fixo .metric {
+        height: 28px;
+      }
+      #tab-fixo {
+        padding-top: 24px;
+        padding-bottom: 0;
+      }
+      #tab-flex {
+        padding-top: 24px;
+      }
+      #tab-flex .cenario-top-with-note {
+        display: block;
+        text-align: center;
+      }
+      #tab-flex .cenario-top-with-note > :first-child {
+        display: none;
+      }
+      #tab-flex .cenario-note {
+        width: 320px;
+        max-width: 100%;
+        margin: 0 auto;
+        padding: 6px 10px;
+        line-height: 1.08;
+      }
+      #tab-flex .cenario-line {
+        margin: 6px 0;
+      }
+      #tab-flex .cenario-flex-bottom {
+        display: block;
+      }
+      #tab-flex .cenario-flex-lower {
+        margin: 0 auto;
+      }
+      #tab-custos .cenario-cost-block {
+        grid-template-columns: 340px 190px;
+        justify-content: center;
+      }
+      #tab-custos .cenario-cost-grid {
+        grid-template-columns: 220px 110px;
+        width: 340px;
+        max-width: none;
+        gap: 8px 10px;
+      }
+      .cenario-summary {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 10px;
+      }
+      .cenario-summary .cenario-lbl {
+        min-width: 150px;
+      }
+      .cenario-summary.stack {
+        display: grid;
+        grid-template-columns: 160px 72px;
+        gap: 10px 12px;
+        align-items: center;
+        justify-content: start;
+        margin-top: 0;
+      }
+      .cenario-summary.stack .cenario-lbl {
+        min-width: 0;
+      }
+      .cenario-summary.stack .cenario-wide {
+        width: 72px;
+        min-width: 72px;
+      }
+      .cenario-actions {
+        display: flex;
+        justify-content: flex-end;
+        position: absolute;
+        top: 10px;
+        right: 46px;
+        gap: 8px;
+        margin-top: 0;
+        z-index: 5;
+      }
+      .cenario-inline-btn,
+      .cenario-action {
+        border: 1px solid #adbdd0;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font: 700 12px Tahoma, sans-serif;
+        background: #f2f7fc;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      .cenario-inline-btn {
+        min-height: 30px;
+        min-width: 110px;
+      }
+      .cenario-action.primary {
+        background: var(--accent-2);
+        border-color: var(--accent-2);
+        color: #ffffff;
+      }
+      .cenario-inline-btn img,
+      .cenario-action img {
+        width: 18px;
+        height: 18px;
+      }
+      .nproc-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 14px;
+      }
+      .nproc-group {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+      .nproc-group-title {
+        font: 700 13px Tahoma, sans-serif;
+        margin-bottom: 8px;
+      }
+      .nproc-field {
+        margin-bottom: 8px;
+      }
+      .nproc-header-row {
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+      .nproc-symbol-frame {
+        width: 52px;
+        height: 52px;
+        border: 1px solid #bfc9d6;
+        border-radius: 6px;
+        background: linear-gradient(180deg, #fafcff 0%, #eef4fb 100%);
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      .nproc-symbol-frame img {
+        max-width: 40px;
+        max-height: 40px;
+        display: none;
+        image-rendering: crisp-edges;
+      }
+      .nproc-symbol-frame.has-image img {
+        display: block;
+      }
+      .nproc-symbol-frame span {
+        font: 700 10px Tahoma, sans-serif;
+        color: #6b7a90;
+        text-align: center;
+        line-height: 1.1;
+      }
+      .nproc-symbol-frame.has-image span {
+        display: none;
+      }
+      .nproc-field label {
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .nproc-field input,
+      .nproc-field select,
+      .nproc-field textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 4px 6px;
+      }
+      .nproc-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .nproc-row.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .nproc-check {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font: 11px Tahoma, sans-serif;
+      }
+      .nproc-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .nproc-meta .nproc-box {
+        background: #dffcff;
+        border: 1px solid #9beaf3;
+        border-radius: 6px;
+        min-height: 26px;
+        display: grid;
+        place-items: center;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      .nproc-fin-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px 12px;
+      }
+      .nproc-fin-item label {
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+        display: block;
+        margin-bottom: 2px;
+      }
+      .nproc-box {
+        background: #ffffff;
+        border: 1px solid #bfc9d6;
+        border-radius: 6px;
+        min-height: 28px;
+        display: grid;
+        place-items: center;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      .sa-online-box {
+        place-items: start;
+        justify-items: start;
+        padding: 8px 10px;
+        text-align: left;
+        line-height: 1.3;
+        white-space: normal;
+      }
+      .nproc-box.note {
+        background: #f6fbff;
+      }
+      .nproc-box.note.good {
+        background: var(--good);
+      }
+      .nproc-box.note.bad {
+        background: var(--bad);
+      }
+      .nproc-table-head {
+        display: none;
+        grid-template-columns: 60px 350px 90px 90px 90px 90px 90px;
+        gap: 0;
+        margin: 10px 0 4px;
+        font: 700 11px Tahoma, sans-serif;
+        color: #2b394d;
+        min-width: 860px;
+      }
+      .nproc-table-head span {
+        padding: 0 6px;
+      }
+      .nproc-table-head span:nth-child(2) {
+        text-align: left;
+      }
+      .nproc-table-head span:nth-child(n + 3) {
+        text-align: center;
+      }
+      .nproc-table-wrap {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: auto;
+        max-height: 240px;
+        margin-top: 10px;
+        background: #ffffff;
+      }
+      .nproc-table {
+        width: 860px;
+        min-width: 100%;
+        border-collapse: collapse;
+        font: 11px Tahoma, sans-serif;
+        table-layout: fixed;
+      }
+      .nproc-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #f2f6fb;
+        color: #2b394d;
+        border-bottom: 1px solid var(--line);
+        padding: 6px;
+        text-align: center;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      .nproc-table thead th:nth-child(2) {
+        text-align: left;
+      }
+      .nproc-table thead th:nth-child(n + 3) {
+        text-align: center;
+      }
+      .nproc-table td {
+        border-bottom: 1px solid var(--line-soft);
+        padding: 4px 6px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nproc-table td:nth-child(2) {
+        text-align: left;
+      }
+      .nproc-table td:nth-child(n + 3) {
+        text-align: center;
+      }
+      .nproc-table tr.selected {
+        background: #d9e8fb;
+      }
+      .nproc-summary {
+        display: grid;
+        grid-template-columns: 60px 350px 90px 90px 90px 90px 90px;
+        gap: 0;
+        align-items: center;
+        margin-top: 8px;
+        font: 11px Tahoma, sans-serif;
+      }
+      .nproc-summary-label {
+        grid-column: 2 / 3;
+        justify-self: start;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font: 700 11px Tahoma, sans-serif;
+        color: #2b394d;
+        padding-left: 6px;
+      }
+      .nproc-summary .nproc-box {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        min-height: auto;
+        height: auto;
+        padding: 0;
+        color: #2b394d;
+        font: 700 11px Tahoma, sans-serif;
+      }
+      #nproc-total-mats {
+        grid-column: auto;
+        justify-self: start;
+      }
+      #nproc-total-custound {
+        grid-column: 5 / 6;
+        justify-self: center;
+        transform: translateX(58px);
+        text-align: center;
+      }
+      #nproc-total-custo {
+        grid-column: 7 / 8;
+        justify-self: center;
+        transform: translateX(70px);
+        text-align: center;
+      }
+      .footer {
+        padding: 8px 16px;
+        border-top: 1px solid var(--line);
+        background: #f8fbff;
+        font: 11px Tahoma, sans-serif;
+        color: var(--muted);
+      }
+      @media (max-width: 980px) {
+        .nproc-layout {
+          grid-template-columns: 1fr;
+        }
+        .filter-row {
+          grid-template-columns: 1fr 1fr;
+        }
+        .cenario-top-with-note,
+        .cenario-cost-block,
+        .cenario-fixo-bottom {
+          grid-template-columns: 1fr;
+        }
+        .cenario-flex-bottom,
+        #tab-custos .cenario-cost-block {
+          grid-template-columns: 1fr;
+        }
+        .cenario-note {
+          width: auto;
+        }
+        .cenario-summary {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 8px 10px;
+        }
+        .cenario-summary .cenario-lbl {
+          min-width: 0;
+        }
+        .cenario-summary.stack {
+          grid-template-columns: 1fr auto;
+        }
+        .cenario-panel .panel-title {
+          padding-right: 0;
+        }
+        .cenario-actions {
+          position: static;
+          margin-top: 6px;
+          flex-wrap: wrap;
+        }
+        .cenario-flex-lower {
+          grid-template-columns: 1fr auto;
+          grid-template-areas:
+            "consult-label consult-input"
+            "horas-label horas-value"
+            "minutos-label minutos-value"
+            "turnos-label turnos-value";
+          margin-left: 0;
+        }
+        #tab-custos .cenario-cost-grid {
+          width: auto;
+          grid-template-columns: 1fr auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="login-wrap" class="login-wrap">
+      <div class="login-card">
+        <img class="login-logo" src="/desktop-assets/brana.png" alt="Brana">
+        <div class="login-title">Brana Sistema de Precificacao</div>
+        <div class="login-sub">Acesso seguro para sua clínica.</div>
+        <div id="login-status" class="status"></div>
+
+        <section id="panel-login" class="login-panel">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="username">
+          <label for="senha">Senha</label>
+          <input id="senha" type="password" autocomplete="current-password">
+          <div class="login-actions">
+            <button id="btn-login" class="login-btn" type="button">Entrar</button>
+            <button id="btn-google-login" class="login-google" type="button">Continuar com Google</button>
+          </div>
+          <div class="login-links">
+            <button id="btn-open-signup" class="login-link" type="button">Cadastrar</button>
+            <button id="btn-open-forgot" class="login-link" type="button">Esqueci a senha</button>
+          </div>
+        </section>
+
+        <section id="panel-signup" class="login-panel hidden">
+          <label for="signup-nome">Nome</label>
+          <input id="signup-nome" type="text">
+          <label for="signup-email">E-mail</label>
+          <input id="signup-email" type="email">
+          <label for="signup-senha">Senha</label>
+          <input id="signup-senha" type="password">
+          <label for="signup-codigo">Código de ativação</label>
+          <input id="signup-codigo" type="text">
+          <div class="login-actions">
+            <button id="btn-signup-code" class="btn" type="button">Solicitar código</button>
+            <button id="btn-signup-confirm" class="btn primary" type="button">Confirmar cadastro</button>
+            <button id="btn-back-login-from-signup" class="btn" type="button">Voltar</button>
+          </div>
+        </section>
+
+        <section id="panel-forgot" class="login-panel hidden">
+          <label for="forgot-email">E-mail</label>
+          <input id="forgot-email" type="email">
+          <label for="forgot-codigo">Código</label>
+          <input id="forgot-codigo" type="text">
+          <label for="forgot-senha">Nova senha</label>
+          <input id="forgot-senha" type="password">
+          <div class="login-actions">
+            <button id="btn-forgot-code" class="btn" type="button">Enviar código</button>
+            <button id="btn-forgot-reset" class="btn primary" type="button">Redefinir senha</button>
+            <button id="btn-back-login-from-forgot" class="btn" type="button">Voltar</button>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div id="shell" class="shell hidden">
+      <nav class="menu-bar">
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Cadastro</button>
+          <div class="menu-pop">
+            <button class="menu-action" data-menu-action="cadastro-conectar" type="button">Conectar-se ao sistema...</button>
+            <button class="menu-action" data-menu-action="cadastro-desconectar" type="button">Desconectar-se do sistema...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-novo-paciente" type="button"><span>Novo paciente...</span><span class="menu-shortcut">Ctrl + N</span></button>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-abre-paciente" type="button"><span>Abre paciente...</span><span class="menu-shortcut">Ctrl + A</span></button>
+            <button class="menu-action" data-menu-action="cadastro-fecha-paciente" type="button">Fecha paciente...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-ficha-pessoal" type="button"><span>Ficha pessoal...</span><span class="menu-shortcut">Ctrl + F</span></button>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-ficha-rapida" type="button"><span>Ficha rápida...</span><span class="menu-shortcut">Ctrl + R</span></button>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-ficha-anamnese" type="button"><span>Ficha de anamnese...</span><span class="menu-shortcut">Ctrl + M</span></button>
+            <button class="menu-action with-shortcut" data-menu-action="cadastro-ficha-historico" type="button"><span>Ficha de histórico...</span><span class="menu-shortcut">Ctrl + H</span></button>
+            <button class="menu-action" data-menu-action="cadastro-dados-complementares" type="button">Dados complementares...</button>
+            <button class="menu-action" data-menu-action="cadastro-controle-retornos" type="button">Controle de retornos...</button>
+            <button class="menu-action" data-menu-action="cadastro-restricoes-terapeuticas" type="button">Restrições terapêuticas...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="cadastro-medicamentos" type="button">Medicamentos...</button>
+            <button class="menu-action" data-menu-action="cadastro-convenios-planos" type="button">Convênios e planos...</button>
+            <button class="menu-action" data-menu-action="cadastro-controle-estoque" type="button">Controle de estoque...</button>
+            <button class="menu-action" data-menu-action="cadastro-controle-proteticos" type="button">Controle de protéticos...</button>
+            <button class="menu-action" data-menu-action="cadastro-prestadores" type="button">Prestadores...</button>
+            <button class="menu-action" data-menu-action="cadastro-unidades-atendimento" type="button">Unidades de atendimento...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="cadastro-sair" type="button">Sair do sistema</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Tratamento</button>
+          <div class="menu-pop">
+            <button class="menu-action with-shortcut" data-menu-action="tratamento-novo" type="button"><span>Novo tratamento...</span><span class="menu-shortcut">Ctrl + T</span></button>
+            <button class="menu-action" data-menu-action="tratamento-altera" type="button">Altera tratamento...</button>
+            <button class="menu-action" data-menu-action="tratamento-elimina" type="button">Elimina tratamento...</button>
+            <button class="menu-action" data-menu-action="tratamento-finaliza" type="button">Finaliza tratamento...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action with-shortcut" data-menu-action="tratamento-orcamento" type="button"><span>Orçamento...</span><span class="menu-shortcut">Ctrl + O</span></button>
+            <button class="menu-action" data-menu-action="tratamento-imprime" type="button">Imprime tratamento...</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Agenda</button>
+          <div class="menu-pop">
+            <button class="menu-action" data-menu-action="agenda-dia" type="button">Agenda do dia...</button>
+            <button class="menu-action with-shortcut" data-menu-action="agenda-semana" type="button"><span>Agenda da semana...</span><span class="menu-shortcut">Ctrl + G</span></button>
+            <button class="menu-action" data-menu-action="agenda-proximo" type="button">Abre o próximo agendado...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="agenda-contatos" type="button">Agenda de contatos...</button>
+            <button class="menu-action" data-menu-action="agenda-avisos" type="button">Quadro de avisos...</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Relatório</button>
+          <div class="menu-pop">
+            <button class="menu-action" data-menu-action="relatorio-pacientes" type="button">Pesquisa pacientes...</button>
+            <button class="menu-action" data-menu-action="relatorio-contatos" type="button">Pesquisa contatos...</button>
+            <button class="menu-action" data-menu-action="relatorio-mala-direta" type="button">Mala direta...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="relatorio-tratamentos" type="button">Tratamentos</button>
+            <div class="menu-dd submenu">
+              <button class="menu-action menu-submenu-btn" type="button">Financeiros</button>
+              <div class="menu-pop right">
+                <button class="menu-action" data-menu-action="relatorio-financeiro-conta-corrente" type="button">Conta corrente...</button>
+              </div>
+            </div>
+            <div class="menu-dd submenu">
+              <button class="menu-action menu-submenu-btn" type="button">Estatísticos</button>
+              <div class="menu-pop right">
+                <button class="menu-action" data-menu-action="relatorio-estatistico-fluxo-caixa" type="button">Análise do fluxo de caixa...</button>
+              </div>
+            </div>
+            <button class="menu-action" data-menu-action="relatorio-agendas" type="button">Agendas</button>
+            <button class="menu-action" data-menu-action="relatorio-estoque" type="button">Estoque</button>
+            <button class="menu-action" data-menu-action="relatorio-proteticos" type="button">Protéticos</button>
+            <button class="menu-action" data-menu-action="relatorio-fichas-branco" type="button">Fichas em branco</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Financeiro</button>
+          <div class="menu-pop">
+            <button class="menu-action with-shortcut" data-menu-action="financeiro-cc-paciente" type="button"><span>Conta corrente do paciente...</span><span class="menu-shortcut">Ctrl+P</span></button>
+            <button class="menu-action with-shortcut" data-menu-action="financeiro-cc-cirurgiao" type="button"><span>Conta corrente do cirurgião...</span><span class="menu-shortcut">Ctrl+C</span></button>
+            <button class="menu-action" data-menu-action="financeiro-controle-recibos" type="button">Controle de recibos...</button>
+            <button class="menu-action" data-menu-action="financeiro-mensalidades-ortodontia" type="button">Mensalidades de ortodontia...</button>
+            <button class="menu-action" data-menu-action="financeiro-contas-receber" type="button">Contas a receber...</button>
+            <button class="menu-action" data-menu-action="financeiro-parametros-custo-fixo" type="button">Parâmetros de custo fixo...</button>
+            <button class="menu-action" data-menu-action="financeiro-comissoes-internas" type="button">Geração de comissões internas...</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Configurações</button>
+          <div class="menu-pop">
+            <div class="menu-dd submenu">
+              <button class="menu-action menu-submenu-btn" type="button">Tabelas</button>
+              <div class="menu-pop right">
+                <button class="menu-action" data-menu-action="tabelas-procedimentos" type="button">Intervenções / Procedimentos...</button>
+                <button class="menu-action" data-menu-action="tabelas-protetico" type="button">Serviços de protético...</button>
+                <button class="menu-action" data-menu-action="materiais" type="button">Materiais</button>
+                <button class="menu-action" data-menu-action="tabelas-cid" type="button">Doenças (CID)...</button>
+                <button class="menu-action" data-menu-action="tabelas-procedimentos-genericos" type="button">Procedimentos genéricos...</button>
+              </div>
+            </div>
+            <button class="menu-action" data-menu-action="config-simbolos-graficos" type="button">Simbolos gráficos...</button>
+            <button class="menu-action" data-menu-action="config-anamnese" type="button">Anamnese...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="config-indices-financeiros" type="button">Índices financeiros...</button>
+            <button class="menu-action" data-menu-action="plano" type="button">Plano de contas...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="cenario" type="button">Configuração de cenário anual...</button>
+            <button class="menu-action" data-menu-action="usuarios" type="button">Usuários...</button>
+            <button class="menu-action" data-menu-action="config-agendas" type="button">Agendas...</button>
+            <button class="menu-action" data-menu-action="config-relatorios" type="button">Relatórios...</button>
+            <button class="menu-action" data-menu-action="config-etiquetas" type="button">Etiquetas...</button>
+            <button class="menu-action" data-menu-action="config-preferencias" type="button">Preferências...</button>
+            <button class="menu-action" data-menu-action="config-opcoes-sistema" type="button">Opções do sistema...</button>
+            <button class="menu-action" data-menu-action="config-alterar-senha" type="button">Alterar senha...</button>
+            <div class="menu-sep" role="separator"></div>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="aux" type="button">Tabelas auxiliares...</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Ferramentas</button>
+          <div class="menu-pop">
+            <button class="menu-action" data-menu-action="ferr-editor-textos" type="button">Editor de textos...</button>
+            <div class="menu-dd submenu">
+              <button class="menu-action menu-submenu-btn" type="button">Editor MS Word</button>
+              <div class="menu-pop right">
+                <button class="menu-action" data-menu-action="ferr-editor-msword" type="button">Editor MS Word...</button>
+              </div>
+            </div>
+            <button class="menu-action" data-menu-action="ferr-easycapture" type="button">EasyCapture...</button>
+            <button class="menu-action" data-menu-action="ferr-slide-show" type="button">Slide Show...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="ferr-auditoria" type="button">Auditoria...</button>
+            <button class="menu-action" data-menu-action="ferr-usuarios-conectados" type="button">Usuários conectados...</button>
+            <div class="menu-sep" role="separator"></div>
+            <button class="menu-action" data-menu-action="ferr-chat" type="button">Chat...</button>
+          </div>
+        </div>
+        <div class="menu-dd">
+          <button class="menu-btn" type="button">Sobre</button>
+          <div class="menu-pop right">
+            <button id="menu-superadmin-action" class="menu-action hidden" data-menu-action="superadmin" type="button">Painel ADM</button>
+            <div id="menu-superadmin-sep" class="menu-sep hidden" role="separator"></div>
+            <button class="menu-action" data-menu-action="licenca" type="button">Licença</button>
+            <button class="menu-action" data-menu-action="sobre" type="button">Sobre</button>
+          </div>
+        </div>
+      </nav>
+
+      <div class="toolbar-bar">
+        <div class="toolbar-left">
+          <button id="btn-open-cenario" class="toolbar-btn" type="button" title="Configuração de Cenário Anual">
+            <img src="/desktop-assets/cenario.png" alt="">
+          </button>
+          <button id="btn-open-materiais" class="toolbar-btn" type="button" title="Tabela de materiais">
+            <img src="/desktop-assets/tabela.png" alt="">
+          </button>
+          <button id="btn-open-procedimentos" class="toolbar-btn" type="button" title="Configura tabela de preços">
+            <img src="/desktop-assets/procedimentos.png" alt="">
+          </button>
+          <button class="toolbar-btn" type="button" data-modulo="Conta corrente" title="Conta corrente">
+            <img src="/desktop-assets/CC.png" alt="">
+          </button>
+          <button id="btn-open-dashboard" class="toolbar-btn" type="button" title="Dashboard">
+            <img src="/desktop-assets/dashboard.png" alt="">
+          </button>
+        </div>
+        <div class="toolbar-right">
+          <div class="toolbar-user">
+            <div id="user-email">-</div>
+            <div id="user-role">Perfil: -</div>
+            <div id="user-license">Licença</div>
+          </div>
+          <button id="btn-open-users" class="toolbar-btn hidden" type="button" title="Painel administrador" aria-label="Painel administrador">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.64 7.84a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.07.63-.07.94s.02.63.07.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.4 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .5.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54c.58-.22 1.13-.54 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.02-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
+            </svg>
+          </button>
+          <button id="btn-sair" class="toolbar-btn exit" type="button" title="Sair">
+            <img src="/desktop-assets/sair.png" alt="">Sair
+          </button>
+        </div>
+      </div>
+
+      <main class="workspace">
+        <section id="workspace-empty" class="panel">
+          <div class="panel-title">Bem-vindo</div>
+          <p>Escolha um módulo acima para começar.</p>
+        </section>
+
+        <section id="cenario-panel" class="panel cenario-panel hidden">
+          <div class="panel-title">Configuração de cenário anual</div>
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="fixo" type="button">Perfil horário fixo</button>
+            <button class="tab-btn" data-tab="flex" type="button">Perfil horário flexível</button>
+            <button class="tab-btn" data-tab="custos" type="button">Cenario financeiro</button>
+          </div>
+
+          <div id="tab-fixo" class="tab-body">
+            <div class="cenario-top-with-note">
+              <div class="cenario-grid2 cenario-form-stack">
+                <div class="cenario-lbl">Meses de trabalho no Ano</div><input id="txtMesestrabalhados" class="mini" type="text" value="12">
+                <div class="cenario-lbl">Dias úteis / Mês</div><input id="txtDiasUteisMes" class="mini" type="text" value="22">
+                <div class="cenario-lbl">Dias úteis / Ano</div><div id="lblDiasUteisAno" class="metric">264</div>
+                <div class="cenario-lbl">Horas por dia</div><input id="txtHorasAtendimentoDia" class="mini" type="text" value="8">
+              </div>
+              <div class="cenario-note">Defina quantidade de horas de trabalho no ano. Neste caso o perfil é definido como fixo por ter o mesmo número de horas todos os dias.</div>
+            </div>
+            <div class="cenario-line"></div>
+            <div class="cenario-fixo-bottom">
+              <div class="cenario-grid2 cenario-form-stack">
+                <div class="cenario-lbl">Nº de Consultórios</div><input id="txtNumConsultorios" class="mini" type="number" min="1" step="1" value="1">
+                <div class="cenario-lbl">Horas por ano</div><div id="lblTotalHorasFixo" class="metric">0</div>
+                <div class="cenario-lbl">Minutos por ano</div><div id="lblTotalMinutosFixo" class="metric">0</div>
+                <div class="cenario-lbl">Turnos por ano</div><div id="lblTotalTurnosFixo" class="metric">0</div>
+              </div>
+              <div></div>
+            </div>
+          </div>
+
+          <div id="tab-flex" class="tab-body hidden">
+            <div class="cenario-top-with-note">
+              <div></div>
+              <div class="cenario-note">Defina quantidade de horas de trabalho no ano. Neste caso o perfil é definido como flexível por ter carga horária diária flexível com oportunidade de escolher o número de horas trabalhadas por dia.</div>
+            </div>
+            <div class="cenario-line"></div>
+            <div id="turnos-grid">
+              <div class="cenario-table-wrap">
+                <table class="cenario-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Segunda</th>
+                      <th>Terca</th>
+                      <th>Quarta</th>
+                      <th>Quinta</th>
+                      <th>Sexta</th>
+                      <th>Sabado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="rowlabel">Horas da Manhã</td>
+                      <td><input id="txtManha1" class="mini" type="text" value="0"></td>
+                      <td><input id="txtManha2" class="mini" type="text" value="0"></td>
+                      <td><input id="txtManha3" class="mini" type="text" value="0"></td>
+                      <td><input id="txtManha4" class="mini" type="text" value="0"></td>
+                      <td><input id="txtManha5" class="mini" type="text" value="0"></td>
+                      <td><input id="txtManha6" class="mini" type="text" value="0"></td>
+                    </tr>
+                    <tr>
+                      <td class="rowlabel">Horas da Tarde</td>
+                      <td><input id="txtTarde1" class="mini" type="text" value="0"></td>
+                      <td><input id="txtTarde2" class="mini" type="text" value="0"></td>
+                      <td><input id="txtTarde3" class="mini" type="text" value="0"></td>
+                      <td><input id="txtTarde4" class="mini" type="text" value="0"></td>
+                      <td><input id="txtTarde5" class="mini" type="text" value="0"></td>
+                      <td><input id="txtTarde6" class="mini" type="text" value="0"></td>
+                    </tr>
+                    <tr>
+                      <td class="rowlabel">Horas da Noite</td>
+                      <td><input id="txtNoite1" class="mini" type="text" value="0"></td>
+                      <td><input id="txtNoite2" class="mini" type="text" value="0"></td>
+                      <td><input id="txtNoite3" class="mini" type="text" value="0"></td>
+                      <td><input id="txtNoite4" class="mini" type="text" value="0"></td>
+                      <td><input id="txtNoite5" class="mini" type="text" value="0"></td>
+                      <td><input id="txtNoite6" class="mini" type="text" value="0"></td>
+                    </tr>
+                    <tr>
+                      <td class="rowlabel">Total Horas/Dia</td>
+                      <td><div id="lblTotalDia1" class="metric">0</div></td>
+                      <td><div id="lblTotalDia2" class="metric">0</div></td>
+                      <td><div id="lblTotalDia3" class="metric">0</div></td>
+                      <td><div id="lblTotalDia4" class="metric">0</div></td>
+                      <td><div id="lblTotalDia5" class="metric">0</div></td>
+                      <td><div id="lblTotalDia6" class="metric">0</div></td>
+                    </tr>
+                    <tr>
+                      <td class="rowlabel">Dias no ano</td>
+                      <td><input id="txtDiasAno1" class="mini" type="text" value="0"></td>
+                      <td><input id="txtDiasAno2" class="mini" type="text" value="0"></td>
+                      <td><input id="txtDiasAno3" class="mini" type="text" value="0"></td>
+                      <td><input id="txtDiasAno4" class="mini" type="text" value="0"></td>
+                      <td><input id="txtDiasAno5" class="mini" type="text" value="0"></td>
+                      <td><input id="txtDiasAno6" class="mini" type="text" value="0"></td>
+                    </tr>
+                    <tr>
+                      <td class="rowlabel">Horas por ano</td>
+                      <td><div id="lblHorasAnoDia1" class="metric">0</div></td>
+                      <td><div id="lblHorasAnoDia2" class="metric">0</div></td>
+                      <td><div id="lblHorasAnoDia3" class="metric">0</div></td>
+                      <td><div id="lblHorasAnoDia4" class="metric">0</div></td>
+                      <td><div id="lblHorasAnoDia5" class="metric">0</div></td>
+                      <td><div id="lblHorasAnoDia6" class="metric">0</div></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="cenario-line"></div>
+            <div class="cenario-flex-bottom">
+              <div class="cenario-flex-lower">
+                <div class="cenario-lbl consult-label">Nº de Consultórios</div>
+                <input id="txtNumConsultorios_2" class="mini cenario-spin consult-input" type="number" min="1" step="1" value="1">
+                <div class="cenario-lbl horas-label">Horas por ano</div>
+                <div id="lblTotalHorasAnoFlex" class="cenario-wide horas-value">0</div>
+                <div class="cenario-lbl minutos-label">Minutos por ano</div>
+                <div id="lblTotalMinutosFlex" class="cenario-wide minutos-value">0</div>
+                <div class="cenario-lbl turnos-label">Turnos por ano</div>
+                <div id="lblTotalTurnosFlex" class="cenario-wide turnos-value">0</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-custos" class="tab-body hidden">
+            <div class="cenario-cost-block">
+              <div class="cenario-cost-grid">
+                <div class="cenario-lbl">Digite o ano base de cálculo desejado</div>
+                <div class="cenario-year-stack">
+                  <input id="box_Ano" class="cenario-input cenario-year-input" type="number" min="1900" max="3000" step="1" value="">
+                  <button id="btn-calcular-fixos" class="cenario-inline-btn" type="button"><img src="/desktop-assets/calculadora.png" alt="">Calcular</button>
+                </div>
+                <div class="cenario-lbl">Custo Fixo Anual do Cirurgião</div><div id="lblFixo_pessoal" class="cenario-wide">R$ 0,00</div>
+                <div class="cenario-lbl">Custo Fixo Anual Profissional</div><div id="lblFixo_empresa" class="cenario-wide">R$ 0,00</div>
+                <div class="cenario-lbl">Custo Anual</div><div id="lblCusto_Anual" class="cenario-wide">R$ 0,00</div>
+              </div>
+              <div class="cenario-note">Escolha o ano desejado para base de cálculo de custo fixo anual. Para ter esta opção sincronizada no sistema deve-se alimentar a conta corrente com lançamentos. As categorias que estão dentro dos grupos financeiros Custo fixo do cirurgião e Custo fixo da clínica serão a base de referência.</div>
+            </div>
+            <div class="cenario-line"></div>
+            <div class="cenario-cost-block">
+              <div class="cenario-cost-grid">
+                <div class="cenario-lbl">Gasto Anual Particular</div><input id="txtGastoAnualParticular" class="cenario-input" type="text">
+                <div class="cenario-lbl">Gasto Anual da Clínica</div><input id="txtGastoAnualEmpresa" class="cenario-input" type="text">
+              </div>
+              <div class="cenario-note">Digite os valores referentes aos custos fixos do cirurgião e da clínica que deseja utilizar como base de cálculo para custo fixo por hora.</div>
+            </div>
+            <div class="cenario-line"></div>
+            <div class="cenario-cost-block">
+              <div class="cenario-cost-grid">
+                <div class="cenario-lbl">Escolha o perfil de horário</div><select id="cboHorasAno" class="cenario-input"></select>
+                <div class="cenario-lbl">Horas por Ano</div><input id="txtHorasAno" class="cenario-input" type="text">
+                <div class="cenario-lbl">Custo Anual</div><div id="lblCustoAno" class="cenario-wide">R$ 0,00</div>
+                <div class="cenario-lbl">Custo Fixo por Hora</div><div id="lblCFPH" class="cenario-wide">0</div>
+                <div class="cenario-lbl">Custo Fixo por Minuto</div><div id="lblCFPM" class="cenario-wide">0</div>
+              </div>
+              <div class="cenario-note">Defina o perfil de horários que mais se enquadra com sua rotina.</div>
+            </div>
+            <div class="cenario-line"></div>
+            <div class="cenario-cost-block">
+              <div class="cenario-cost-grid">
+                <div class="cenario-lbl">Imposto de Renda (%)</div><input id="txtIR" class="cenario-input" type="text">
+                <div class="cenario-lbl">Comissao Dentista (%)</div><input id="txtCD" class="cenario-input" type="text">
+                <div class="cenario-lbl">Taxa Cartão (%)</div><input id="txtCartao" class="cenario-input" type="text">
+              </div>
+              <div class="cenario-note">Defina em percentual (%) qual a sua taxa de imposto de renda, comissão e taxa de operadoras de créditos.</div>
+            </div>
+          </div>
+
+          <div class="cenario-actions">
+            <button id="btn-salvar-cenario" class="cenario-action" type="button"><img src="/desktop-assets/gravar.png" alt="">Salvar</button>
+            <button id="btn-fechar-cenario" class="cenario-action" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+          </div>
+        </section>
+
+        <section id="materiais-panel" class="panel hidden">
+          <div class="panel-title">Tabela de materiais</div>
+          <div class="materiais-top-group">
+            <div class="materiais-inline-label">Tabelas:</div>
+            <select id="materiais-cbo-listas" class="materiais-lista-select"></select>
+            <div class="materiais-top-actions">
+              <button id="materiais-btn-nova-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova tabela</button>
+              <button id="materiais-btn-altera-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera tabela</button>
+              <button id="materiais-btn-excluir-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina tabela</button>
+              <button id="materiais-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+            </div>
+          </div>
+          <div class="materiais-action-row">
+            <button id="materiais-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo material</button>
+            <button id="materiais-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera material</button>
+            <button id="materiais-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina material</button>
+          </div>
+          <div class="materiais-divider"></div>
+          <div class="materiais-filters">
+            <div class="materiais-field">
+              <label for="materiais-cbo-classificacao">Classificação:</label>
+              <select id="materiais-cbo-classificacao"></select>
+            </div>
+            <div class="materiais-search">
+              <label for="materiais-txt-pesquisar">Pesquiar material:</label>
+              <input id="materiais-txt-pesquisar" type="text">
+            </div>
+          </div>
+          <div class="materiais-head" aria-hidden="true">
+            <span>Código</span>
+            <span>Material</span>
+            <span>Preço R$</span>
+            <span>Relação / Qtde</span>
+            <span>Custo R$</span>
+          </div>
+          <div class="materiais-table-wrap">
+            <table class="materiais-table">
+              <colgroup>
+                <col>
+                <col>
+                <col>
+                <col>
+                <col>
+              </colgroup>
+              <tbody id="materiais-tbody"></tbody>
+            </table>
+          </div>
+          <div id="materiais-total" class="materiais-total">Total de Materiais: 0</div>
+        </section>
+
+        <section id="procedimentos-panel" class="panel hidden">
+          <div class="panel-title">Configura tabela de preços</div>
+          <div class="proc-top-group">
+            <div class="proc-inline-label">Tabelas:</div>
+            <select id="proc-cbo-tabela" class="proc-lista-select"></select>
+            <div class="proc-top-actions">
+              <button id="proc-btn-nova-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova tabela</button>
+              <button id="proc-btn-altera-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera tabela</button>
+              <button id="proc-btn-excluir-tabela" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina tabela</button>
+              <span class="proc-vdivider" aria-hidden="true"></span>
+              <button id="proc-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime</button>
+              <button id="proc-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+            </div>
+          </div>
+          <div class="proc-action-row">
+            <button id="proc-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova intervenção...</button>
+            <button id="proc-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera intervenção...</button>
+            <button id="proc-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button>
+            <span class="proc-vdivider" aria-hidden="true"></span>
+            <button id="proc-btn-reajuste" class="materiais-btn" type="button"><img src="/desktop-assets/calculadora.png" alt="">% Reajusta tabela...</button>
+          </div>
+          <div class="proc-divider"></div>
+          <div class="proc-filters">
+            <div class="proc-field">
+              <label for="proc-cbo-especialidade">Especialidade</label>
+              <select id="proc-cbo-especialidade"></select>
+            </div>
+            <div class="proc-search">
+              <label for="proc-txt-pesquisar">Nome da intervenção / procedimento</label>
+              <input id="proc-txt-pesquisar" type="text" placeholder="Filtrar por nome ou código">
+            </div>
+          </div>
+          <div class="table-wrap proc-table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width:90px">Código</th>
+                  <th>Procedimento</th>
+                  <th style="width:90px">Tempo</th>
+                  <th style="width:120px">Preço</th>
+                  <th style="width:120px">Custo Lab</th>
+                </tr>
+              </thead>
+              <tbody id="proc-tbody"></tbody>
+            </table>
+          </div>
+          <div id="proc-total" class="panel-total">Total de Procedimentos: 0</div>
+        </section>
+
+        <section id="novo-proc-panel" class="panel hidden">
+          <div class="panel-toolbar">
+            <button id="nproc-btn-gravar" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Gravar</button>
+            <button id="nproc-btn-voltar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Voltar</button>
+            <button id="nproc-btn-vincular" class="materiais-btn" type="button"><img src="/desktop-assets/adicionar.png" alt="">Vincular material</button>
+            <button id="nproc-btn-desvincular" class="materiais-btn" type="button"><img src="/desktop-assets/remover.png" alt="">Desvincular material</button>
+          </div>
+          <div class="nproc-layout">
+            <div class="nproc-group">
+              <div class="nproc-group-title">Painel de Cadastro</div>
+              <div class="nproc-field">
+                <label>Nome da intervenção / procedimento</label>
+                <div class="nproc-header-row">
+                  <div id="nproc-simbolo-frame" class="nproc-symbol-frame">
+                    <img id="nproc-simbolo-img" alt="Símbolo gráfico do procedimento">
+                    <span>Símbolo</span>
+                  </div>
+                  <input id="nproc-nome" type="text">
+                </div>
+              </div>
+              <div class="nproc-field">
+                <label>Procedimento genérico</label>
+                <select id="nproc-generico">
+                  <option value="">Selecione...</option>
+                </select>
+              </div>
+              <div class="nproc-row">
+                <div class="nproc-field">
+                  <label>Código</label>
+                  <input id="nproc-codigo" type="text">
+                </div>
+                <div class="nproc-field">
+                  <label>Especialidade</label>
+                  <select id="nproc-especialidade">
+                    <option value="">Selecione...</option>
+                  </select>
+                </div>
+              </div>
+              <div class="nproc-row">
+                <div class="nproc-field">
+                  <label>Símbolo gráfico</label>
+                  <select id="nproc-simbolo">
+                    <option value="">Selecione...</option>
+                  </select>
+                </div>
+                <div class="nproc-field">
+                  <label>Garantia (meses)</label>
+                  <input id="nproc-garantia" type="number" min="0" value="0">
+                </div>
+              </div>
+              <div class="nproc-row three">
+                <div class="nproc-field">
+                  <label>Forma de cobrança</label>
+                  <select id="nproc-cobranca">
+                    <option value="">Selecione...</option>
+                  </select>
+                </div>
+                <div class="nproc-field">
+                  <label>Valor repasse</label>
+                  <input id="nproc-repasse" type="text">
+                </div>
+                <div class="nproc-field">
+                  <label>Valor paciente</label>
+                  <input id="nproc-preco" type="text">
+                </div>
+              </div>
+              <div class="nproc-row">
+                <div class="nproc-field">
+                  <label>Custo de laboratório</label>
+                  <input id="nproc-lab" type="text">
+                </div>
+                <div class="nproc-field">
+                  <label>Tempo de execução (min)</label>
+                  <input id="nproc-tempo" type="text">
+                </div>
+              </div>
+              <div class="nproc-row">
+                <label class="nproc-check"><input id="nproc-inativar" type="checkbox"> Inativar intervenção</label>
+                <label class="nproc-check"><input id="nproc-preferidos" type="checkbox"> Incluir na lista de preferidos</label>
+              </div>
+              <div class="nproc-field">
+                <label>Observações</label>
+                <textarea id="nproc-obs"></textarea>
+              </div>
+              <div class="nproc-meta">
+                <div>
+                  <label>Inclusão</label>
+                  <div id="nproc-inclusao" class="nproc-box"></div>
+                </div>
+                <div>
+                  <label>Alteração</label>
+                  <div id="nproc-alteracao" class="nproc-box"></div>
+                </div>
+              </div>
+            </div>
+            <div class="nproc-group">
+              <div class="nproc-group-title">Painel Financeiro</div>
+              <div class="nproc-fin-grid">
+                <div class="nproc-fin-item">
+                  <label>CFPH</label>
+                  <div id="nproc-cfph" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Mat. Consumo</label>
+                  <div id="nproc-matconsumo" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Custo R$</label>
+                  <div id="nproc-custoproc" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Imposto</label>
+                  <div id="nproc-ir" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Comissão CD</label>
+                  <div id="nproc-cd" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Taxa Cartão</label>
+                  <div id="nproc-cartao" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Valor Mínimo</label>
+                  <div id="nproc-valormin" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Lucro Bruto</label>
+                  <div id="nproc-lucrobruto" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Lucro Líquido</label>
+                  <div id="nproc-lucroliq" class="nproc-box"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Rendimento %</label>
+                  <div id="nproc-rendproc" class="nproc-box note"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Bom 30 a 40%</label>
+                  <div id="nproc-rend3040" class="nproc-box note"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Bom 10 a 20%</label>
+                  <div id="nproc-rend1020" class="nproc-box note"></div>
+                </div>
+                <div class="nproc-fin-item">
+                  <label>Lucro por hora</label>
+                  <div id="nproc-lucrohora" class="nproc-box"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="nproc-table-head">
+            <span>Código</span>
+            <span>Material vinculado ao procedimento</span>
+            <span>Relação</span>
+            <span>Preço R$</span>
+            <span>Custo / UND</span>
+            <span>Quantidade</span>
+            <span>Custo R$</span>
+          </div>
+          <div class="nproc-table-wrap">
+            <table class="nproc-table">
+              <colgroup>
+                <col style="width:60px">
+                <col style="width:350px">
+                <col style="width:90px">
+                <col style="width:90px">
+                <col style="width:90px">
+                <col style="width:90px">
+                <col style="width:90px">
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>CÃ³digo</th>
+                  <th>Material vinculado ao procedimento</th>
+                  <th>RelaÃ§Ã£o</th>
+                  <th>PreÃ§o R$</th>
+                  <th>Custo / UND</th>
+                  <th>Quantidade</th>
+                  <th>Custo R$</th>
+                </tr>
+              </thead>
+              <tbody id="nproc-links-tbody"></tbody>
+            </table>
+          </div>
+          <div class="nproc-summary">
+            <div class="nproc-summary-label">Total de materiais vinculados: <span id="nproc-total-mats" class="nproc-box"></span></div>
+            <div id="nproc-total-custound" class="nproc-box"></div>
+            <div id="nproc-total-custo" class="nproc-box" data-valor="0"></div>
+          </div>
+        </section>
+
+        <section id="users-panel" class="panel panel-standardized hidden">
+          <div class="panel-standard-header">
+          <div class="panel-title">Configuração de usuários do sistema</div>
+          </div>
+          <div id="users-status" class="status"></div>
+          <div class="panel-toolbar">
+            <button id="users-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo usuário...</button>
+            <button id="users-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button>
+            <button id="users-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Excluir</button>
+            <button id="users-btn-impressos" class="materiais-btn" type="button"><img src="/desktop-assets/impressora.png" alt="">Impressos...</button>
+            <button id="users-btn-preferencias" class="materiais-btn" type="button"><img src="/desktop-assets/config.png" alt="">Preferências...</button>
+            <button id="users-btn-permissoes" class="materiais-btn" type="button"><img src="/desktop-assets/chave.png" alt="">Permissões...</button>
+            <button id="users-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Nome do usuário</th>
+                  <th style="width:140px">Apelido</th>
+                  <th style="width:180px">Tipo</th>
+                  <th style="width:120px">Conectado</th>
+                  <th style="width:120px">Status</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="superadmin-panel" class="panel hidden">
+          <div class="panel-title">Painel ADM</div>
+          <div id="superadmin-status" class="status"></div>
+          <div class="panel-toolbar">
+            <button id="superadmin-btn-refresh" class="materiais-btn" type="button"><img src="/desktop-assets/dashboard.png" alt="">Atualizar</button>
+          </div>
+          <div class="filter-row">
+            <div>
+              <label>Buscar clínicas</label>
+              <input id="sa-clinicas-q" type="text">
+            </div>
+            <div>
+              <label>Status clínica</label>
+              <select id="sa-clinicas-status">
+                <option value="todas">Todas</option>
+                <option value="ativas">Ativas</option>
+                <option value="trial">Trial</option>
+                <option value="expiradas">Expiradas</option>
+                <option value="suspensas">Suspensas</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button id="sa-clinicas-filtrar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Filtrar</button>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div>
+              <label>Buscar usuários</label>
+              <input id="sa-usuarios-q" type="text">
+            </div>
+            <div>
+              <label>Ativo</label>
+              <select id="sa-usuarios-ativo">
+                <option value="todos">Todos</option>
+                <option value="ativo">Ativo</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </div>
+            <div>
+              <label>Admin</label>
+              <select id="sa-usuarios-admin">
+                <option value="todos">Todos</option>
+                <option value="admin">Admin</option>
+                <option value="usuario">Usuário</option>
+              </select>
+            </div>
+            <div>
+              <label>Plano</label>
+              <select id="sa-usuarios-plano">
+                <option value="TODOS">Todos</option>
+                <option value="DEMO">Demo</option>
+                <option value="MENSAL">Mensal</option>
+                <option value="ANUAL">Anual</option>
+                <option value="SUPERADMIN">Super Admin</option>
+                <option value="OWNER">Vitalício</option>
+              </select>
+            </div>
+            <div>
+              <label>Status clínica</label>
+              <select id="sa-usuarios-clinica-status">
+                <option value="todas">Todas</option>
+                <option value="ativas">Ativas</option>
+                <option value="trial">Trial</option>
+                <option value="expiradas">Expiradas</option>
+                <option value="suspensas">Suspensas</option>
+              </select>
+            </div>
+            <div>
+              <label>&nbsp;</label>
+              <button id="sa-usuarios-filtrar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Filtrar</button>
+              <button id="sa-usuarios-exportar" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Exportar CSV</button>
+            </div>
+          </div>
+          <div class="nproc-row three">
+            <div class="nproc-field" style="grid-column: 1 / -1">
+              <label>Usuário/Clínica online</label>
+              <div id="sa-online-summary" class="nproc-box sa-online-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Total clínicas</label>
+              <div id="sa-total-clinicas" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Total usuários</label>
+              <div id="sa-total-usuarios" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>MRR</label>
+              <div id="sa-mrr" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>ARR</label>
+              <div id="sa-arr" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Ativas</label>
+              <div id="sa-clinicas-ativas" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Trial</label>
+              <div id="sa-clinicas-trial" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Expiradas</label>
+              <div id="sa-clinicas-expiradas" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Suspensas</label>
+              <div id="sa-clinicas-suspensas" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Sem usuário</label>
+              <div id="sa-clinicas-sem-usuario" class="nproc-box"></div>
+            </div>
+            <div class="nproc-field">
+              <label>Arquivadas</label>
+              <div id="sa-clinicas-arquivadas" class="nproc-box"></div>
+            </div>
+          </div>
+          <div class="line-block"></div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Clínica</th>
+                  <th>Status</th>
+                  <th>Plano</th>
+                  <th>Trial até</th>
+                  <th>Usuários</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="sa-clinicas-tbody"></tbody>
+            </table>
+          </div>
+          <div class="line-block"></div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nome</th>
+                  <th>E-mail</th>
+                  <th>Clínica</th>
+                  <th>Plano</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="sa-usuarios-tbody"></tbody>
+            </table>
+          </div>
+          <div class="line-block"></div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Clínica</th>
+                  <th>Plano</th>
+                  <th>Status</th>
+                  <th>Valor</th>
+                  <th>Origem</th>
+                  <th>Data</th>
+                </tr>
+              </thead>
+              <tbody id="sa-cobrancas-tbody"></tbody>
+            </table>
+          </div>
+          <div class="line-block"></div>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Data</th>
+                  <th>Ação</th>
+                  <th>Autor</th>
+                  <th>Alvo</th>
+                </tr>
+              </thead>
+              <tbody id="sa-auditoria-tbody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span id="footer-msg"></span>
+      </footer>
+    </div>
+
+    <div id="materiais-modal-backdrop" class="modal-backdrop hidden">
+      <div class="modal">
+        <div class="modal-header">
+          <div id="materiais-modal-title" class="modal-title">Novo Material</div>
+          <div class="modal-tabs">
+            <button id="materiais-modal-tab-principal-btn" class="modal-tab-btn active" type="button">Principal</button>
+            <button id="materiais-modal-tab-detalhes-btn" class="modal-tab-btn" type="button">Detalhes</button>
+          </div>
+        </div>
+        <div id="materiais-modal-tab-principal" class="materiais-modal-stack">
+          <div class="materiais-modal-top">
+            <div>
+              <label for="materiais-modal-classificacao">Classificação:</label>
+              <select id="materiais-modal-classificacao"></select>
+            </div>
+            <div>
+              <label for="materiais-modal-codigo">Código interno:</label>
+              <input id="materiais-modal-codigo" type="text">
+            </div>
+          </div>
+          <div class="materiais-modal-name">
+            <label for="materiais-modal-nome">Nome do material:</label>
+            <input id="materiais-modal-nome" type="text">
+          </div>
+          <div class="materiais-modal-line"></div>
+          <div class="materiais-modal-form-row">
+            <label for="materiais-modal-und-compra">Unidade de compra................</label>
+            <select id="materiais-modal-und-compra"></select>
+          </div>
+          <div class="materiais-modal-form-row">
+            <label for="materiais-modal-und-consumo">Unidade de consumo..............</label>
+            <select id="materiais-modal-und-consumo"></select>
+          </div>
+          <div class="materiais-modal-form-row">
+            <label for="materiais-modal-relacao">Relação.............................</label>
+            <input id="materiais-modal-relacao" type="text">
+          </div>
+          <div class="materiais-modal-form-row">
+            <label for="materiais-modal-preco">Preço...............................</label>
+            <input id="materiais-modal-preco" type="text">
+          </div>
+          <div class="materiais-modal-form-row">
+            <label for="materiais-modal-custo">Valor de custo unitário...........</label>
+            <input id="materiais-modal-custo" type="text" readonly>
+          </div>
+          <div class="materiais-modal-form-row compact">
+            <label for="materiais-modal-validade">Validade média.....................</label>
+            <input id="materiais-modal-validade" type="number" min="0" step="1">
+            <span class="materiais-modal-day-label">dias</span>
+          </div>
+          <div class="materiais-modal-line"></div>
+          <label class="materiais-modal-preferido"><input id="materiais-modal-preferido" type="checkbox">Incluir na lista de preferidos</label>
+        </div>
+        <div id="materiais-modal-tab-detalhes" class="hidden materiais-modal-stack">
+          <div class="materiais-modal-detail">
+            <label for="materiais-modal-fabricante">Fabricante:</label>
+            <select id="materiais-modal-fabricante"></select>
+          </div>
+          <div class="materiais-modal-detail">
+            <label for="materiais-modal-apresentacao">Apresentação:</label>
+            <select id="materiais-modal-apresentacao"></select>
+          </div>
+          <div class="materiais-modal-detail">
+            <label for="materiais-modal-observacao">Observações:</label>
+            <textarea id="materiais-modal-observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="materiais-modal-gravar" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="materiais-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="materiais-tabela-modal-backdrop" class="modal-backdrop hidden">
+      <div class="modal">
+        <div class="modal-header">
+          <div id="materiais-tabela-modal-title" class="modal-title">Nova tabela de materiais</div>
+          <button id="materiais-tabela-modal-close" class="btn" type="button">X</button>
+        </div>
+        <div class="materiais-tabela-modal-body">
+          <div class="materiais-tabela-modal-frame">
+            <div class="materiais-tabela-modal-grid">
+              <label id="materiais-tabela-modal-label" for="materiais-tabela-modal-nome">Nome</label>
+              <input id="materiais-tabela-modal-nome" class="materiais-tabela-hotkey" type="text" maxlength="120">
+              <label for="materiais-tabela-modal-indice">Índice</label>
+              <select id="materiais-tabela-modal-indice" class="materiais-tabela-hotkey"></select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="materiais-tabela-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="materiais-tabela-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="vincula-backdrop" class="pgen-mat-edit-backdrop hidden">
+      <div class="pgen-mat-edit-modal">
+        <div class="pgen-mat-edit-head">
+          <div class="pgen-mat-edit-title">Vincular material</div>
+          <button id="vincula-close" class="pgen-mat-edit-close" type="button" aria-label="Fechar">X</button>
+        </div>
+        <div class="pgen-mat-edit-body">
+          <div class="pgen-mat-edit-grid">
+            <div>
+              <label for="vincula-listas">Classificação:</label>
+              <select id="vincula-listas"></select>
+            </div>
+            <div class="pgen-mat-edit-search">
+              <label for="vincula-q">Material</label>
+              <input id="vincula-q" type="text">
+            </div>
+            <div>
+              <label for="vincula-materiais">Nome do material:</label>
+              <select id="vincula-materiais"></select>
+            </div>
+            <div class="pgen-mat-edit-metric">
+              <label for="vincula-custo-unit">Valor de custo unitário........................</label>
+              <input id="vincula-custo-unit" type="text" value="0,00" readonly>
+            </div>
+            <div class="pgen-mat-edit-metric">
+              <label for="vincula-quantidade">Quantidade média utilizada................</label>
+              <input id="vincula-quantidade" class="metric-qtd" type="number" min="0" step="0.01" value="0">
+            </div>
+            <div class="pgen-mat-edit-metric">
+              <label for="vincula-custo-total">Valor de custo total............................</label>
+              <input id="vincula-custo-total" type="text" value="0,00" readonly>
+            </div>
+          </div>
+        </div>
+        <div class="pgen-mat-edit-actions">
+          <button id="vincula-btn-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="vincula-btn-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="proc-tabela-modal-backdrop" class="modal-backdrop hidden">
+      <div class="modal">
+        <div class="proc-tabela-titlebar">
+          <div id="proc-tabela-modal-title" class="modal-title">Insere nova tabela</div>
+          <button id="proc-tabela-modal-close" class="proc-tabela-x" type="button" aria-label="Fechar">X</button>
+        </div>
+        <div class="proc-tabela-frame">
+          <div class="proc-tabela-fields">
+            <div class="proc-tabela-row">
+              <label for="proc-tabela-modal-nome">Nome da tabela:</label>
+              <input id="proc-tabela-modal-nome" class="proc-tabela-hotkey" type="text">
+            </div>
+            <div class="proc-tabela-inline-grid">
+              <div class="proc-tabela-col">
+                <label for="proc-tabela-modal-fonte">Fonte pagadora:</label>
+                <select id="proc-tabela-modal-fonte" class="proc-tabela-hotkey">
+                  <option value="particular">Particular</option>
+                  <option value="convenio">Convênio</option>
+                </select>
+              </div>
+              <div class="proc-tabela-col">
+                <label for="proc-tabela-modal-indice">Índice:</label>
+                <select id="proc-tabela-modal-indice" class="proc-tabela-hotkey"></select>
+              </div>
+            </div>
+            <div id="proc-tabela-modal-cred-row" class="proc-tabela-cred-row hidden">
+              <label for="proc-tabela-modal-cred">Nº de credenciamento:</label>
+              <input id="proc-tabela-modal-cred" class="proc-tabela-hotkey" type="text" maxlength="30">
+            </div>
+            <div class="proc-tabela-row">
+              <label for="proc-tabela-modal-tiss">Tipo de tabela [TISS]:</label>
+              <select id="proc-tabela-modal-tiss" class="proc-tabela-hotkey"></select>
+            </div>
+            <div class="proc-tabela-divider"></div>
+            <label class="proc-tabela-check-row"><input id="proc-tabela-modal-inativo" type="checkbox">Inativar tabela</label>
+            <div class="proc-tabela-divider"></div>
+            <div id="proc-tabela-modal-copy-row" class="proc-tabela-copy-row disabled">
+              <label class="proc-tabela-check-row"><input id="proc-tabela-modal-copiar" type="checkbox">Copiar da tabela:</label>
+              <select id="proc-tabela-modal-origem" class="proc-tabela-hotkey"></select>
+            </div>
+          </div>
+        </div>
+        <div class="proc-tabela-actions">
+          <button id="proc-tabela-modal-ok" class="materiais-btn proc-tabela-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="proc-tabela-modal-cancelar" class="materiais-btn proc-tabela-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="users-modal-backdrop" class="modal-backdrop hidden">
+      <div class="modal modal-standardized" style="max-width:620px">
+        <div class="modal-header">
+          <div class="modal-title">Usuário</div>
+        </div>
+        <div class="modal-grid">
+          <input id="users-modal-codigo" type="hidden">
+          <div style="display:grid;grid-template-columns:minmax(0,1.7fr) minmax(150px,.8fr);gap:8px;grid-column:1 / -1">
+            <div>
+              <label>Nome do usuário</label>
+              <input id="users-modal-nome" type="text">
+            </div>
+            <div>
+              <label>Apelido</label>
+              <input id="users-modal-apelido" type="text">
+            </div>
+          </div>
+          <div>
+            <label>Tipo do usuário</label>
+            <select id="users-modal-tipo"></select>
+          </div>
+          <div>
+            <label>E-mail</label>
+            <input id="users-modal-email" type="text">
+          </div>
+          <div>
+            <label>Associar a prestador</label>
+            <select id="users-modal-prestador"></select>
+          </div>
+          <div>
+            <label>Unidade de atendimento</label>
+            <select id="users-modal-unidade"></select>
+          </div>
+          <div id="users-modal-senha-atual-wrap">
+            <label>Senha atual</label>
+            <input id="users-modal-senha-atual" type="password">
+          </div>
+          <div id="users-modal-senha-wrap">
+            <label>Nova senha</label>
+            <input id="users-modal-senha" type="password">
+          </div>
+          <div id="users-modal-confirma-wrap">
+            <label>Confirmação</label>
+            <input id="users-modal-confirma" type="password">
+          </div>
+          <div style="grid-column:1 / -1;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px"><input id="users-modal-show-senha" type="checkbox">Mostrar senha</label>
+          </div>
+          <div style="grid-column:1 / -1;border-top:1px solid #d4dbe5;padding-top:8px;display:flex;align-items:center;justify-content:flex-start;gap:18px;flex-wrap:nowrap">
+            <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px"><input id="users-modal-forcar-senha" type="checkbox">Alterar senha no próximo login</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px"><input id="users-modal-ativo" type="checkbox">Inativar usuário</label>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="users-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="users-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="users-pass-backdrop" class="modal-backdrop hidden">
+      <div class="modal modal-standardized" style="max-width:420px">
+        <div class="modal-header">
+          <div id="users-pass-title" class="modal-title">Troca de senha</div>
+        </div>
+        <div class="modal-grid">
+          <div>
+            <label>Código</label>
+            <input id="users-pass-codigo" type="text">
+          </div>
+          <div>
+            <label>Usuário</label>
+            <input id="users-pass-usuario" type="text">
+          </div>
+          <div>
+            <label>Senha atual</label>
+            <input id="users-pass-atual" type="password">
+          </div>
+          <div>
+            <label>Nova senha</label>
+            <input id="users-pass-nova" type="password">
+          </div>
+          <div>
+            <label>Confirmação</label>
+            <input id="users-pass-confirma" type="password">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="users-pass-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="users-pass-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="protected-pass-backdrop" class="modal-backdrop hidden">
+      <div class="modal modal-standardized" style="max-width:320px">
+        <div class="modal-header">
+          <div class="modal-title">Senha</div>
+        </div>
+        <div class="modal-grid" style="grid-template-columns:1fr">
+          <div>
+            <label>Senha:</label>
+            <input id="protected-pass-input" type="password">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="protected-pass-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="protected-pass-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="users-perm-backdrop" class="modal-backdrop hidden">
+      <div class="modal modal-standardized">
+        <div class="modal-header">
+          <div class="modal-title">Permissões de acesso para <span id="users-perm-title-name">usuário</span></div>
+        </div>
+
+        <div class="modal-tabs" style="margin-top:8px">
+          <button id="users-perm-tab-acesso-btn" class="modal-tab-btn active" type="button">Permissões de Acesso</button>
+          <button id="users-perm-tab-perfis-btn" class="modal-tab-btn" type="button">Perfis de acesso</button>
+        </div>
+
+        <div class="users-perm-top">
+          <div>
+            <label>Usuário</label>
+            <input id="users-perm-nome" type="text" readonly>
+          </div>
+          <div>
+            <label>Tipo</label>
+            <input id="users-perm-tipo" type="text" readonly>
+          </div>
+        </div>
+
+        <div id="users-perm-tab-acesso" class="users-perm-layout">
+          <div class="users-perm-toolbar">
+            <div class="users-perm-legend">
+              <button class="users-perm-action" type="button" data-level="habilitado"><span class="users-perm-dot habilitado"></span>Permite acesso</button>
+              <button class="users-perm-action" type="button" data-level="desabilitado"><span class="users-perm-dot desabilitado"></span>Proíbe acesso</button>
+              <button class="users-perm-action" type="button" data-level="protegido"><img class="users-perm-key" src="/desktop-assets/chave.png" alt="">Solicita senha</button>
+              <button id="users-perm-fechar" class="users-perm-action users-perm-fechar" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+            </div>
+          </div>
+
+          <div>
+            <div class="users-perm-section-title">Módulo</div>
+            <div id="users-perm-module-wrap" class="users-perm-table-wrap modules" tabindex="0">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Módulo</th>
+                  </tr>
+                </thead>
+                <tbody id="users-perm-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="users-perm-actions" id="users-perm-function-actions">
+            <label><input type="radio" name="users-perm-func-level" id="users-perm-func-habilitado" value="habilitado"><span class="users-perm-dot habilitado"></span>Permite execução</label>
+            <label><input type="radio" name="users-perm-func-level" id="users-perm-func-desabilitado" value="desabilitado"><span class="users-perm-dot desabilitado"></span>Proíbe execução</label>
+            <label><input type="radio" name="users-perm-func-level" id="users-perm-func-protegido" value="protegido"><img class="users-perm-key" src="/desktop-assets/chave.png" alt="">Solicita senha</label>
+          </div>
+
+          <div>
+            <div class="users-perm-section-title">Função</div>
+            <div id="users-perm-function-wrap" class="users-perm-table-wrap functions" tabindex="0">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Função</th>
+                  </tr>
+                </thead>
+                <tbody id="users-perm-func-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div id="users-perm-tab-perfis" class="hidden">
+          <div class="users-perf-layout">
+            <div>
+              <div class="users-perm-section-title">Perfil</div>
+              <div class="users-perm-table-wrap perfis">
+                <table class="tbl">
+                  <tbody id="users-perf-profile-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <div class="users-perm-section-title">Prestadores</div>
+              <div class="users-perm-table-wrap prestadores">
+                <div id="users-perf-prestadores" class="users-perf-checklist"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="users-perm-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
+          <button id="users-perm-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sobre-backdrop" class="modal-backdrop hidden">
+      <div class="modal" style="max-width:520px">
+        <div class="modal-title">Sobre</div>
+        <div class="modal-grid">
+          <div>
+            <label>Versão</label>
+            <div id="sobre-versao" class="nproc-box"></div>
+          </div>
+          <div>
+            <label>Suporte</label>
+            <div id="sobre-suporte" class="nproc-box"></div>
+          </div>
+          <div>
+            <label>Registrado</label>
+            <div id="sobre-registrado" class="nproc-box"></div>
+          </div>
+          <div>
+            <label>Serial</label>
+            <div id="sobre-serial" class="nproc-box"></div>
+          </div>
+          <div>
+            <label>Machine ID</label>
+            <div id="sobre-machine" class="nproc-box"></div>
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>Status</label>
+            <div id="sobre-status" class="nproc-box"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="sobre-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="licenca-backdrop" class="modal-backdrop hidden">
+      <div class="modal" style="max-width:520px">
+        <div class="modal-title">Licença</div>
+        <div class="modal-grid">
+          <div style="grid-column: 1 / -1">
+            <label>Machine ID</label>
+            <input id="licenca-machine-id" type="text" readonly>
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>Usuário</label>
+            <input id="licenca-usuario" type="text" readonly>
+          </div>
+          <div style="grid-column: 1 / -1">
+            <label>Status</label>
+            <div id="licenca-status" class="status"></div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="licenca-btn-copiar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Copiar ID</button>
+          <button id="licenca-btn-mensal" class="materiais-btn" type="button"><img src="/desktop-assets/adicionar.png" alt="">Plano mensal</button>
+          <button id="licenca-btn-anual" class="materiais-btn" type="button"><img src="/desktop-assets/adicionar.png" alt="">Plano anual</button>
+          <button id="licenca-btn-atualizar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Atualizar</button>
+          <button id="licenca-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+        </div>
+      </div>
+    </div>
+    <script src="/frontend/app.js?v=20260401-users-padronizacao6"></script>
+    <script src="/frontend/easy_font_dialog.js?v=20260330-pref-amb-font3"></script>
+    <script src="/frontend/prestadores_override.js?v=20260329-prestadores-restore-apres11"></script>
+    <script src="/frontend/prestadores_agenda_hotfix.js?v=20260329-prest-agenda-hotfix-restore7"></script>
+    <script src="/frontend/prestadores_agenda_apresentacao_patch.js?v=20260328-prest-agenda-apres-patch15"></script>
+    <script src="/frontend/prestadores_agenda_refino.js?v=20260329-prest-agenda-refino25"></script>
+    <script src="/frontend/prestadores_agenda_fonte_color_patch.js?v=20260328-prest-agenda-fonte-color4"></script>
+    <script src="/frontend/prestadores_agenda_utf_fix.js?v=20260328-prest-agenda-utf-fix2"></script>
+  </body>
+</html>

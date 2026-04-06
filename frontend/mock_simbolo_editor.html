@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edita simbolo grafico</title>
+  <style>
+    :root{
+      --bg:#eef3f7;
+      --panel:#ffffff;
+      --line:#cfd8e3;
+      --text:#18222d;
+      --muted:#5b6b7e;
+      --accent:#008080;
+      --pixel:#111111;
+      --pixel-alt:#ffffff;
+      --danger:#d33c30;
+      --shadow:0 18px 50px rgba(31,52,73,.14);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      min-height:100vh;
+      overflow:hidden;
+      background:linear-gradient(180deg,#dfe8f0 0%,#edf3f8 100%);
+      font:12px Tahoma,sans-serif;
+      color:var(--text);
+    }
+    .window{
+      position:absolute;
+      top:12px;
+      left:12px;
+      width:min(1120px,calc(100vw - 24px));
+      background:var(--panel);
+      border:1px solid #bdd0dc;
+      border-radius:14px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .window-header{
+      background:var(--accent);
+      color:#fff;
+      padding:8px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      user-select:none;
+    }
+    .window-drag{
+      flex:1;
+      min-width:0;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      cursor:move;
+    }
+    .window-title{
+      font:700 13px Tahoma,sans-serif;
+    }
+    .window-header-right{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .window-status{
+      font:12px Tahoma,sans-serif;
+      opacity:.95;
+      white-space:nowrap;
+    }
+    .window-close{
+      width:30px;
+      height:30px;
+      border:1px solid rgba(255,255,255,.48);
+      border-radius:999px;
+      background:#f5f8fb;
+      color:#245a61;
+      font:700 16px/1 Tahoma,sans-serif;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+    }
+    .window-close:hover{
+      background:#c62828;
+      color:#fff;
+      border-color:#f3b1b1;
+    }
+    .window-body{
+      padding:18px;
+      display:grid;
+      grid-template-columns:260px 1fr 230px;
+      gap:18px;
+      align-items:start;
+    }
+    .group{
+      border:1px solid var(--line);
+      border-radius:10px;
+      background:#fafcfe;
+      padding:12px;
+    }
+    .group h3{
+      margin:0 0 10px;
+      font-size:12px;
+      color:#233243;
+    }
+    .field{margin-bottom:10px}
+    .field label{
+      display:block;
+      margin-bottom:3px;
+      color:#243446;
+    }
+    .field input,.field select{
+      width:100%;
+      height:28px;
+      border:1px solid #bfc9d6;
+      background:#fff;
+      padding:0 8px;
+      font:12px Tahoma,sans-serif;
+    }
+    .tools{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .btn{
+      height:30px;
+      border:1px solid #b7c7d7;
+      background:linear-gradient(#ffffff,#edf3f8);
+      border-radius:8px;
+      cursor:pointer;
+      font:700 12px Tahoma,sans-serif;
+      color:#13202c;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:0 10px;
+    }
+    .btn img{
+      width:16px;
+      height:16px;
+      object-fit:contain;
+    }
+    .btn.active{
+      background:linear-gradient(#dff5f4,#c9ecea);
+      border-color:#79b4b2;
+    }
+    .btn.danger{
+      color:var(--danger);
+    }
+    .palette{
+      display:grid;
+      grid-template-columns:repeat(6,1fr);
+      gap:8px;
+    }
+    .color{
+      width:100%;
+      aspect-ratio:1;
+      border:1px solid #7b8793;
+      border-radius:6px;
+      cursor:pointer;
+    }
+    .color.active{
+      outline:2px solid #2f6fed;
+      outline-offset:1px;
+    }
+    .editor-wrap{
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#fff;
+      padding:14px;
+    }
+    .editor-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:12px;
+      gap:12px;
+    }
+    .editor-head .title{
+      font-weight:700;
+    }
+    .editor-stage{
+      display:grid;
+      grid-template-columns:1fr 160px;
+      gap:14px;
+    }
+    .pixel-card{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fbfdff;
+      padding:12px;
+    }
+    .pixel-toolbar{
+      display:flex;
+      gap:8px;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    }
+    .pixel-grid{
+      width:100%;
+      max-width:560px;
+      aspect-ratio:1;
+      display:grid;
+      grid-template-columns:repeat(24,1fr);
+      grid-template-rows:repeat(24,1fr);
+      border:1px solid #9fb1c2;
+      background:#fff;
+      user-select:none;
+      touch-action:none;
+    }
+    .pixel{
+      border-right:1px solid #ebf0f5;
+      border-bottom:1px solid #ebf0f5;
+      background:var(--pixel-alt);
+    }
+    .preview-card{
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:#fbfdff;
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .preview-box{
+      border:1px solid #bfc9d6;
+      background:#fff;
+      display:grid;
+      place-items:center;
+      min-height:150px;
+    }
+    canvas{
+      image-rendering:pixelated;
+      image-rendering:crisp-edges;
+    }
+    .help{
+      color:var(--muted);
+      line-height:1.45;
+    }
+    .status{
+      padding:10px 18px 14px;
+      color:#4c6177;
+      border-top:1px solid #e4ecf4;
+      background:#fafcfe;
+    }
+    @media (max-width: 980px){
+      .window-body{grid-template-columns:1fr}
+      .editor-stage{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="window-header">
+      <div class="window-drag" id="window-header">
+        <div class="window-title">Edita simbolo grafico</div>
+        <div class="window-status" id="editor-status">Edicao do desenho</div>
+      </div>
+      <div class="window-header-right">
+        <button id="window-close" class="window-close" type="button" aria-label="Fechar">X</button>
+      </div>
+    </div>
+    <div class="window-body">
+      <aside class="group">
+        <h3>Dados do Simbolo</h3>
+        <div class="field">
+          <label for="nome">Nome do simbolo</label>
+          <input id="nome" value="">
+        </div>
+        <div class="field">
+          <label for="especialidade">Especialidade (botao)</label>
+          <select id="especialidade">
+            <option>Dentistica</option>
+            <option>Protese</option>
+            <option>Ortodontia</option>
+            <option>Cirurgia</option>
+            <option>Periodontia</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="forma">Forma de marcacao no odontograma</label>
+          <select id="forma">
+            <option>Face (ex: Restauracao)</option>
+            <option selected>Dente (ex: Coroa)</option>
+            <option>Grupo (ex: Protese-fixa)</option>
+            <option>Arcada (ex: Protese-total)</option>
+            <option>Geral (ex: Profilaxia)</option>
+            <option>Segmento [ex: Bracket]</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ferramentas</label>
+          <div class="tools">
+            <button class="btn active" id="tool-pencil" type="button">Lapis</button>
+            <button class="btn" id="tool-eraser" type="button">Borracha</button>
+            <button class="btn" id="tool-undo" type="button">Desfazer</button>
+            <button class="btn danger" id="tool-clear" type="button">Limpar</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Paleta</label>
+          <div class="palette" id="palette"></div>
+        </div>
+      </aside>
+
+      <section class="editor-wrap">
+        <div class="editor-head">
+          <div class="title">Area de edicao do desenho</div>
+          <div class="help">Use o mouse para editar o desenho selecionado.</div>
+        </div>
+        <div class="editor-stage">
+          <div class="pixel-card">
+            <div class="pixel-toolbar">
+              <button class="btn" id="sample-x" type="button">Carregar X</button>
+              <button class="btn" id="sample-bracket" type="button">Carregar Bracket</button>
+              <button class="btn" id="sample-empty" type="button">Tela vazia</button>
+            </div>
+            <div id="pixel-grid" class="pixel-grid" aria-label="Editor de pixels"></div>
+          </div>
+          <div class="preview-card">
+            <div>
+              <strong>Previa 1x</strong>
+              <div class="preview-box"><canvas id="preview-1x" width="24" height="24"></canvas></div>
+            </div>
+            <div>
+              <strong>Previa ampliada</strong>
+              <div class="preview-box"><canvas id="preview-6x" width="144" height="144"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="group">
+        <h3>Acoes</h3>
+        <div class="field">
+          <button class="btn" id="btn-save" type="button"><img src="/desktop-assets/gravar.png" alt="">Salvar desenho</button>
+        </div>
+        <div class="field">
+          <button class="btn" id="btn-save-as" type="button"><img src="/desktop-assets/gravar.png" alt="">Salvar como</button>
+        </div>
+        <div class="field">
+          <button class="btn" id="btn-cancel" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela edicao</button>
+        </div>
+        <div class="help">
+          <p>Ferramentas disponiveis:</p>
+          <p>- lapis</p>
+          <p>- borracha</p>
+          <p>- desfazer</p>
+          <p>- limpar</p>
+          <p>- previa ampliada</p>
+        </div>
+      </aside>
+    </div>
+    <div class="status">Pronto para editar o desenho do simbolo.</div>
+  </div>
+
+  <script>
+    const SIZE = 24;
+    const COLORS = [
+      "#111111","#ffffff","#d62828","#9d0208","#1d3557","#0b4f6c",
+      "#2a9d8f","#2b9348","#55a630","#80b918","#ffb703","#f48c06",
+      "#fb5607","#e76f51","#8d99ae","#6c757d","#495057","#264653",
+      "#8338ec","#5a189a","#118ab2","#4cc9f0","#ff006e","#c9184a"
+    ];
+
+    const gridEl = document.getElementById("pixel-grid");
+    const paletteEl = document.getElementById("palette");
+    const windowEl = document.querySelector(".window");
+    const headerEl = document.getElementById("window-header");
+    const preview1 = document.getElementById("preview-1x");
+    const preview6 = document.getElementById("preview-6x");
+    const nomeInput = document.getElementById("nome");
+    const especialidadeSelect = document.getElementById("especialidade");
+    const formaSelect = document.getElementById("forma");
+    const statusEl = document.getElementById("editor-status");
+    const ctx1 = preview1.getContext("2d");
+    const ctx6 = preview6.getContext("2d");
+
+    let pixels = Array.from({ length: SIZE * SIZE }, () => "#ffffff");
+    let history = [];
+    let tool = "pencil";
+    let color = "#111111";
+    let drawing = false;
+    let drag = null;
+
+    function pushHistory() {
+      history.push([...pixels]);
+      if (history.length > 40) history.shift();
+    }
+
+    function setTool(next) {
+      tool = next;
+      document.querySelectorAll("#tool-pencil,#tool-eraser").forEach(btn => btn.classList.remove("active"));
+      document.getElementById(`tool-${next}`).classList.add("active");
+    }
+
+    function renderPalette() {
+      paletteEl.innerHTML = COLORS.map(c => `<button class="color${c===color?" active":""}" data-color="${c}" style="background:${c}"></button>`).join("");
+      paletteEl.querySelectorAll(".color").forEach(btn => {
+        btn.addEventListener("click", () => {
+          color = btn.dataset.color;
+          renderPalette();
+        });
+      });
+    }
+
+    function renderGrid() {
+      gridEl.innerHTML = pixels.map((c, i) => `<div class="pixel" data-idx="${i}" style="background:${c}"></div>`).join("");
+    }
+
+    function renderPreview() {
+      ctx1.clearRect(0, 0, SIZE, SIZE);
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          ctx1.fillStyle = pixels[y * SIZE + x];
+          ctx1.fillRect(x, y, 1, 1);
+        }
+      }
+      ctx6.imageSmoothingEnabled = false;
+      ctx6.clearRect(0, 0, preview6.width, preview6.height);
+      ctx6.drawImage(preview1, 0, 0, preview6.width, preview6.height);
+    }
+
+    function drawAt(idx) {
+      if (idx < 0 || idx >= pixels.length) return;
+      pixels[idx] = tool === "eraser" ? "#ffffff" : color;
+      const cell = gridEl.querySelector(`[data-idx="${idx}"]`);
+      if (cell) cell.style.background = pixels[idx];
+      renderPreview();
+    }
+
+    function loadPattern(kind) {
+      pushHistory();
+      pixels = Array.from({ length: SIZE * SIZE }, () => "#ffffff");
+      if (kind === "x") {
+        for (let i = 5; i < 19; i++) {
+          pixels[i * SIZE + i] = "#111111";
+          pixels[i * SIZE + (SIZE - 1 - i)] = "#111111";
+        }
+        for (let i = 7; i < 17; i++) {
+          pixels[(i - 1) * SIZE + i] = "#111111";
+          pixels[(i - 1) * SIZE + (SIZE - 1 - i)] = "#111111";
+        }
+      } else if (kind === "bracket") {
+        for (let y = 7; y <= 16; y++) {
+          pixels[y * SIZE + 9] = "#111111";
+          pixels[y * SIZE + 14] = "#111111";
+        }
+        for (let x = 8; x <= 15; x++) {
+          pixels[7 * SIZE + x] = "#111111";
+          pixels[16 * SIZE + x] = "#111111";
+        }
+      }
+      renderGrid();
+      renderPreview();
+    }
+
+    function centerWindow() {
+      const width = Math.min(1120, window.innerWidth - 24);
+      windowEl.style.width = `${width}px`;
+      const left = Math.max(12, Math.round((window.innerWidth - width) / 2));
+      const top = Math.max(12, Math.round((window.innerHeight - windowEl.offsetHeight) / 2));
+      windowEl.style.left = `${left}px`;
+      windowEl.style.top = `${top}px`;
+    }
+
+    function startDrag(ev) {
+      if (ev.button !== 0) return;
+      if (ev.target.closest("button,input,select,textarea,label")) return;
+      const rect = windowEl.getBoundingClientRect();
+      drag = { dx: ev.clientX - rect.left, dy: ev.clientY - rect.top };
+      ev.preventDefault();
+    }
+
+    function moveDrag(ev) {
+      if (!drag) return;
+      const maxLeft = Math.max(12, window.innerWidth - windowEl.offsetWidth - 12);
+      const maxTop = Math.max(12, window.innerHeight - windowEl.offsetHeight - 12);
+      const left = Math.min(maxLeft, Math.max(12, ev.clientX - drag.dx));
+      const top = Math.min(maxTop, Math.max(12, ev.clientY - drag.dy));
+      windowEl.style.left = `${left}px`;
+      windowEl.style.top = `${top}px`;
+    }
+
+    function stopDrag() {
+      drag = null;
+    }
+
+    function notifyParent(type, payload = {}) {
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type, ...payload }, window.location.origin);
+        }
+      } catch {}
+    }
+
+    function closeEditor() {
+      notifyParent("simbolo-editor-close");
+      try {
+        if (window.opener && !window.opener.closed) {
+          try { window.opener.focus(); } catch {}
+        }
+      } catch {}
+      try { window.close(); } catch {}
+      window.setTimeout(() => {
+        try { window.location.replace("about:blank"); } catch {}
+        window.setTimeout(() => {
+          try { window.open("", "_self"); } catch {}
+          try { window.close(); } catch {}
+        }, 20);
+      }, 20);
+    }
+
+    function rgbToHex(r, g, b) {
+      return `#${[r, g, b].map(v => Number(v).toString(16).padStart(2, "0")).join("")}`;
+    }
+
+    async function loadFromImage(url) {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      const loaded = await new Promise(resolve => {
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(false);
+        img.src = url;
+      });
+      if (!loaded) return false;
+      const canvas = document.createElement("canvas");
+      canvas.width = SIZE;
+      canvas.height = SIZE;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, SIZE, SIZE);
+      ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      const data = ctx.getImageData(0, 0, SIZE, SIZE).data;
+      pushHistory();
+      pixels = Array.from({ length: SIZE * SIZE }, (_, idx) => {
+        const off = idx * 4;
+        const a = data[off + 3];
+        if (a < 24) return "#ffffff";
+        const r = data[off];
+        const g = data[off + 1];
+        const b = data[off + 2];
+        if (r > 245 && g > 245 && b > 245) return "#ffffff";
+        return rgbToHex(r, g, b);
+      });
+      renderGrid();
+      renderPreview();
+      return true;
+    }
+
+    async function applyInitialState() {
+      const params = new URLSearchParams(window.location.search);
+      const nome = params.get("nome") || "";
+      const especialidade = params.get("especialidade") || "";
+      const forma = params.get("forma") || "";
+      const codigo = params.get("codigo") || "";
+      const imageUrl = params.get("image") || "";
+      if (nome) nomeInput.value = nome;
+      if (especialidade) {
+        const match = [...especialidadeSelect.options].find(opt => opt.textContent === especialidade || opt.value === especialidade);
+        if (match) especialidadeSelect.value = match.value;
+      }
+      if (forma) {
+        const match = [...formaSelect.options].find(opt => opt.textContent === forma || opt.value === forma);
+        if (match) formaSelect.value = match.value;
+      }
+      if (codigo) statusEl.textContent = `Editando ${codigo}`;
+      if (imageUrl) await loadFromImage(imageUrl);
+    }
+
+    gridEl.addEventListener("mousedown", ev => {
+      const cell = ev.target.closest(".pixel");
+      if (!cell) return;
+      pushHistory();
+      drawing = true;
+      drawAt(Number(cell.dataset.idx));
+    });
+    gridEl.addEventListener("mouseover", ev => {
+      if (!drawing) return;
+      const cell = ev.target.closest(".pixel");
+      if (!cell) return;
+      drawAt(Number(cell.dataset.idx));
+    });
+    window.addEventListener("mouseup", () => { drawing = false; });
+
+    document.getElementById("tool-pencil").addEventListener("click", () => setTool("pencil"));
+    document.getElementById("tool-eraser").addEventListener("click", () => setTool("eraser"));
+    document.getElementById("tool-undo").addEventListener("click", () => {
+      const prev = history.pop();
+      if (!prev) return;
+      pixels = prev;
+      renderGrid();
+      renderPreview();
+    });
+    document.getElementById("tool-clear").addEventListener("click", () => {
+      pushHistory();
+      pixels = Array.from({ length: SIZE * SIZE }, () => "#ffffff");
+      renderGrid();
+      renderPreview();
+    });
+    document.getElementById("sample-x").addEventListener("click", () => loadPattern("x"));
+    document.getElementById("sample-bracket").addEventListener("click", () => loadPattern("bracket"));
+    document.getElementById("sample-empty").addEventListener("click", () => {
+      pushHistory();
+      pixels = Array.from({ length: SIZE * SIZE }, () => "#ffffff");
+      renderGrid();
+      renderPreview();
+    });
+    function enviarSalvamento(saveAs = false) {
+      const nome = (nomeInput.value || "").trim();
+      const especialidade = especialidadeSelect.selectedOptions?.[0]?.textContent || "";
+      const forma = formaSelect.selectedOptions?.[0]?.textContent || "";
+      if (!nome || !especialidade || !forma) {
+        statusEl.textContent = "Nao pode salvar sem ter campos preenchidos.";
+        window.alert("Nao pode salvar sem ter campos preenchidos.");
+        return;
+      }
+      const image = preview1.toDataURL("image/png");
+      const payload = {
+        type: "simbolo-editor-save",
+        nome,
+        especialidade,
+        forma,
+        saveAs: !!saveAs,
+        codigo: new URLSearchParams(window.location.search).get("codigo") || "",
+        image
+      };
+      notifyParent("simbolo-editor-save", payload);
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(payload, window.location.origin);
+        }
+      } catch {}
+      statusEl.textContent = saveAs ? "Salvando copia do desenho..." : "Salvando desenho...";
+    }
+    document.getElementById("btn-save").addEventListener("click", () => enviarSalvamento(false));
+    document.getElementById("btn-save-as").addEventListener("click", () => enviarSalvamento(true));
+    document.getElementById("btn-cancel").addEventListener("click", closeEditor);
+    document.getElementById("window-close").addEventListener("click", closeEditor);
+    headerEl.addEventListener("mousedown", startDrag);
+    window.addEventListener("mousemove", moveDrag);
+    window.addEventListener("mouseup", stopDrag);
+    window.addEventListener("resize", centerWindow);
+    window.addEventListener("keydown", ev => {
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        closeEditor();
+      }
+    });
+    window.addEventListener("message", ev => {
+      if (ev.origin !== window.location.origin) return;
+      const data = ev.data || {};
+      if (data.type === "simbolo-editor-error") {
+        const message = String(data.message || "Falha ao salvar simbolo.");
+        statusEl.textContent = message;
+        window.alert(message);
+      }
+      if (data.type === "simbolo-editor-saved") {
+        statusEl.textContent = String(data.message || "Desenho salvo com sucesso.");
+      }
+    });
+
+    renderPalette();
+    renderGrid();
+    renderPreview();
+    centerWindow();
+    applyInitialState();
+  </script>
+</body>
+</html>

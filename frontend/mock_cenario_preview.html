@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preview Cenario - Desktop Modernizado</title>
+  <style>
+    :root{
+      --bg:#f2f7fb;
+      --card:#ffffff;
+      --line:#cfd9e5;
+      --line-2:#dbe4ee;
+      --text:#1f2f42;
+      --muted:#5b6f85;
+      --tab:#e8eef5;
+      --tab-active:#ffffff;
+      --cyan:#dffcff;
+      --accent:#0f766e;
+      --shadow:0 16px 34px rgba(20,45,70,.10);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Tahoma,Segoe UI,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(900px 440px at -10% -20%, #d9eaf7 0%, transparent 70%),
+        radial-gradient(820px 420px at 110% -30%, #d8f2ea 0%, transparent 70%),
+        var(--bg);
+      padding:22px;
+    }
+    .wrap{max-width:980px;margin:0 auto}
+    .title{margin:0 0 6px;font-size:23px}
+    .subtitle{margin:0 0 12px;color:var(--muted)}
+    .card{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:var(--card);
+      box-shadow:var(--shadow);
+      padding:12px;
+    }
+    .tabs{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line-2);padding:0 2px 8px}
+    .tab{
+      border:1px solid #bfcbd9;border-radius:10px;padding:8px 10px;font:700 12px Tahoma,sans-serif;
+      background:var(--tab);color:#334a61;cursor:pointer;
+    }
+    .tab.active{background:var(--tab-active);border-color:#9eafc3}
+    .panel{padding:10px 4px}
+    .panel.hidden{display:none}
+    .top-with-note,.cost-block{display:grid;grid-template-columns:1fr 220px;gap:14px;align-items:start}
+    .grid2{display:grid;grid-template-columns:1fr auto;gap:8px;max-width:360px}
+    .lbl{font:700 12px Tahoma,sans-serif;color:#283b50;align-self:center}
+    .mini{
+      width:56px;height:34px;border:1px solid #bdc9d8;border-radius:8px;text-align:center;
+      font:700 12px Tahoma,sans-serif;background:#fff;padding:4px
+    }
+    .metric{
+      width:74px;height:32px;border:1px solid #9beaf3;border-radius:8px;background:var(--cyan);
+      display:grid;place-items:center;font:700 12px Tahoma,sans-serif
+    }
+    .wide{
+      width:120px;height:32px;border:1px solid #9beaf3;border-radius:8px;background:var(--cyan);
+      display:grid;place-items:center;font:700 12px Tahoma,sans-serif
+    }
+    .line{border-top:1px solid var(--line-2);margin:12px 0}
+    .fixo-bottom{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}
+    .note{
+      width:220px;border:1px solid #b9c7d7;border-radius:10px;background:#f8fbff;padding:10px;
+      font:400 12px Calibri,sans-serif;line-height:1.2;color:#44596e
+    }
+    .table-wrap{border:1px solid var(--line);border-radius:10px;overflow:auto;background:#fff}
+    table{width:100%;border-collapse:collapse;font:700 12px Tahoma,sans-serif}
+    th,td{border:1px solid var(--line);padding:5px;text-align:center;vertical-align:middle}
+    thead th{background:#eef3f9}
+    .rowlabel{background:#f6f9fc;text-align:left;padding-left:8px;min-width:110px}
+    .summary{display:flex;gap:12px;align-items:center;margin-top:10px}
+    .summary .lbl{min-width:150px}
+    .cost-grid{display:grid;grid-template-columns:1fr auto;gap:8px;max-width:470px}
+    .in100{width:110px;height:32px;border:1px solid #bdc9d8;border-radius:8px;text-align:center;font:700 12px Tahoma,sans-serif}
+    .actions{display:flex;justify-content:center;gap:8px;margin-top:10px}
+    .btn{border:1px solid #adbdd0;border-radius:10px;padding:8px 12px;font:700 12px Tahoma,sans-serif;background:#f2f7fc}
+    .btn.save{background:var(--accent);border-color:var(--accent);color:#fff}
+    @media (max-width:760px){
+      .top-with-note,.cost-block,.fixo-bottom{grid-template-columns:1fr}
+      .note{width:auto}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="title">Preview Cenario (base desktop)</h1>
+    <p class="subtitle">Mesmo formato do cenario.ui, com acabamento visual moderno e discreto.</p>
+    <section class="card">
+      <div class="tabs">
+        <button class="tab active" data-tab="fixo" type="button">Perfil horario fixo</button>
+        <button class="tab" data-tab="flex" type="button">Perfil horario flexivel</button>
+        <button class="tab" data-tab="custos" type="button">Custos</button>
+      </div>
+
+      <section id="panel-fixo" class="panel">
+        <div class="top-with-note">
+          <div class="grid2">
+            <div class="lbl">Meses de trabalho no Ano</div><input class="mini" value="12">
+            <div class="lbl">Dias uteis / Mes</div><input class="mini" value="22">
+            <div class="lbl">Dias uteis / Ano</div><div class="metric">264</div>
+            <div class="lbl">Horas por dia</div><input class="mini" value="8">
+          </div>
+          <div class="note">Defina quantidade de horas de trabalho no ano. Neste caso o perfil e definido como fixo por ter o mesmo numero de horas todos os dias.</div>
+        </div>
+        <div class="line"></div>
+        <div class="fixo-bottom">
+          <div class="grid2">
+            <div class="lbl">No de Consultorios</div><input class="mini" value="2">
+            <div class="lbl">Horas por ano</div><div class="metric">4224</div>
+            <div class="lbl">Minutos por ano</div><div class="metric">253440</div>
+            <div class="lbl">Turnos por ano</div><div class="metric">1056</div>
+          </div>
+          <div></div>
+        </div>
+      </section>
+
+      <section id="panel-flex" class="panel hidden">
+        <div class="top-with-note">
+          <div class="grid2" style="max-width:260px">
+            <div class="lbl">No de Consultorios</div><input class="mini" value="2">
+          </div>
+          <div class="note">Defina o perfil de horarios que mais se enquadra com sua rotina.</div>
+        </div>
+        <div class="line"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th></th><th>Segunda</th><th>Terca</th><th>Quarta</th><th>Quinta</th><th>Sexta</th><th>Sabado</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="rowlabel">Horas da Manha</td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="2"></td></tr>
+              <tr><td class="rowlabel">Horas da Tarde</td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="3"></td><td><input class="mini" value="2"></td></tr>
+              <tr><td class="rowlabel">Horas da Noite</td><td><input class="mini" value="2"></td><td><input class="mini" value="2"></td><td><input class="mini" value="2"></td><td><input class="mini" value="2"></td><td><input class="mini" value="2"></td><td><input class="mini" value="0"></td></tr>
+              <tr><td class="rowlabel">Dias no ano</td><td><input class="mini" value="52"></td><td><input class="mini" value="52"></td><td><input class="mini" value="52"></td><td><input class="mini" value="52"></td><td><input class="mini" value="52"></td><td><input class="mini" value="26"></td></tr>
+              <tr><td class="rowlabel">Total Horas/Dia</td><td><div class="metric">8</div></td><td><div class="metric">8</div></td><td><div class="metric">8</div></td><td><div class="metric">8</div></td><td><div class="metric">8</div></td><td><div class="metric">4</div></td></tr>
+              <tr><td class="rowlabel">Horas por ano</td><td><div class="metric">416</div></td><td><div class="metric">416</div></td><td><div class="metric">416</div></td><td><div class="metric">416</div></td><td><div class="metric">416</div></td><td><div class="metric">104</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="summary">
+          <div class="lbl">Total Horas Anual</div><div class="wide">2184</div>
+          <div class="lbl">Total Minutos Anual</div><div class="wide">131040</div>
+          <div class="lbl">Total turnos Anual</div><div class="wide">546</div>
+        </div>
+      </section>
+
+      <section id="panel-custos" class="panel hidden">
+        <div class="cost-block">
+          <div class="cost-grid">
+            <div class="lbl">Digite o ano base de calculo desejado</div><input class="in100" value="2026">
+            <div class="lbl">Custo Fixo Anual Pessoal</div><div class="wide">R$ 120.000</div>
+            <div class="lbl">Custo Fixo Anual Profissional</div><div class="wide">R$ 180.000</div>
+            <div class="lbl">Custo Anual</div><div class="wide">R$ 300.000</div>
+          </div>
+          <div class="note">Escolha o ano desejado para base de calculo de custo fixo anual. Para sincronizar, alimente a conta corrente com lancamentos dos grupos de custo fixo pessoal e profissional.</div>
+        </div>
+        <div class="line"></div>
+        <div class="cost-block">
+          <div class="cost-grid">
+            <div class="lbl">Gasto Anual Particular</div><input class="in100" value="120000">
+            <div class="lbl">Gasto Anual Empresarial</div><input class="in100" value="180000">
+            <div class="lbl">Escolha o perfil de horario</div><input class="in100" value="Perfil Fixo">
+            <div class="lbl">Horas por Ano</div><input class="in100" value="4224">
+          </div>
+          <div class="note">Digite os valores referentes aos custos fixos pessoal e empresarial que deseja utilizar como base de calculo para custo fixo por hora.</div>
+        </div>
+        <div class="line"></div>
+        <div class="cost-block">
+          <div class="cost-grid">
+            <div class="lbl">Custo Anual</div><div class="wide">R$ 300.000</div>
+            <div class="lbl">Custo Fixo por Hora</div><div class="wide">R$ 71,02</div>
+            <div class="lbl">Custo Fixo por Minuto</div><div class="wide">R$ 1,18</div>
+            <div class="lbl">Imposto de Renda (%)</div><input class="in100" value="15">
+            <div class="lbl">Comissao Dentista (%)</div><input class="in100" value="20">
+            <div class="lbl">Taxa cartoes (%)</div><input class="in100" value="5">
+          </div>
+          <div class="note">Defina em percentual (%) qual a sua taxa de imposto de renda, comissao e taxa de operadoras de creditos.</div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button class="btn save" type="button">Salvar</button>
+        <button class="btn" type="button">Cancelar</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const tabs = document.querySelectorAll(".tab");
+    const panels = {
+      fixo: document.getElementById("panel-fixo"),
+      flex: document.getElementById("panel-flex"),
+      custos: document.getElementById("panel-custos"),
+    };
+    const setTab = (name) => {
+      tabs.forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
+      Object.entries(panels).forEach(([k, panel]) => panel.classList.toggle("hidden", k !== name));
+    };
+    tabs.forEach((tab) => tab.addEventListener("click", () => setTab(tab.dataset.tab)));
+  </script>
+</body>
+</html>
