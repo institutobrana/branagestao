@@ -1,9 +1,11 @@
-import hashlib
+﻿import hashlib
 import json
+import logging
 import os
 import random
 import re
 from datetime import datetime, timedelta
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -29,6 +31,7 @@ from services.email_service import EmailDeliveryError, send_verification_code
 from services.signup_service import criar_conta_saas
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 DISPOSABLE_DOMAINS = {
@@ -158,6 +161,14 @@ def _google_settings():
     return client_id, client_secret, redirect_uri
 
 
+def _mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "*" * len(value)
+    return f"{value[:4]}...{value[-4:]}"
+
+
 def _upsert_google_user(db: Session, email: str, nome: str):
     usuario = db.query(Usuario).filter(Usuario.email == email).first()
     if usuario:
@@ -192,7 +203,7 @@ def login(
         raise HTTPException(status_code=400, detail="Usuario nao encontrado")
 
     if is_system_user(usuario):
-        raise HTTPException(status_code=403, detail="Conta sistêmica sem login interativo.")
+        raise HTTPException(status_code=403, detail="Conta sistÃªmica sem login interativo.")
 
     owner = _enforce_owner_access(usuario)
     changed = False
@@ -238,7 +249,14 @@ def login(
 @router.get("/auth/google/login")
 def google_login():
     client_id, _, redirect_uri = _google_settings()
+    logger.info(
+        "Google OAuth login start: client_id_configured=%s redirect_uri=%s client_id_masked=%s",
+        bool(client_id),
+        redirect_uri,
+        _mask_secret(client_id),
+    )
     if not client_id:
+        logger.error("Google OAuth login blocked: GOOGLE_CLIENT_ID ausente.")
         raise HTTPException(status_code=503, detail="Google OAuth nao configurado (GOOGLE_CLIENT_ID).")
 
     params = {
@@ -250,22 +268,49 @@ def google_login():
         "access_type": "online",
     }
 
-    return RedirectResponse(url=f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
+    google_redirect = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+    logger.info("Google OAuth login redirecting to Google auth URL.")
+    return RedirectResponse(url=google_redirect)
 
 
 @router.get("/auth/google/callback")
-def google_callback(code: str | None = None, error: str | None = None, db: Session = Depends(get_db)):
+def google_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    logger.info(
+        "Google OAuth callback recebido: has_code=%s has_state=%s error=%s",
+        bool(code),
+        bool(state),
+        error,
+    )
     if error:
-        return RedirectResponse(url=f"/app?oauth_error={error}")
+        redirect_url = f"/app?oauth_error={error}"
+        logger.warning("Google OAuth callback com erro do provedor: error=%s redirect=%s", error, redirect_url)
+        return RedirectResponse(url=redirect_url)
 
     if not code:
-        return RedirectResponse(url="/app?oauth_error=missing_code")
+        redirect_url = "/app?oauth_error=missing_code"
+        logger.warning("Google OAuth callback sem code. redirect=%s", redirect_url)
+        return RedirectResponse(url=redirect_url)
 
     client_id, client_secret, redirect_uri = _google_settings()
+    logger.info(
+        "Google OAuth callback settings: client_id_configured=%s client_secret_configured=%s redirect_uri=%s client_id_masked=%s",
+        bool(client_id),
+        bool(client_secret),
+        redirect_uri,
+        _mask_secret(client_id),
+    )
     if not client_id or not client_secret:
-        return RedirectResponse(url="/app?oauth_error=google_oauth_not_configured")
+        redirect_url = "/app?oauth_error=google_oauth_not_configured"
+        logger.error("Google OAuth callback sem configuracao completa. redirect=%s", redirect_url)
+        return RedirectResponse(url=redirect_url)
 
     try:
+        logger.info("Google OAuth token exchange iniciado: redirect_uri=%s", redirect_uri)
         token_body = urlencode(
             {
                 "client_id": client_id,
@@ -285,10 +330,17 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
 
         with urlopen(token_req, timeout=20) as token_resp:
             token_data = json.loads(token_resp.read().decode("utf-8"))
+        logger.info(
+            "Google OAuth token exchange concluido: keys=%s has_access_token=%s",
+            sorted(token_data.keys()),
+            bool(token_data.get("access_token")),
+        )
 
         access_token = token_data.get("access_token")
         if not access_token:
-            return RedirectResponse(url="/app?oauth_error=missing_access_token")
+            redirect_url = "/app?oauth_error=missing_access_token"
+            logger.error("Google OAuth sem access_token no retorno. redirect=%s token_data=%s", redirect_url, token_data)
+            return RedirectResponse(url=redirect_url)
 
         user_req = Request(
             GOOGLE_USERINFO_URL,
@@ -298,22 +350,43 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
 
         with urlopen(user_req, timeout=20) as userinfo_resp:
             profile = json.loads(userinfo_resp.read().decode("utf-8"))
+        logger.info("Google OAuth userinfo recebido: keys=%s", sorted(profile.keys()))
 
         email = normalize_email(profile.get("email", ""))
         nome = (profile.get("name") or "Usuario Google").strip()
         email_verified = bool(profile.get("email_verified"))
+        logger.info(
+            "Google OAuth profile normalizado: email=%s email_verified=%s nome=%s",
+            email,
+            email_verified,
+            nome,
+        )
 
         if not email or not email_verified:
-            return RedirectResponse(url="/app?oauth_error=unverified_email")
+            redirect_url = "/app?oauth_error=unverified_email"
+            logger.warning("Google OAuth rejeitado por email nao verificado/ausente. redirect=%s", redirect_url)
+            return RedirectResponse(url=redirect_url)
 
         usuario = _upsert_google_user(db, email=email, nome=nome)
+        logger.info(
+            "Google OAuth upsert usuario: encontrado=%s usuario_id=%s clinica_id=%s",
+            bool(usuario),
+            getattr(usuario, "id", None),
+            getattr(usuario, "clinica_id", None),
+        )
         if not usuario:
-            return RedirectResponse(url="/app?oauth_error=account_create_failed")
+            redirect_url = "/app?oauth_error=account_create_failed"
+            logger.error("Google OAuth falhou ao criar/buscar usuario. redirect=%s", redirect_url)
+            return RedirectResponse(url=redirect_url)
         if is_system_user(usuario):
-            return RedirectResponse(url="/app?oauth_error=system_account_login_blocked")
+            redirect_url = "/app?oauth_error=system_account_login_blocked"
+            logger.warning("Google OAuth bloqueado para conta sistemica: usuario_id=%s", usuario.id)
+            return RedirectResponse(url=redirect_url)
         owner = _enforce_owner_access(usuario)
         if not usuario.ativo and not owner:
-            return RedirectResponse(url="/app?oauth_error=user_disabled")
+            redirect_url = "/app?oauth_error=user_disabled"
+            logger.warning("Google OAuth bloqueado: usuario inativo usuario_id=%s redirect=%s", usuario.id, redirect_url)
+            return RedirectResponse(url=redirect_url)
 
         changed = False
         if owner and (not usuario.is_admin or not usuario.ativo):
@@ -334,11 +407,42 @@ def google_callback(code: str | None = None, error: str | None = None, db: Sessi
                 "is_admin": True if owner else usuario.is_admin,
             }
         )
+        logger.info("Google OAuth token de sessao gerado: usuario_id=%s clinica_id=%s", usuario.id, usuario.clinica_id)
 
-        return RedirectResponse(url=f"/app?token={token}")
+        final_redirect = f"/app?token={token}"
+        logger.info("Google OAuth sucesso: redirect_final=%s", final_redirect)
+        return RedirectResponse(url=final_redirect)
 
+    except HTTPError as exc:
+        body = ""
+        try:
+            body = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            body = "<nao foi possivel ler corpo do erro HTTP>"
+        logger.exception(
+            "Google OAuth HTTPError no callback: status=%s reason=%s redirect_uri=%s response_body=%s",
+            getattr(exc, "code", None),
+            getattr(exc, "reason", None),
+            redirect_uri,
+            body,
+        )
+        redirect_url = "/app?oauth_error=unexpected_google_error"
+        logger.error("Google OAuth erro HTTP. redirect=%s", redirect_url)
+        return RedirectResponse(url=redirect_url)
+    except URLError as exc:
+        logger.exception(
+            "Google OAuth URLError no callback: reason=%s redirect_uri=%s",
+            getattr(exc, "reason", None),
+            redirect_uri,
+        )
+        redirect_url = "/app?oauth_error=unexpected_google_error"
+        logger.error("Google OAuth erro de rede. redirect=%s", redirect_url)
+        return RedirectResponse(url=redirect_url)
     except Exception:
-        return RedirectResponse(url="/app?oauth_error=unexpected_google_error")
+        logger.exception("Google OAuth excecao inesperada no callback: redirect_uri=%s", redirect_uri)
+        redirect_url = "/app?oauth_error=unexpected_google_error"
+        logger.error("Google OAuth excecao inesperada. redirect=%s", redirect_url)
+        return RedirectResponse(url=redirect_url)
 
 
 @router.post("/signup/request-code")
