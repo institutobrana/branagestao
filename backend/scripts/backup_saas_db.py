@@ -23,6 +23,19 @@ DEFAULT_ENV_PATH = BACKEND_DIR / ".env"
 DEFAULT_OUTPUT_DIR = BACKEND_DIR / "backups"
 
 
+def _configure_csv_field_limit() -> None:
+    limit = sys.maxsize
+    while True:
+        try:
+            csv.field_size_limit(limit)
+            break
+        except OverflowError:
+            limit = limit // 10
+
+
+_configure_csv_field_limit()
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Gera um backup completo do banco PostgreSQL usado pelo SaaS."
