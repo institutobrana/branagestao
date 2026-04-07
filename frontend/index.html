@@ -1,7 +1,7 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="pt-BR">
   <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Brana Sistema de Precificação</title>
     <link rel="icon" href="/desktop-assets/brana.png">
@@ -2454,10 +2454,12 @@
           <input id="signup-email" type="email">
           <label for="signup-senha">Senha</label>
           <input id="signup-senha" type="password">
+          <div class="login-actions">
+            <button id="btn-signup-code" class="btn" type="button">Solicitar código</button>
+          </div>
           <label for="signup-codigo">Código de ativação</label>
           <input id="signup-codigo" type="text">
           <div class="login-actions">
-            <button id="btn-signup-code" class="btn" type="button">Solicitar código</button>
             <button id="btn-signup-confirm" class="btn primary" type="button">Confirmar cadastro</button>
             <button id="btn-back-login-from-signup" class="btn" type="button">Voltar</button>
           </div>
@@ -2466,12 +2468,14 @@
         <section id="panel-forgot" class="login-panel hidden">
           <label for="forgot-email">E-mail</label>
           <input id="forgot-email" type="email">
+          <div class="login-actions">
+            <button id="btn-forgot-code" class="btn" type="button">Enviar código</button>
+          </div>
           <label for="forgot-codigo">Código</label>
           <input id="forgot-codigo" type="text">
           <label for="forgot-senha">Nova senha</label>
           <input id="forgot-senha" type="password">
           <div class="login-actions">
-            <button id="btn-forgot-code" class="btn" type="button">Enviar código</button>
             <button id="btn-forgot-reset" class="btn primary" type="button">Redefinir senha</button>
             <button id="btn-back-login-from-forgot" class="btn" type="button">Voltar</button>
           </div>
@@ -2725,7 +2729,7 @@
                   </thead>
                   <tbody>
                     <tr>
-                      <td class="rowlabel">Horas da Manhã</td>
+                      <td class="rowlabel">Horas da Manh?</td>
                       <td><input id="txtManha1" class="mini" type="text" value="0"></td>
                       <td><input id="txtManha2" class="mini" type="text" value="0"></td>
                       <td><input id="txtManha3" class="mini" type="text" value="0"></td>
@@ -3122,10 +3126,10 @@
               </colgroup>
               <thead>
                 <tr>
-                  <th>CÃ³digo</th>
+                  <th>Código</th>
                   <th>Material vinculado ao procedimento</th>
-                  <th>RelaÃ§Ã£o</th>
-                  <th>PreÃ§o R$</th>
+                  <th>Relação</th>
+                  <th>Preço R$</th>
                   <th>Custo / UND</th>
                   <th>Quantidade</th>
                   <th>Custo R$</th>
@@ -3830,3 +3834,8 @@
     <script src="/frontend/prestadores_agenda_utf_fix.js?v=20260328-prest-agenda-utf-fix2"></script>
   </body>
 </html>
+
+
+
+
+
