@@ -149,7 +149,7 @@ def _build_verification_template(code: str, purpose: str, exp_minutes: int):
         titulo = "Verificacao de cadastro"
         mensagem = "Use o codigo abaixo para concluir seu cadastro no Brana SaaS."
     else:
-        subject = "Brana SaaS - Codigo para redefinir senha"
+        subject = "Brana Gestão Odontológica - Código para redefinir senha"
         titulo = "Redefinicao de senha"
         mensagem = "Use o codigo abaixo para redefinir sua senha no Brana SaaS."
 
