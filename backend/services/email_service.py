@@ -1,4 +1,4 @@
-import os
+﻿import os
 import smtplib
 from html import escape
 from email.message import EmailMessage
@@ -143,43 +143,35 @@ def send_email_with_attachment(
         raise EmailDeliveryError(f"Falha ao enviar e-mail: {exc}") from exc
 
 
-def _build_verification_template(code: str, purpose: str, exp_minutes: int):
-    if purpose == "signup":
-        subject = "Brana SaaS - Codigo de verificacao de cadastro"
-        titulo = "Verificacao de cadastro"
-        mensagem = "Use o codigo abaixo para concluir seu cadastro no Brana SaaS."
-    else:
-        subject = "Brana Gestão Odontológica - Código para redefinir senha"
-        titulo = "Redefinicao de senha"
-        mensagem = "Use o codigo abaixo para redefinir sua senha no Brana SaaS."
-
-    texto = (
-        f"{titulo}\n\n"
-        f"{mensagem}\n\n"
-        f"Codigo: {code}\n\n"
-        f"O codigo expira em {exp_minutes} minutos.\n\n"
-        "Instituto Brana"
-    )
-
-    html = f"""
+def _build_email_html_base(*, subtitle: str, message: str, code: str, notice: str):
+    return f"""
 <html>
-  <body style="margin:0;padding:0;background:#f7f7f9;font-family:Arial,sans-serif;color:#1f2937;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:24px 0;">
+  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:28px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;">
             <tr>
-              <td style="padding:24px;">
-                <h1 style="margin:0 0 12px;font-size:22px;line-height:1.3;color:#111827;">{escape(titulo)}</h1>
-                <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#374151;">{escape(mensagem)}</p>
-                <div style="margin:0 0 18px;padding:14px 16px;background:#f3f4f6;border:1px dashed #9ca3af;border-radius:6px;font-size:28px;font-weight:700;letter-spacing:4px;text-align:center;color:#111827;">
-                  {escape(code)}
-                </div>
-                <p style="margin:0 0 20px;font-size:14px;line-height:1.5;color:#4b5563;">
-                  O codigo expira em {exp_minutes} minutos.
+              <td style="padding:32px 28px;">
+                <p style="margin:0 0 18px;font-size:22px;line-height:1.2;font-weight:700;color:#0f172a;">
+                  Brana Gestão Odontológica
                 </p>
-                <p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280;">
-                  Instituto Brana
+                <h1 style="margin:0 0 12px;font-size:24px;line-height:1.3;font-weight:700;color:#111827;">
+                  {escape(subtitle)}
+                </h1>
+                <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#374151;">
+                  {escape(message)}
+                </p>
+                <div style="margin:0 0 18px;padding:16px 20px;background:#eaf2ff;border-radius:12px;text-align:center;">
+                  <span style="display:inline-block;font-size:34px;line-height:1;font-weight:700;letter-spacing:6px;color:#1e3a8a;">
+                    {escape(code)}
+                  </span>
+                </div>
+                <p style="margin:0 0 24px;font-size:13px;line-height:1.5;color:#6b7280;">
+                  {escape(notice)}
+                </p>
+                <p style="margin:0;padding-top:18px;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.5;color:#6b7280;">
+                  Instituto Brana • Sistema de Gestão Odontológica
                 </p>
               </td>
             </tr>
@@ -191,7 +183,42 @@ def _build_verification_template(code: str, purpose: str, exp_minutes: int):
 </html>
 """.strip()
 
-    return subject, html, texto
+
+def _build_reset_password_template(code: str):
+    subject = "Brana Gestão Odontológica - Código para redefinir senha"
+    subtitle = "Redefinição de senha"
+    message = "Use o código abaixo para redefinir sua senha."
+    notice = "Este código expira em poucos minutos."
+    text = (
+        "Brana Gestão Odontológica\n\n"
+        "Seu código para redefinir senha é:\n\n"
+        f"{code}\n\n"
+        "Este código expira em poucos minutos."
+    )
+    html = _build_email_html_base(subtitle=subtitle, message=message, code=code, notice=notice)
+    return subject, html, text
+
+
+def _build_signup_verification_template(code: str):
+    subject = "Brana Gestão Odontológica - Código de verificação"
+    subtitle = "Verificação de cadastro"
+    message = "Use o código abaixo para concluir seu cadastro."
+    notice = "Este código expira em poucos minutos."
+    text = (
+        "Brana Gestão Odontológica\n\n"
+        "Seu código de verificação é:\n\n"
+        f"{code}\n\n"
+        "Este código expira em poucos minutos."
+    )
+    html = _build_email_html_base(subtitle=subtitle, message=message, code=code, notice=notice)
+    return subject, html, text
+
+
+def _build_verification_template(code: str, purpose: str, exp_minutes: int):
+    _ = exp_minutes  # Mantido para compatibilidade com a assinatura atual.
+    if purpose == "signup":
+        return _build_signup_verification_template(code)
+    return _build_reset_password_template(code)
 
 
 def send_verification_code(to_email: str, code: str, purpose: str):
