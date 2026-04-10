@@ -1,34 +1,57 @@
+# =========================
 # Python
+# =========================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
+# =========================
 # Ambiente
+# =========================
 .env
 .env.*
 !.env.example
 venv/
 .venv/
 env/
+venv_saas/
 
+# =========================
 # Logs e temporários
+# =========================
 *.log
 *.tmp
-*.bak
 
+# Backups (importante)
+*.bak
+*.bak_*
+_backup_*/
+*_backup_*
+
+# arquivos de check/teste
+*backup_check.js
+*from_fullbackup_check.js
+*sync-combo*
+
+# =========================
 # IDE / SO
+# =========================
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
 
+# =========================
 # Arquivos locais de diagnóstico
+# =========================
 estrutura.txt
 git_status.txt
 git_remote.txt
 
-# Backups e bancos locais
+# =========================
+# Bancos locais
+# =========================
 backups/
 *.sqlite
 *.sqlite3
