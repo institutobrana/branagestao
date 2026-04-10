@@ -151,12 +151,30 @@
     sw.style.background = toHex(selected);
   }
 
+  function syncBuiltDropdown(select) {
+    if (!(select instanceof HTMLSelectElement)) return;
+    var wrap = select.parentElement;
+    if (!(wrap instanceof HTMLElement)) return;
+    var root = wrap.querySelector(".easy-color-dropdown");
+    if (!(root instanceof HTMLElement)) return;
+    var headSwatch = root.querySelector(".easy-color-swatch");
+    var headLabel = root.querySelector(".easy-color-label");
+    var selected = select.options[select.selectedIndex] || null;
+    if (headSwatch instanceof HTMLElement) headSwatch.style.background = toHex(selected);
+    if (headLabel instanceof HTMLElement) headLabel.textContent = fixedLabel(selected ? selected.textContent : "");
+    var items = root.querySelectorAll(".easy-color-item");
+    items.forEach(function (item, idx) {
+      item.classList.toggle("active", idx === select.selectedIndex);
+    });
+  }
+
   function buildDropdown(select) {
     if (!(select instanceof HTMLSelectElement)) return;
     var wrap = select.parentElement;
     if (!(wrap instanceof HTMLElement)) return;
     if (select.dataset.easyColorBuilt === "1") {
       syncPrimarySwatch(select);
+      syncBuiltDropdown(select);
       return;
     }
 

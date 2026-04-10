@@ -1,8 +1,8 @@
-(function prestAgendaRefinoInit() {
+﻿(function prestAgendaRefinoInit() {
   if (window.__prestAgendaRefinoApplied) return;
   window.__prestAgendaRefinoApplied = true;
-  // O patch canônico da aba Apresentação controla os combos de cor.
-  // O refino não deve mais construir renderizador próprio.
+  // O patch canÃ´nico da aba ApresentaÃ§Ã£o controla os combos de cor.
+  // O refino nÃ£o deve mais construir renderizador prÃ³prio.
   window.__prestAgendaApresentacaoPatchApplied = true;
   const VISUALIZACAO_CAMPOS = [
     "Número do paciente",
@@ -17,7 +17,7 @@
     "Sala",
   ];
   const VISUALIZACAO_PADRAO = [
-    "NÃºmero do paciente",
+    "Número do paciente",
     "Nome do paciente",
     "Fone 1",
     "Fone 2",
@@ -176,6 +176,33 @@
     setBySelector(backdrop, "#prest-agenda-cancelar", "Cancela");
   }
 
+  function normalizeEscalaPane() {
+    const pane = document.querySelector('#prest-agenda-backdrop [data-tab="escala"]');
+    if (!pane) return;
+
+    const groups = pane.querySelectorAll(".prest-agenda-group h4");
+    if (groups.length >= 1) setText(groups[0], "Manhã");
+    if (groups.length >= 2) setText(groups[1], "Tarde");
+    if (groups.length >= 3) setText(groups[2], "Duração do horário");
+    if (groups.length >= 4) setText(groups[3], "Visualizar horários");
+
+    const labels = pane.querySelectorAll("label");
+    labels.forEach((lbl) => {
+      const key = normalizeText(lbl.textContent);
+      if (key.includes("horario inicial")) setText(lbl, "Horário inicial..........");
+      if (key.includes("horario final")) setText(lbl, "Horário final............");
+      if (key.includes("agenda da semana")) setText(lbl, "Agenda da semana:");
+      if (key.includes("agenda do dia")) setText(lbl, "Agenda do dia:");
+    });
+
+    const spans = pane.querySelectorAll("span");
+    spans.forEach((sp) => {
+      const key = normalizeText(sp.textContent);
+      if (key === "horarios") setText(sp, "horários");
+      if (key === "minutos") setText(sp, "minutos");
+    });
+  }
+
   function normalizeBloqueiosPane() {
     const pane = document.querySelector('#prest-agenda-backdrop [data-tab="bloqueios"]');
     if (!pane) return;
@@ -330,8 +357,8 @@
     const pane = document.querySelector('#prest-agenda-backdrop [data-tab="apresentacao"]');
     if (!pane) return;
 
-    // Remove qualquer combo legado, evitando duplicidade/sobreposição.
-    // O render canônico da aba Apresentação fica no patch dedicado.
+    // Remove qualquer combo legado, evitando duplicidade/sobreposiÃ§Ã£o.
+    // O render canÃ´nico da aba ApresentaÃ§Ã£o fica no patch dedicado.
     pane.querySelectorAll(".easy-color-combo").forEach((node) => node.remove());
     pane.querySelectorAll(".easy-force-combo").forEach((node) => node.remove());
 
@@ -366,7 +393,7 @@
         opt.textContent = fixed;
         opt.dataset.easyColor = colorFromLabel(fixed);
       });
-      // Render custom desativado no refino; o patch canônico monta a UI final.
+      // Render custom desativado no refino; o patch canÃ´nico monta a UI final.
       el.classList.remove("hidden");
       el.dataset.easyComboReady = "0";
       syncApresentacaoSwatch(el);
@@ -494,7 +521,7 @@
       if (t.includes("script")) setText(lbl, "Script:");
     });
 
-    // Mantém a área de cor da janela Fonte como no estado anterior estável.
+    // MantÃ©m a Ã¡rea de cor da janela Fonte como no estado anterior estÃ¡vel.
   }
 
   function normalizeVisualizacaoPane() {
@@ -556,6 +583,7 @@
   function runNormalize() {
     applyVisualFitEscala();
     normalizeAgendaPrincipal();
+    normalizeEscalaPane();
     normalizeBloqueiosPane();
     normalizeApresentacaoPane();
     normalizeFonteModal();
@@ -595,3 +623,4 @@
 
   setTimeout(runNormalize, 0);
 })();
+

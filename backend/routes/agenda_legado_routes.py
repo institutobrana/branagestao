@@ -14,6 +14,7 @@ from models.prestador_odonto import PrestadorOdonto
 from models.unidade_atendimento import UnidadeAtendimento
 from models.usuario import Usuario
 from security.dependencies import get_current_user, require_module_access
+from services.signup_service import garantir_auxiliares_raw_clinica
 
 router = APIRouter(
     prefix="/agenda-legado",
@@ -30,6 +31,31 @@ TIPOS_FONE_AGENDA = (
     {"id": 4, "codigo": "4", "descricao": "Celular", "ordem": 4, "valor_int": 4},
     {"id": 5, "codigo": "5", "descricao": "Recado", "ordem": 5, "valor_int": 5},
 )
+
+AGENDA_CONFIG_PADRAO = {
+    "manha_inicio": "07:00",
+    "manha_fim": "13:00",
+    "tarde_inicio": "13:00",
+    "tarde_fim": "20:00",
+    "duracao": "5",
+    "semana_horarios": "12",
+    "dia_horarios": "12",
+    "apresentacao_particular_cor": "#ffff00",
+    "apresentacao_convenio_cor": "#0000ff",
+    "apresentacao_compromisso_cor": "#00e5ef",
+    "apresentacao_fonte": {
+        "family": "MS Sans Serif",
+        "size": 8,
+        "bold": False,
+        "italic": False,
+        "underline": False,
+        "strike": False,
+        "color": "#000000",
+        "script": "Ocidental",
+    },
+    "visualizacao_campos": [],
+    "bloqueios_itens": [],
+}
 
 
 class AgendaPayload(BaseModel):
@@ -135,9 +161,34 @@ def _aux_to_options(rows: list[ItemAuxiliar]) -> list[dict]:
                 "descricao": descricao or codigo,
                 "ordem": int(row.ordem) if row.ordem is not None else None,
                 "valor_int": valor_int,
+                "cor_apresentacao": str(getattr(row, "cor_apresentacao", "") or "").strip(),
             }
         )
     return itens
+
+
+def _coerce_agenda_int(value: object, default: int, minimum: int) -> str:
+    try:
+        parsed = int(str(value).strip())
+    except Exception:
+        parsed = default
+    return str(max(minimum, parsed))
+
+
+def _normalize_agenda_config(raw: object) -> dict:
+    cfg = dict(AGENDA_CONFIG_PADRAO)
+    if isinstance(raw, dict):
+        cfg.update(raw)
+    cfg["duracao"] = _coerce_agenda_int(cfg.get("duracao", "5"), default=5, minimum=5)
+    cfg["semana_horarios"] = _coerce_agenda_int(cfg.get("semana_horarios", "12"), default=12, minimum=1)
+    cfg["dia_horarios"] = _coerce_agenda_int(cfg.get("dia_horarios", "12"), default=12, minimum=1)
+    if not isinstance(cfg.get("visualizacao_campos"), list):
+        cfg["visualizacao_campos"] = []
+    if not isinstance(cfg.get("bloqueios_itens"), list):
+        cfg["bloqueios_itens"] = []
+    if not isinstance(cfg.get("apresentacao_fonte"), dict):
+        cfg["apresentacao_fonte"] = dict(AGENDA_CONFIG_PADRAO["apresentacao_fonte"])
+    return cfg
 
 
 @router.get("")
@@ -233,6 +284,15 @@ def listar_prestadores(
         if not nome:
             continue
         especialidades_exec = _load_json_list(item.especialidades_json)
+        agenda_config_raw = {}
+        try:
+            txt = str(item.agenda_config_json or "").strip()
+            if txt:
+                parsed = json.loads(txt)
+                if isinstance(parsed, dict):
+                    agenda_config_raw = parsed
+        except Exception:
+            agenda_config_raw = {}
         itens.append(
             {
                 "id": prestador_id,
@@ -242,6 +302,7 @@ def listar_prestadores(
                 "executa_procedimento": bool(item.executa_procedimento),
                 "especialidade": str(item.especialidade or "").strip(),
                 "especialidades_exec": especialidades_exec,
+                "agenda_config": _normalize_agenda_config(agenda_config_raw),
             }
         )
     itens.sort(key=lambda x: (str(x.get("nome") or "").lower(), int(x.get("id") or 0)))
@@ -328,16 +389,32 @@ def listar_status_agendamento(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    clinica_id = int(current_user.clinica_id)
     rows = (
         db.query(ItemAuxiliar)
         .filter(
-            ItemAuxiliar.clinica_id == int(current_user.clinica_id),
+            ItemAuxiliar.clinica_id == clinica_id,
             ItemAuxiliar.tipo.in_(TIPOS_AUX_STATUS_AGENDA),
-            ItemAuxiliar.inativo.is_(False),
+            or_(ItemAuxiliar.inativo.is_(False), ItemAuxiliar.inativo.is_(None)),
         )
         .order_by(ItemAuxiliar.ordem.asc().nullslast(), ItemAuxiliar.descricao.asc(), ItemAuxiliar.id.asc())
         .all()
     )
+    if not rows:
+        try:
+            garantir_auxiliares_raw_clinica(db, clinica_id)
+        except Exception:
+            pass
+        rows = (
+            db.query(ItemAuxiliar)
+            .filter(
+                ItemAuxiliar.clinica_id == clinica_id,
+                or_(ItemAuxiliar.inativo.is_(False), ItemAuxiliar.inativo.is_(None)),
+                ItemAuxiliar.tipo.ilike("%agendamento%"),
+            )
+            .order_by(ItemAuxiliar.ordem.asc().nullslast(), ItemAuxiliar.descricao.asc(), ItemAuxiliar.id.asc())
+            .all()
+        )
     return _aux_to_options(rows)
 
 

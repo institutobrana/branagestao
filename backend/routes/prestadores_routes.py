@@ -323,6 +323,12 @@ def _normalize_agenda_config(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {}
     cfg = dict(raw)
+    cfg["manha_inicio"] = _normalize_hhmm(cfg.get("manha_inicio")) or "07:00"
+    cfg["manha_fim"] = _normalize_hhmm(cfg.get("manha_fim")) or "13:00"
+    cfg["tarde_inicio"] = _normalize_hhmm(cfg.get("tarde_inicio")) or "13:00"
+    cfg["tarde_fim"] = _normalize_hhmm(cfg.get("tarde_fim")) or "20:00"
+    duracao = _coerce_int(cfg.get("duracao"))
+    cfg["duracao"] = str(max(5, duracao or 5))
     itens = raw.get("bloqueios_itens")
     if isinstance(itens, list):
         normalized: list[dict[str, Any]] = []
