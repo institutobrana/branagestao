@@ -7006,6 +7006,8 @@ let agendaLegadoStatusCache=[];
 let agendaLegadoNomeUltimoPrompt="";
 let agendaLegadoNomeConfirmadoComoLivre="";
 let agendaLegadoTiposContatoCache=[];
+let agendaLegadoAssuntosCompromissoCache=[];
+let agendaLegadoAssuntosCompromissoLoading=false;
 function agendaLegadoEnsureUI(){
   if(agendaLegado)return;
   const style=document.createElement("style");
@@ -7098,10 +7100,93 @@ function agendaLegadoSetModalTab(tab){
   if(agendaLegado.tabDadosPanel)agendaLegado.tabDadosPanel.classList.toggle("hidden",t!=="dados");
   if(agendaLegado.tabRepetePanel)agendaLegado.tabRepetePanel.classList.toggle("hidden",t!=="repete");
 }
+function agendaLegadoClampInt(value,min,max,fallback){
+  const parsed=parseInt(String(value??"").trim(),10);
+  if(!Number.isFinite(parsed))return fallback;
+  return Math.max(min,Math.min(max,parsed));
+}
+function agendaLegadoRepeteModoAtual(){
+  if(agendaLegado?.repeteModoSemanas?.checked)return"semanas";
+  if(agendaLegado?.repeteModoMeses?.checked)return"meses";
+  return"dias";
+}
+function agendaLegadoAtualizarRepeteEstado(){
+  if(!agendaLegado?.repeteAtivo)return;
+  const ativo=!!agendaLegado.repeteAtivo.checked;
+  const modo=agendaLegadoRepeteModoAtual();
+  const setState=(el,on)=>{if(el)el.disabled=!on;};
+  setState(agendaLegado.repeteModoDias,ativo);
+  setState(agendaLegado.repeteModoSemanas,ativo);
+  setState(agendaLegado.repeteModoMeses,ativo);
+  setState(agendaLegado.repeteSobrepor,ativo);
+  setState(agendaLegado.repeteDias,ativo&&modo==="dias");
+  setState(agendaLegado.repeteSemanas,ativo&&modo==="semanas");
+  setState(agendaLegado.repeteDiaSemana,ativo&&modo==="semanas");
+  setState(agendaLegado.repeteDiaMes,ativo&&modo==="meses");
+  setState(agendaLegado.repeteMeses,ativo&&modo==="meses");
+}
+function agendaLegadoDiaMesDataModal(){
+  const iso=agendaLegadoParseDataInput(agendaLegado?.modalData?.value||"");
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso))return 1;
+  const partes=iso.split("-").map(v=>parseInt(v,10));
+  return agendaLegadoClampInt(partes[2],1,31,1);
+}
+function agendaLegadoResetRepeteControles(){
+  if(!agendaLegado?.repeteAtivo)return;
+  if(agendaLegado.repeteAtivo)agendaLegado.repeteAtivo.checked=false;
+  if(agendaLegado.repeteModoDias)agendaLegado.repeteModoDias.checked=true;
+  if(agendaLegado.repeteModoSemanas)agendaLegado.repeteModoSemanas.checked=false;
+  if(agendaLegado.repeteModoMeses)agendaLegado.repeteModoMeses.checked=false;
+  if(agendaLegado.repeteDias)agendaLegado.repeteDias.value="1";
+  if(agendaLegado.repeteSemanas)agendaLegado.repeteSemanas.value="1";
+  if(agendaLegado.repeteMeses)agendaLegado.repeteMeses.value="1";
+  if(agendaLegado.repeteDiaMes)agendaLegado.repeteDiaMes.value=String(agendaLegadoDiaMesDataModal());
+  if(agendaLegado.repeteSobrepor)agendaLegado.repeteSobrepor.checked=false;
+  if(agendaLegado.repeteDiaSemana){
+    const iso=agendaLegadoParseDataInput(agendaLegado?.modalData?.value||"");
+    let diaSem=1;
+    if(/^\d{4}-\d{2}-\d{2}$/.test(iso)){
+      const [y,m,d]=iso.split("-").map(v=>parseInt(v,10));
+      const civil=new Date(y,m-1,d);
+      const jsDay=civil.getDay();
+      if(jsDay===0)diaSem=1;
+      else diaSem=agendaLegadoClampInt(jsDay,1,6,1);
+    }
+    agendaLegado.repeteDiaSemana.value=String(diaSem);
+  }
+  agendaLegadoAtualizarRepeteEstado();
+}
+function agendaLegadoColetarRepeticaoConfig(){
+  if(!agendaLegado?.repeteAtivo?.checked)return{ativo:false,payload:null};
+  const modo=agendaLegadoRepeteModoAtual();
+  const payload={modo,sobrepor:!!agendaLegado?.repeteSobrepor?.checked};
+  if(modo==="dias"){
+    const qtd=agendaLegadoClampInt(agendaLegado?.repeteDias?.value,1,60,1);
+    if(agendaLegado.repeteDias)agendaLegado.repeteDias.value=String(qtd);
+    payload.qtd_dias=qtd;
+  }else if(modo==="semanas"){
+    const qtd=agendaLegadoClampInt(agendaLegado?.repeteSemanas?.value,1,60,1);
+    const diaSem=agendaLegadoClampInt(agendaLegado?.repeteDiaSemana?.value,1,6,1);
+    if(agendaLegado.repeteSemanas)agendaLegado.repeteSemanas.value=String(qtd);
+    if(agendaLegado.repeteDiaSemana)agendaLegado.repeteDiaSemana.value=String(diaSem);
+    payload.qtd_semanas=qtd;
+    payload.dia_semana=diaSem;
+  }else{
+    const diaMes=agendaLegadoClampInt(agendaLegado?.repeteDiaMes?.value,1,31,agendaLegadoDiaMesDataModal());
+    const qtd=agendaLegadoClampInt(agendaLegado?.repeteMeses?.value,1,60,1);
+    if(agendaLegado.repeteDiaMes)agendaLegado.repeteDiaMes.value=String(diaMes);
+    if(agendaLegado.repeteMeses)agendaLegado.repeteMeses.value=String(qtd);
+    payload.dia_mes=diaMes;
+    payload.qtd_meses=qtd;
+  }
+  return{ativo:true,payload};
+}
 function agendaLegadoAplicarBloqueioPorTipo(){
   if(!agendaLegado)return;
   const tipo=String(agendaLegado?.modalTipo?.value||"").trim();
   const isCompromisso=tipo==="2";
+  const lblAssunto=agendaLegado?.modalBackdrop?.querySelector('label[for="agenda-legado-modal-motivo"]');
+  if(lblAssunto)lblAssunto.textContent="Assunto:";
   if(agendaLegado.modalNome){
     agendaLegado.modalNome.disabled=isCompromisso;
     if(isCompromisso){
@@ -7113,6 +7198,17 @@ function agendaLegadoAplicarBloqueioPorTipo(){
     agendaLegado.modalStatus.disabled=isCompromisso;
     if(isCompromisso)agendaLegado.modalStatus.value="";
   }
+  agendaLegadoAplicarFocoPorTipo();
+}
+function agendaLegadoAplicarFocoPorTipo(){
+  if(!agendaLegado)return;
+  const tipo=String(agendaLegado?.modalTipo?.value||"").trim();
+  const alvo=tipo==="2"?agendaLegado?.modalMotivo:agendaLegado?.modalNome;
+  if(!alvo||alvo.disabled)return;
+  try{
+    alvo.focus();
+    if(alvo instanceof HTMLInputElement)alvo.select();
+  }catch{}
 }
 function agendaLegadoRenderAuxSelect(selectEl,itens,placeholder=""){
   if(!selectEl)return;
@@ -7183,6 +7279,61 @@ function agendaLegadoNomeExisteNoCadastro(nome){
 function agendaLegadoFecharDialogNomeNaoEncontrado(){
   if(agendaLegado?.nfBackdrop)agendaLegado.nfBackdrop.classList.add("hidden");
 }
+function agendaLegadoFecharDialogEscala(){
+  if(agendaLegado?.escalaBackdrop)agendaLegado.escalaBackdrop.classList.add("hidden");
+  const done=agendaLegado?.escalaResolver;
+  if(agendaLegado)agendaLegado.escalaResolver=null;
+  if(typeof done==="function")done();
+}
+function agendaLegadoAbrirDialogEscala(){
+  if(!agendaLegado?.escalaBackdrop||!agendaLegado?.escalaMsg){
+    window.alert("Horário não pode estar fora da escala.");
+    return Promise.resolve();
+  }
+  if(typeof agendaLegado.escalaResolver==="function"){
+    const pendente=agendaLegado.escalaResolver;
+    agendaLegado.escalaResolver=null;
+    pendente();
+  }
+  agendaLegado.escalaMsg.textContent="Horário não pode estar fora da escala.";
+  if(agendaLegado.escalaAjuda){
+    agendaLegado.escalaAjuda.style.display="";
+  }
+  if(agendaLegado.escalaHelp){
+    agendaLegado.escalaHelp.textContent="Verifique a escala de horários no módulo Configura - Agenda.";
+    agendaLegado.escalaHelp.classList.add("hidden");
+  }
+  agendaLegado.escalaBackdrop.classList.remove("hidden");
+  requestAnimationFrame(()=>{try{agendaLegado.escalaAjuda?.focus()}catch{}});
+  return new Promise(resolve=>{agendaLegado.escalaResolver=resolve});
+}
+function agendaLegadoMostrarAjudaEscala(){
+  if(!agendaLegado?.escalaHelp)return;
+  agendaLegado.escalaHelp.textContent="Verifique a escala de horários no módulo Configura - Agenda.";
+  agendaLegado.escalaHelp.classList.remove("hidden");
+}
+function agendaLegadoAbrirDialogDuracaoPermitida(maxPermitido){
+  const maxTxt=Math.max(5,parseInt(maxPermitido||5,10)||5);
+  if(!agendaLegado?.escalaBackdrop||!agendaLegado?.escalaMsg){
+    window.alert(`O valor fornecido não é permitido.\nOs valores permitidos são de 5 a ${maxTxt}.`);
+    return Promise.resolve();
+  }
+  if(typeof agendaLegado.escalaResolver==="function"){
+    const pendente=agendaLegado.escalaResolver;
+    agendaLegado.escalaResolver=null;
+    pendente();
+  }
+  agendaLegado.escalaMsg.innerHTML=`O valor fornecido não é permitido.<br>Os valores permitidos são de 5 a ${maxTxt}.`;
+  if(agendaLegado.escalaAjuda){
+    agendaLegado.escalaAjuda.style.display="none";
+  }
+  if(agendaLegado.escalaHelp){
+    agendaLegado.escalaHelp.classList.add("hidden");
+  }
+  agendaLegado.escalaBackdrop.classList.remove("hidden");
+  requestAnimationFrame(()=>{try{agendaLegado.escalaOk?.focus()}catch{}});
+  return new Promise(resolve=>{agendaLegado.escalaResolver=resolve});
+}
 async function agendaLegadoConfirmarDialogNomeNaoEncontrado(){
   const textoNome=String(agendaLegado?.nfBackdrop?.dataset?.nomeBusca||agendaLegado?.modalNome?.value||"").trim();
   const acao=(agendaLegado?.nfRadioNovo?.checked!==false)?"novo":"buscar";
@@ -7195,6 +7346,11 @@ async function agendaLegadoConfirmarDialogNomeNaoEncontrado(){
   agendaLegadoLimparPacienteVinculo();
   if(agendaLegado?.modalNome){
     agendaLegado.modalNome.value=textoNome;
+  }
+  if(agendaLegado?.modalMotivo){
+    agendaLegado.modalMotivo.focus();
+    if(agendaLegado.modalMotivo instanceof HTMLInputElement)agendaLegado.modalMotivo.select();
+  }else if(agendaLegado?.modalNome){
     agendaLegado.modalNome.focus();
   }
 }
@@ -7287,7 +7443,14 @@ function agendaLegadoEnriquecerModal(){
       .agenda-legado-top .col-dur{grid-column:3}
       .agenda-legado-top .col-min{grid-column:4}
       .agenda-legado-top .col-sala{grid-column:5}
-      .agenda-legado-mini{height:22px;border:1px solid #9ea7b4;background:#ececec;padding:0;cursor:pointer}
+      .agenda-legado-mini{width:16px;min-width:16px;height:16px;border:1px solid #7f8fa3;background:#f4f4f4;padding:0;cursor:pointer;box-sizing:border-box;display:block}
+      .agenda-legado-mini.periodo-manha{background:linear-gradient(to bottom,#26e8ef 0 50%,#ffffff 50% 100%)}
+      .agenda-legado-mini.periodo-tarde{background:linear-gradient(to bottom,#ffffff 0 50%,#26e8ef 50% 100%)}
+      .agenda-legado-mini.periodo-dia{background:#26e8ef}
+      .agenda-legado-mini:disabled{opacity:1;filter:none;cursor:default;border-color:#aeb7c4}
+      .agenda-legado-mini.periodo-manha:disabled{background:linear-gradient(to bottom,#c9eef1 0 50%,#f7f7f7 50% 100%)}
+      .agenda-legado-mini.periodo-tarde:disabled{background:linear-gradient(to bottom,#f7f7f7 0 50%,#c9eef1 50% 100%)}
+      .agenda-legado-mini.periodo-dia:disabled{background:#c9eef1}
       .agenda-legado-mini:focus{outline:1px dotted #000;outline-offset:-3px}
       .agenda-legado-two{grid-template-columns:106px 1fr 24px}
       .agenda-legado-two-tight{grid-template-columns:106px 1fr}
@@ -7295,9 +7458,9 @@ function agendaLegadoEnriquecerModal(){
       .agenda-legado-telefones{display:grid;grid-template-columns:118px 128px 24px;gap:8px 6px;align-items:center}
       .agenda-legado-telefones select,.agenda-legado-telefones input{height:28px}
       .agenda-legado-telefones .ico{height:28px;width:24px;border:1px solid #9ea7b4;background:#ececec url('/desktop-assets/whatsapp.png') center/14px 14px no-repeat;color:transparent;font-size:10px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center}
-      .agenda-legado-bloco-telefones{display:grid;grid-template-columns:278px 206px;gap:6px;align-items:start;justify-content:start;margin-top:4px;padding-top:4px;border-top:1px solid #b5bdc8}
+      .agenda-legado-bloco-telefones{display:grid;grid-template-columns:278px 1fr;gap:6px;align-items:start;justify-content:start;margin-top:4px;padding-top:4px;border-top:1px solid #b5bdc8}
       .agenda-legado-bloco-telefones > div{min-width:0}
-      #agenda-legado-modal-observ{width:206px;height:96px;min-height:96px;max-height:96px;resize:none}
+      #agenda-legado-modal-observ{width:100%;height:96px;min-height:96px;max-height:96px;resize:none}
       .agenda-legado-stamps{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;padding-top:4px;border-top:1px solid #b5bdc8}
       .agenda-legado-stamps input[readonly]{background:#26e8ef}
       #agenda-legado-modal-data[readonly]{background:#26e8ef}
@@ -7326,6 +7489,19 @@ function agendaLegadoEnriquecerModal(){
       .agenda-legado-nf-opt{display:flex;align-items:center;gap:6px;margin:3px 0}
       .agenda-legado-nf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
       .agenda-legado-nf-actions .materiais-btn{min-width:84px;height:28px;padding:0 10px;border-radius:0}
+      .agenda-legado-escala-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.28);display:grid;place-items:center;z-index:1710}
+      .agenda-legado-escala-backdrop.hidden{display:none}
+      .agenda-legado-escala-modal{width:640px;max-width:94vw;border:1px solid #9ea7b4;background:#ececec;box-sizing:border-box;font:12px Tahoma,sans-serif}
+      .agenda-legado-escala-head{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #c4cbd5}
+      .agenda-legado-escala-head .ttl{font:12px Tahoma,sans-serif}
+      .agenda-legado-escala-body{display:grid;grid-template-columns:90px 1fr;align-items:start;gap:10px;padding:14px 14px 8px}
+      .agenda-legado-escala-icon{width:58px;height:58px;border-radius:50%;border:3px solid #7dc2eb;background:#e8f6ff;color:#1b95dc;display:flex;align-items:center;justify-content:center;font:700 40px/1 Arial,sans-serif}
+      .agenda-legado-escala-text{padding-top:10px;font:700 12px/1.2 Tahoma,sans-serif}
+      .agenda-legado-escala-divider{height:1px;background:#b8c0cb;margin:8px 14px}
+      .agenda-legado-escala-actions{display:flex;justify-content:space-between;align-items:center;padding:8px 14px}
+      .agenda-legado-escala-actions .materiais-btn{min-width:90px;height:30px;padding:0 10px;border:1px solid #9ea7b4;background:#ececec;border-radius:4px;font:12px Tahoma,sans-serif}
+      .agenda-legado-escala-help{margin:0 14px 14px;padding:10px;border:1px solid #d2d7de;background:#f5f6f8;min-height:70px;font:12px Tahoma,sans-serif}
+      .agenda-legado-escala-help.hidden{display:none}
     `;
     document.head.appendChild(css);
   }
@@ -7343,9 +7519,9 @@ function agendaLegadoEnriquecerModal(){
         <div class="col-dur"><label for="agenda-legado-modal-duracao">Duração:</label><input id="agenda-legado-modal-duracao" type="number" min="5" step="5"></div>
         <div class="col-min"><label>&nbsp;</label><input value="min" readonly></div>
         <div class="col-sala"><label for="agenda-legado-modal-sala">Sala:</label><input id="agenda-legado-modal-sala" type="number" min="1" step="1"></div>
-        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 1"></button></div>
-        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 2"></button></div>
-        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 3"></button></div>
+        <div><label>&nbsp;</label><button id="agenda-legado-periodo-manha" class="agenda-legado-mini periodo-manha" type="button" aria-label="Período da manhã" title="Período da manhã"></button></div>
+        <div><label>&nbsp;</label><button id="agenda-legado-periodo-tarde" class="agenda-legado-mini periodo-tarde" type="button" aria-label="Período da tarde" title="Período da tarde"></button></div>
+        <div><label>&nbsp;</label><button id="agenda-legado-periodo-dia" class="agenda-legado-mini periodo-dia" type="button" aria-label="O dia todo" title="O dia todo"></button></div>
       </div>
       <div class="agenda-legado-row agenda-legado-two" style="margin-top:6px">
         <div><label for="agenda-legado-modal-tipo">Tipo:</label><select id="agenda-legado-modal-tipo"><option value="1">Paciente</option><option value="2">Compromisso</option></select></div>
@@ -7354,7 +7530,7 @@ function agendaLegadoEnriquecerModal(){
       </div>
       <div class="agenda-legado-row agenda-legado-two-tight">
         <div><label for="agenda-legado-modal-status">Situação:</label><select id="agenda-legado-modal-status"></select></div>
-        <div><label for="agenda-legado-modal-motivo">Motivo:</label><select id="agenda-legado-modal-motivo"><option value=""></option></select></div>
+        <div><label for="agenda-legado-modal-motivo">Assunto:</label><input id="agenda-legado-modal-motivo" type="text" list="agenda-legado-modal-motivo-list"><datalist id="agenda-legado-modal-motivo-list"></datalist></div>
       </div>
       <div class="agenda-legado-bloco-telefones">
         <div>
@@ -7376,16 +7552,16 @@ function agendaLegadoEnriquecerModal(){
     <div id="agenda-legado-pane-repete" class="agenda-legado-pane hidden">
       <div class="agenda-legado-rep">
         <div class="agenda-legado-rep-top">
-          <input type="checkbox" disabled>
+          <input id="agenda-legado-repete-ativo" type="checkbox">
           <span>Repete horário</span>
         </div>
         <div class="agenda-legado-rep-box">
-            <div class="linha"><input type="radio" disabled><span>Próximos</span><input type="number" value="1" disabled><span class="extra">dias</span></div>
-            <div class="linha"><input type="radio" disabled><span>Próximas</span><input type="number" value="1" disabled><select disabled><option>Quarta-feira</option></select></div>
-            <div class="linha"><input type="radio" disabled><span>Todo o dia</span><input type="number" value="8" disabled><span class="extra">dos próximos <input type="number" value="1" disabled style="width:38px;margin:0 4px"> meses</span></div>
+            <div class="linha"><input id="agenda-legado-repete-modo-dias" type="radio" name="agenda-legado-repete-modo" value="dias"><span>Próximos</span><input id="agenda-legado-repete-dias" type="number" value="1" min="1" max="60"><span class="extra">dias</span></div>
+            <div class="linha"><input id="agenda-legado-repete-modo-semanas" type="radio" name="agenda-legado-repete-modo" value="semanas"><span>Próximas</span><input id="agenda-legado-repete-semanas" type="number" value="1" min="1" max="60"><select id="agenda-legado-repete-dia-semana"><option value="1">Segunda-feira</option><option value="2">Terça-feira</option><option value="3">Quarta-feira</option><option value="4">Quinta-feira</option><option value="5">Sexta-feira</option><option value="6">Sábado</option></select></div>
+            <div class="linha"><input id="agenda-legado-repete-modo-meses" type="radio" name="agenda-legado-repete-modo" value="meses"><span>Todo o dia</span><input id="agenda-legado-repete-dia-mes" type="number" value="1" min="1" max="31"><span class="extra">dos próximos <input id="agenda-legado-repete-meses" type="number" value="1" min="1" max="60" style="width:38px;margin:0 4px"> meses</span></div>
         </div>
         <div class="agenda-legado-rep-bottom">
-          <input type="checkbox" disabled>
+          <input id="agenda-legado-repete-sobrepor" type="checkbox">
           <span>Sobrepor horários já preenchidos</span>
         </div>
       </div>
@@ -7413,6 +7589,23 @@ function agendaLegadoEnriquecerModal(){
         </div>
       </div>
     </div>
+    <div id="agenda-legado-escala-backdrop" class="agenda-legado-escala-backdrop hidden">
+      <div class="agenda-legado-escala-modal" role="dialog" aria-modal="true" aria-labelledby="agenda-legado-escala-title">
+        <div class="agenda-legado-escala-head">
+          <div id="agenda-legado-escala-title" class="ttl">Edita agendamento</div>
+        </div>
+        <div class="agenda-legado-escala-body">
+          <div class="agenda-legado-escala-icon">i</div>
+          <div id="agenda-legado-escala-msg" class="agenda-legado-escala-text">Horário não pode estar fora da escala.</div>
+        </div>
+        <div class="agenda-legado-escala-divider"></div>
+        <div class="agenda-legado-escala-actions">
+          <button id="agenda-legado-escala-ajuda" class="materiais-btn" type="button">Ajuda...</button>
+          <button id="agenda-legado-escala-ok" class="materiais-btn" type="button">Ok</button>
+        </div>
+        <div id="agenda-legado-escala-help" class="agenda-legado-escala-help hidden"></div>
+      </div>
+    </div>
   `;
   agendaLegado.modalTitle=document.getElementById("agenda-legado-modal-title");
   agendaLegado.tabDados=document.getElementById("agenda-legado-tab-dados");
@@ -7424,11 +7617,15 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.modalFim=document.getElementById("agenda-legado-modal-fim");
   agendaLegado.modalDuracao=document.getElementById("agenda-legado-modal-duracao");
   agendaLegado.modalSala=document.getElementById("agenda-legado-modal-sala");
+  agendaLegado.modalPeriodoManha=document.getElementById("agenda-legado-periodo-manha");
+  agendaLegado.modalPeriodoTarde=document.getElementById("agenda-legado-periodo-tarde");
+  agendaLegado.modalPeriodoDia=document.getElementById("agenda-legado-periodo-dia");
   agendaLegado.modalTipo=document.getElementById("agenda-legado-modal-tipo");
   agendaLegado.modalNome=document.getElementById("agenda-legado-modal-nome");
   agendaLegado.modalNomeBtn=document.getElementById("agenda-legado-modal-nome-btn");
   agendaLegado.modalStatus=document.getElementById("agenda-legado-modal-status");
   agendaLegado.modalMotivo=document.getElementById("agenda-legado-modal-motivo");
+  agendaLegado.modalMotivoList=document.getElementById("agenda-legado-modal-motivo-list");
   agendaLegado.modalTelefone=document.getElementById("agenda-legado-modal-telefone");
   agendaLegado.modalTipFone1=document.getElementById("agenda-legado-modal-tipfone1");
   agendaLegado.modalTipFone2=document.getElementById("agenda-legado-modal-tipfone2");
@@ -7441,6 +7638,16 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.modalObserv=document.getElementById("agenda-legado-modal-observ");
   agendaLegado.modalInclusao=document.getElementById("agenda-legado-modal-inclusao");
   agendaLegado.modalAlteracao=document.getElementById("agenda-legado-modal-alteracao");
+  agendaLegado.repeteAtivo=document.getElementById("agenda-legado-repete-ativo");
+  agendaLegado.repeteModoDias=document.getElementById("agenda-legado-repete-modo-dias");
+  agendaLegado.repeteModoSemanas=document.getElementById("agenda-legado-repete-modo-semanas");
+  agendaLegado.repeteModoMeses=document.getElementById("agenda-legado-repete-modo-meses");
+  agendaLegado.repeteDias=document.getElementById("agenda-legado-repete-dias");
+  agendaLegado.repeteSemanas=document.getElementById("agenda-legado-repete-semanas");
+  agendaLegado.repeteDiaSemana=document.getElementById("agenda-legado-repete-dia-semana");
+  agendaLegado.repeteDiaMes=document.getElementById("agenda-legado-repete-dia-mes");
+  agendaLegado.repeteMeses=document.getElementById("agenda-legado-repete-meses");
+  agendaLegado.repeteSobrepor=document.getElementById("agenda-legado-repete-sobrepor");
   agendaLegado.modalOk=document.getElementById("agenda-legado-modal-ok");
   agendaLegado.modalCancelar=document.getElementById("agenda-legado-modal-cancelar");
   agendaLegado.modalNovo=document.getElementById("agenda-legado-modal-novo");
@@ -7451,6 +7658,12 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.nfRadioBuscar=document.getElementById("agenda-legado-nf-radio-buscar");
   agendaLegado.nfBtnOk=document.getElementById("agenda-legado-nf-ok");
   agendaLegado.nfBtnCancelar=document.getElementById("agenda-legado-nf-cancelar");
+  agendaLegado.escalaBackdrop=document.getElementById("agenda-legado-escala-backdrop");
+  agendaLegado.escalaMsg=document.getElementById("agenda-legado-escala-msg");
+  agendaLegado.escalaAjuda=document.getElementById("agenda-legado-escala-ajuda");
+  agendaLegado.escalaOk=document.getElementById("agenda-legado-escala-ok");
+  agendaLegado.escalaHelp=document.getElementById("agenda-legado-escala-help");
+  agendaLegado.escalaResolver=null;
   if(agendaLegado.nfBtnOk&&!agendaLegado.nfBtnOk.dataset.bound){
     agendaLegado.nfBtnOk.dataset.bound="1";
     agendaLegado.nfBtnOk.addEventListener("click",agendaLegadoConfirmarDialogNomeNaoEncontrado);
@@ -7463,6 +7676,18 @@ function agendaLegadoEnriquecerModal(){
     agendaLegado.nfBackdrop.dataset.bound="1";
     agendaLegado.nfBackdrop.addEventListener("click",ev=>{if(ev.target===agendaLegado.nfBackdrop)agendaLegadoFecharDialogNomeNaoEncontrado()});
   }
+  if(agendaLegado.escalaAjuda&&!agendaLegado.escalaAjuda.dataset.bound){
+    agendaLegado.escalaAjuda.dataset.bound="1";
+    agendaLegado.escalaAjuda.addEventListener("click",agendaLegadoMostrarAjudaEscala);
+  }
+  if(agendaLegado.escalaOk&&!agendaLegado.escalaOk.dataset.bound){
+    agendaLegado.escalaOk.dataset.bound="1";
+    agendaLegado.escalaOk.addEventListener("click",agendaLegadoFecharDialogEscala);
+  }
+  if(agendaLegado.escalaBackdrop&&!agendaLegado.escalaBackdrop.dataset.bound){
+    agendaLegado.escalaBackdrop.dataset.bound="1";
+    agendaLegado.escalaBackdrop.addEventListener("click",ev=>{if(ev.target===agendaLegado.escalaBackdrop)agendaLegadoFecharDialogEscala()});
+  }
   if(agendaLegado.modalSala&&agendaLegado.modalSala.dataset.boundMin!=="1"){
     agendaLegado.modalSala.dataset.boundMin="1";
     agendaLegado.modalSala.min="1";
@@ -7473,6 +7698,30 @@ function agendaLegadoEnriquecerModal(){
     agendaLegado.modalSala.addEventListener("blur",fixSala);
     fixSala();
   }
+  if(agendaLegado.modalPeriodoManha&&!agendaLegado.modalPeriodoManha.dataset.bound){
+    agendaLegado.modalPeriodoManha.dataset.bound="1";
+    agendaLegado.modalPeriodoManha.addEventListener("click",()=>agendaLegadoAplicarDuracaoPeriodo("manha"));
+  }
+  if(agendaLegado.modalPeriodoTarde&&!agendaLegado.modalPeriodoTarde.dataset.bound){
+    agendaLegado.modalPeriodoTarde.dataset.bound="1";
+    agendaLegado.modalPeriodoTarde.addEventListener("click",()=>agendaLegadoAplicarDuracaoPeriodo("tarde"));
+  }
+  if(agendaLegado.modalPeriodoDia&&!agendaLegado.modalPeriodoDia.dataset.bound){
+    agendaLegado.modalPeriodoDia.dataset.bound="1";
+    agendaLegado.modalPeriodoDia.addEventListener("click",()=>agendaLegadoAplicarDuracaoPeriodo("dia"));
+  }
+  if(agendaLegado.modalData&&!agendaLegado.modalData.dataset.boundPeriodo){
+    agendaLegado.modalData.dataset.boundPeriodo="1";
+    const refreshPeriodo=()=>agendaLegadoAtualizarBotoesPeriodo();
+    agendaLegado.modalData.addEventListener("input",refreshPeriodo);
+    agendaLegado.modalData.addEventListener("change",refreshPeriodo);
+    agendaLegado.modalData.addEventListener("blur",refreshPeriodo);
+    if(agendaLegado.modalSala){
+      agendaLegado.modalSala.addEventListener("input",refreshPeriodo);
+      agendaLegado.modalSala.addEventListener("change",refreshPeriodo);
+      agendaLegado.modalSala.addEventListener("blur",refreshPeriodo);
+    }
+  }
   if(agendaLegado.modalWa1)agendaLegado.modalWa1.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalTelefone));
   if(agendaLegado.modalWa2)agendaLegado.modalWa2.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalFone2));
   if(agendaLegado.modalWa3)agendaLegado.modalWa3.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalFone3));
@@ -7482,6 +7731,29 @@ function agendaLegadoEnriquecerModal(){
       const prefill=String(agendaLegado?.modalNome?.value||"").trim();
       await agendaLegadoAbrirMenuPacientesParaRetorno(prefill);
     });
+  }
+  if(agendaLegado.repeteAtivo&&!agendaLegado.repeteAtivo.dataset.bound){
+    agendaLegado.repeteAtivo.dataset.bound="1";
+    const clampRepete=()=>{
+      if(agendaLegado.repeteDias)agendaLegado.repeteDias.value=String(agendaLegadoClampInt(agendaLegado.repeteDias.value,1,60,1));
+      if(agendaLegado.repeteSemanas)agendaLegado.repeteSemanas.value=String(agendaLegadoClampInt(agendaLegado.repeteSemanas.value,1,60,1));
+      if(agendaLegado.repeteDiaSemana)agendaLegado.repeteDiaSemana.value=String(agendaLegadoClampInt(agendaLegado.repeteDiaSemana.value,1,6,1));
+      if(agendaLegado.repeteDiaMes)agendaLegado.repeteDiaMes.value=String(agendaLegadoClampInt(agendaLegado.repeteDiaMes.value,1,31,agendaLegadoDiaMesDataModal()));
+      if(agendaLegado.repeteMeses)agendaLegado.repeteMeses.value=String(agendaLegadoClampInt(agendaLegado.repeteMeses.value,1,60,1));
+    };
+    const syncRepete=()=>agendaLegadoAtualizarRepeteEstado();
+    agendaLegado.repeteAtivo.addEventListener("change",syncRepete);
+    [agendaLegado.repeteModoDias,agendaLegado.repeteModoSemanas,agendaLegado.repeteModoMeses].forEach(el=>{
+      if(el)el.addEventListener("change",syncRepete);
+    });
+    [agendaLegado.repeteDias,agendaLegado.repeteSemanas,agendaLegado.repeteDiaSemana,agendaLegado.repeteDiaMes,agendaLegado.repeteMeses].forEach(el=>{
+      if(!el)return;
+      el.addEventListener("input",clampRepete);
+      el.addEventListener("change",()=>{clampRepete();syncRepete();});
+      el.addEventListener("blur",clampRepete);
+    });
+    clampRepete();
+    agendaLegadoResetRepeteControles();
   }
   if(agendaLegado.tabDados)agendaLegado.tabDados.addEventListener("click",()=>agendaLegadoSetModalTab("dados"));
   if(agendaLegado.tabRepete)agendaLegado.tabRepete.addEventListener("click",()=>agendaLegadoSetModalTab("repete"));
@@ -7529,16 +7801,63 @@ function agendaLegadoFmtData(valor){
 }
 function agendaLegadoSyncMotivoOptions(valorAtual){
   if(!agendaLegado?.modalMotivo)return;
-  const combo=agendaLegado.modalMotivo;
-  const atual=String(valorAtual??combo.value??"").trim();
+  const campo=agendaLegado.modalMotivo;
+  const listaSugestoes=agendaLegado.modalMotivoList||null;
+  const tipo=String(agendaLegado?.modalTipo?.value||"1").trim();
+  const atual=String(valorAtual??campo.value??"").trim();
   const valores=new Set([""]);
-  (Array.isArray(agendaLegadoCache)?agendaLegadoCache:[]).forEach(item=>{
-    const txt=String(item?.motivo||"").trim();
-    if(txt)valores.add(txt);
-  });
+  if(tipo==="2"){
+    const assuntos=Array.isArray(agendaLegadoAssuntosCompromissoCache)?agendaLegadoAssuntosCompromissoCache:[];
+    assuntos.forEach(item=>{
+      const txt=String(item?.descricao||item?.nome||item?.motivo||"").trim();
+      if(txt)valores.add(txt);
+    });
+    if(!assuntos.length&&!agendaLegadoAssuntosCompromissoLoading){
+      agendaLegadoAssuntosCompromissoLoading=true;
+      agendaLegadoBuscarAssuntosCompromisso()
+        .then(lista=>{
+          agendaLegadoAssuntosCompromissoCache=Array.isArray(lista)?lista:[];
+          agendaLegadoSyncMotivoOptions(atual);
+        })
+        .finally(()=>{agendaLegadoAssuntosCompromissoLoading=false});
+    }
+  }else{
+    (Array.isArray(agendaLegadoCache)?agendaLegadoCache:[]).forEach(item=>{
+      const txt=String(item?.motivo||"").trim();
+      if(txt)valores.add(txt);
+    });
+  }
   if(atual)valores.add(atual);
-  combo.innerHTML=[...valores].map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
-  combo.value=atual;
+  const opcoes=[...valores].filter(v=>v);
+  if(listaSugestoes){
+    listaSugestoes.innerHTML=opcoes.map(v=>`<option value="${esc(v)}"></option>`).join("");
+  }else if(campo instanceof HTMLSelectElement){
+    campo.innerHTML=[`<option value=""></option>`,...opcoes.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`)].join("");
+  }
+  campo.value=atual;
+}
+async function agendaLegadoBuscarAssuntosCompromisso(){
+  const normalizar=(lista)=>{
+    if(!Array.isArray(lista))return [];
+    return lista.map(item=>{
+      const codigo=String(item?.codigo??"").trim();
+      const ordemNum=item?.ordem==null?null:Math.trunc(Number(item.ordem));
+      const valorCodigo=Number.isFinite(Number(codigo))?Math.trunc(Number(codigo)):null;
+      const valorInt=item?.valor_int!=null?Math.trunc(Number(item.valor_int)):(valorCodigo!=null?valorCodigo:ordemNum);
+      return{
+        id:Number(item?.id||0)||0,
+        codigo,
+        descricao:String(item?.descricao||item?.nome||codigo||"").trim(),
+        ordem:ordemNum,
+        valor_int:Number.isFinite(valorInt)?valorInt:null
+      };
+    }).filter(item=>item.descricao&&(item.valor_int!=null||item.codigo));
+  };
+  try{
+    const{res,data}=await requestJson("GET","/agenda-legado/assuntos-compromisso",undefined,true);
+    if(res.ok&&Array.isArray(data)&&data.length)return normalizar(data);
+  }catch{}
+  return [];
 }
 function agendaLegadoRender(items,keepSelection=false){
   agendaLegadoCache=Array.isArray(items)?items:[];
@@ -7557,11 +7876,11 @@ function agendaLegadoSelecionado(){
 function agendaLegadoModalPreencher(item){
   agendaLegadoLimparPacienteVinculo();
   agendaLegado.modalData.value=agendaLegadoFmtDataInput(item?.data||"");
+  agendaLegadoResetRepeteControles();
   agendaLegado.modalInicio.value=agendaLegadoFmtHora(item?.hora_inicio||0);
   agendaLegado.modalFim.value=agendaLegadoFmtHora(item?.hora_fim||0);
   agendaLegado.modalNome.value=item?.nome||"";
   agendaLegado.modalTelefone.value=item?.fone1||"";
-  agendaLegadoSyncMotivoOptions(item?.motivo||"");
   if(agendaLegado.modalSala){
     const salaNum=Math.max(1,parseInt(item?.sala??"1",10)||1);
     agendaLegado.modalSala.value=String(salaNum);
@@ -7570,14 +7889,21 @@ function agendaLegadoModalPreencher(item){
     const tipoNum=Number(item?.tipo??1);
     agendaLegado.modalTipo.value=String(tipoNum===2?2:1);
   }
+  agendaLegadoSyncMotivoOptions(item?.motivo||"");
   const nroPacExistente=Number(item?.nro_pac||0)||0;
   if(nroPacExistente>0){
     agendaLegadoSetPacienteVinculo(nroPacExistente,String(item?.nome||"").trim());
   }
   if(agendaLegado.modalStatus)agendaLegado.modalStatus.value=item?.status!=null?String(item.status):"";
-  if(agendaLegado.modalTipFone1)agendaLegado.modalTipFone1.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone1);
-  if(agendaLegado.modalTipFone2)agendaLegado.modalTipFone2.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone2);
-  if(agendaLegado.modalTipFone3)agendaLegado.modalTipFone3.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone3);
+  if(agendaLegado.modalTipFone1){
+    agendaLegado.modalTipFone1.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone1)||"Residencial";
+  }
+  if(agendaLegado.modalTipFone2){
+    agendaLegado.modalTipFone2.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone2)||"Celular";
+  }
+  if(agendaLegado.modalTipFone3){
+    agendaLegado.modalTipFone3.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone3)||"Comercial";
+  }
   if(agendaLegado.modalFone2)agendaLegado.modalFone2.value=item?.fone2||"";
   if(agendaLegado.modalFone3)agendaLegado.modalFone3.value=item?.fone3||"";
   if(nroPacExistente>0&&typeof agendaLegadoAplicarContato==="function"){
@@ -7594,14 +7920,39 @@ function agendaLegadoModalPreencher(item){
     agendaLegado.modalDuracao.value=String(dur);
   }
   agendaLegadoSincronizarFimPorDuracao();
+  agendaLegadoAtualizarBotoesPeriodo();
+}
+function agendaLegadoCoerceHoraTexto(value,{forInput=false,forBlur=false}={}){
+  const raw=String(value??"").trim();
+  if(!raw)return "";
+  const digits=raw.replace(/\D/g,"").slice(0,4);
+  if(forInput&&/^\d{1,4}$/.test(raw)){
+    if(digits.length===1)return digits;
+    if(digits.length===2)return `${digits}:`;
+    if(digits.length===3)return `${digits.slice(0,1)}:${digits.slice(1)}`;
+    return `${digits.slice(0,2)}:${digits.slice(2)}`;
+  }
+  let base=raw;
+  if(/^\d{4}$/.test(base))base=`${base.slice(0,2)}:${base.slice(2)}`;
+  else if(/^\d{3}$/.test(base))base=`0${base.slice(0,1)}:${base.slice(1)}`;
+  else if(/^(\d{1,2}):$/.test(base)&&forBlur){
+    const hhTxt=(/^(\d{1,2}):$/.exec(base)?.[1]||"").padStart(2,"0");
+    base=`${hhTxt}:00`;
+  }
+  else if(/^\d{1,2}$/.test(base)&&forBlur)base=`${base.padStart(2,"0")}:00`;
+  const match=/^(\d{1,2}):(\d{1,2})$/.exec(base);
+  if(!match)return "";
+  const hh=Number(match[1]);
+  const mm=Number(match[2]);
+  if(!Number.isFinite(hh)||!Number.isFinite(mm))return "";
+  if(hh<0||hh>23||mm<0||mm>59)return "";
+  return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
 }
 function agendaLegadoParseHora(value){
-  const base=String(value||"").trim();
-  if(!base)return 0;
-  const parts=base.split(":").map(v=>parseInt(v,10));
-  if(!parts.length||Number.isNaN(parts[0]))return 0;
-  const hh=Math.max(0,Math.min(23,parts[0]||0));
-  const mm=Math.max(0,Math.min(59,parts[1]||0));
+  const normalizada=agendaLegadoCoerceHoraTexto(value,{forBlur:true});
+  if(!normalizada)return 0;
+  const[hh,mm]=normalizada.split(":").map(v=>parseInt(v,10));
+  if(Number.isNaN(hh)||Number.isNaN(mm))return 0;
   return (hh*3600+mm*60)*1000;
 }
 function agendaLegadoSincronizarFimPorDuracao(){
@@ -7610,6 +7961,110 @@ function agendaLegadoSincronizarFimPorDuracao(){
   const duracao=Math.max(5,parseInt(agendaLegado.modalDuracao.value||"0",10)||0);
   if(inicio<=0||duracao<=0)return;
   agendaLegado.modalFim.value=agendaLegadoFmtHora(inicio+(duracao*60*1000));
+}
+function agendaLegadoConfigAtualModal(){
+  const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
+  const prestadorId=Number(
+    agendaLegado?.modalBackdrop?.dataset?.prestadorId
+    || agendaLegado?.selectPrestador?.value
+    || 0
+  )||0;
+  let cfg=null;
+  if(origem==="agenda-semana"&&agendaSemanaState?.config&&typeof agendaSemanaState.config==="object"){
+    cfg=agendaSemanaState.config;
+  }
+  if(!cfg&&agendaLegado?.prestadorCfgMap instanceof Map&&prestadorId>0){
+    cfg=agendaLegado.prestadorCfgMap.get(prestadorId)||null;
+  }
+  if(!cfg&&typeof agendaSemanaConfigPadrao==="function"){
+    cfg=agendaSemanaConfigPadrao();
+  }
+  if(!cfg)return null;
+  return typeof agendaSemanaNormalizaConfig==="function"?agendaSemanaNormalizaConfig(cfg):cfg;
+}
+function agendaLegadoPeriodoIntervaloMs(periodo,cfg){
+  const horaMin=(valor)=>{
+    if(typeof agendaSemanaHoraMin==="function")return agendaSemanaHoraMin(valor);
+    const txt=String(valor||"").trim();
+    const m=/^([01]?\d|2[0-3]):([0-5]\d)$/.exec(txt);
+    return m?(Number(m[1])*60+Number(m[2])):null;
+  };
+  const manhaIni=horaMin(cfg?.manha_inicio);
+  const manhaFim=horaMin(cfg?.manha_fim);
+  const tardeIni=horaMin(cfg?.tarde_inicio);
+  const tardeFim=horaMin(cfg?.tarde_fim);
+  let iniMin=null;
+  let fimMin=null;
+  if(periodo==="manha"){
+    iniMin=manhaIni;
+    fimMin=manhaFim;
+  }else if(periodo==="tarde"){
+    iniMin=tardeIni;
+    fimMin=tardeFim;
+  }else if(periodo==="dia"){
+    if(manhaIni==null||manhaFim==null||tardeIni==null||tardeFim==null)return null;
+    iniMin=Math.min(manhaIni,tardeIni);
+    fimMin=Math.max(manhaFim,tardeFim);
+  }
+  if(!Number.isFinite(iniMin)||!Number.isFinite(fimMin)||fimMin<=iniMin)return null;
+  return{
+    iniMs:Math.trunc(iniMin*60000),
+    fimMs:Math.trunc(fimMin*60000),
+    durMin:Math.trunc(fimMin-iniMin),
+  };
+}
+function agendaLegadoPeriodoDisponivel(dataIso,intervalo){
+  if(!dataIso||!intervalo)return false;
+  const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
+  const agendaSemanaAberta=!!(agendaSemana?.panel&&!agendaSemana.panel.classList.contains("hidden"));
+  const usarSemana=(origem==="agenda-semana")||(agendaSemanaAberta&&Array.isArray(agendaSemanaCache));
+  const lista=usarSemana
+    ?(Array.isArray(agendaSemanaCache)?agendaSemanaCache:[])
+    :(Array.isArray(agendaLegadoCache)?agendaLegadoCache:[]);
+  const editId=Number(agendaLegadoSelId||0)||0;
+  const stepMs=Math.max(5,parseInt(agendaSemanaState?.step||5,10)||5)*60000;
+  return !lista.some(item=>{
+    const itemId=Number(item?.id||0)||0;
+    if(editId>0&&itemId===editId)return false;
+    if(agendaSemanaToIsoDate(item?.data)!==dataIso)return false;
+    const ini=Number(item?.hora_inicio||0)||0;
+    let fim=Number(item?.hora_fim||0)||0;
+    if(fim<=ini)fim=ini+stepMs;
+    return ini<intervalo.fimMs&&fim>intervalo.iniMs;
+  });
+}
+function agendaLegadoAtualizarBotoesPeriodo(){
+  if(!agendaLegado)return;
+  const btnManha=agendaLegado.modalPeriodoManha;
+  const btnTarde=agendaLegado.modalPeriodoTarde;
+  const btnDia=agendaLegado.modalPeriodoDia;
+  if(!btnManha||!btnTarde||!btnDia)return;
+  const dataIso=agendaLegadoParseDataInput(agendaLegado?.modalData?.value||"");
+  const cfg=agendaLegadoConfigAtualModal();
+  const infoManha=agendaLegadoPeriodoIntervaloMs("manha",cfg);
+  const infoTarde=agendaLegadoPeriodoIntervaloMs("tarde",cfg);
+  const infoDia=agendaLegadoPeriodoIntervaloMs("dia",cfg);
+  const apply=(btn,info)=>{
+    const ativo=!!(dataIso&&info&&agendaLegadoPeriodoDisponivel(dataIso,info));
+    btn.disabled=!ativo;
+    btn.dataset.duracao=String(info?.durMin||"");
+  };
+  apply(btnManha,infoManha);
+  apply(btnTarde,infoTarde);
+  apply(btnDia,infoDia);
+}
+function agendaLegadoAplicarDuracaoPeriodo(periodo){
+  if(!agendaLegado?.modalDuracao)return;
+  const dataIso=agendaLegadoParseDataInput(agendaLegado?.modalData?.value||"");
+  const cfg=agendaLegadoConfigAtualModal();
+  const info=agendaLegadoPeriodoIntervaloMs(periodo,cfg);
+  if(!dataIso||!info||!agendaLegadoPeriodoDisponivel(dataIso,info)){
+    agendaLegadoAtualizarBotoesPeriodo();
+    return;
+  }
+  agendaLegado.modalDuracao.value=String(Math.max(5,parseInt(info.durMin||0,10)||0));
+  agendaLegadoSincronizarFimPorDuracao();
+  agendaLegadoAtualizarBotoesPeriodo();
 }
 function agendaLegadoModalPayload(){
   const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
@@ -7651,6 +8106,112 @@ function agendaLegadoModalPayload(){
     id_unidade:(origem==="agenda-semana"?unidadeOrigem:unidadeFiltro)||null
   };
 }
+function agendaLegadoObterFaixaConfigurada(payload){
+  const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
+  const prestadorId=Number(
+    payload?.id_prestador
+    || agendaLegado?.modalBackdrop?.dataset?.prestadorId
+    || agendaLegado?.selectPrestador?.value
+    || 0
+  )||0;
+  let cfg=null;
+  if(origem==="agenda-semana"&&agendaSemanaState?.config&&typeof agendaSemanaState.config==="object"){
+    cfg=agendaSemanaState.config;
+  }
+  if(!cfg&&agendaLegado?.prestadorCfgMap instanceof Map&&prestadorId>0){
+    cfg=agendaLegado.prestadorCfgMap.get(prestadorId)||null;
+  }
+  if(!cfg&&typeof agendaSemanaConfigPadrao==="function"){
+    cfg=agendaSemanaConfigPadrao();
+  }
+  if(!cfg||typeof agendaSemanaBuildSlots!=="function")return null;
+  const cfgNorm=typeof agendaSemanaNormalizaConfig==="function"?agendaSemanaNormalizaConfig(cfg):cfg;
+  const faixa=agendaSemanaBuildSlots(cfgNorm);
+  const iniMin=Number(faixa?.startMin);
+  const fimMin=Number(faixa?.endMin);
+  if(!Number.isFinite(iniMin)||!Number.isFinite(fimMin)||fimMin<=iniMin)return null;
+  const toHHMM=(min)=>typeof agendaSemanaMinToHHMM==="function"
+    ?agendaSemanaMinToHHMM(min)
+    :`${String(Math.floor(min/60)).padStart(2,"0")}:${String(min%60).padStart(2,"0")}`;
+  return{
+    inicioMs:iniMin*60000,
+    fimMs:fimMin*60000,
+    inicioTxt:toHHMM(iniMin),
+    fimTxt:toHHMM(fimMin),
+  };
+}
+function agendaLegadoHorarioDentroDaFaixa(payload){
+  const faixa=agendaLegadoObterFaixaConfigurada(payload);
+  if(!faixa)return{ok:true};
+  const inicio=Number(payload?.hora_inicio||0)||0;
+  const fim=Number(payload?.hora_fim||0)||0;
+  if(inicio<faixa.inicioMs||inicio>=faixa.fimMs||fim<=inicio||fim>faixa.fimMs){
+    return{ok:false,mensagem:`Horário fora da faixa configurada (${faixa.inicioTxt} às ${faixa.fimTxt}).`};
+  }
+  return{ok:true};
+}
+function agendaLegadoCalcularMaxDuracaoPermitida(payload){
+  const dataIso=String(payload?.data||"").trim();
+  const inicioMs=Number(payload?.hora_inicio||0)||0;
+  if(!dataIso||inicioMs<=0)return 5;
+  const toIsoCivil=(valor)=>{
+    const raw=String(valor||"").trim();
+    if(!raw)return "";
+    if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+    if(typeof agendaSemanaParseDataCivil==="function"){
+      const d=agendaSemanaParseDataCivil(raw);
+      if(d instanceof Date&&!Number.isNaN(d.getTime())){
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      }
+    }
+    return agendaSemanaToIsoDate(raw);
+  };
+  const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
+  const agendaSemanaAberta=!!(agendaSemana?.panel&&!agendaSemana.panel.classList.contains("hidden"));
+  const usarSemana=(origem==="agenda-semana")||(agendaSemanaAberta&&Array.isArray(agendaSemanaCache));
+  const lista=usarSemana
+    ?(Array.isArray(agendaSemanaCache)?agendaSemanaCache:[])
+    :(Array.isArray(agendaLegadoCache)?agendaLegadoCache:[]);
+  const stepMin=Math.max(5,parseInt(agendaSemanaState?.step||5,10)||5);
+  const stepMs=stepMin*60000;
+  const editId=Number(agendaLegadoSelId||0)||0;
+  const prestadorId=Number(payload?.id_prestador||0)||0;
+  const unidadeId=Number(payload?.id_unidade||0)||0;
+  const faixa=agendaLegadoObterFaixaConfigurada(payload);
+  let limiteMs=Number(faixa?.fimMs||0)||0;
+  if(limiteMs<=inicioMs)limiteMs=inicioMs+stepMs;
+  const eventos=lista
+    .filter(item=>toIsoCivil(item?.data)===dataIso)
+    .filter(item=>{
+      const itemId=Number(item?.id||0)||0;
+      if(editId>0&&itemId===editId)return false;
+      const itemPrest=Number(item?.id_prestador||0)||0;
+      const itemUnid=Number(item?.id_unidade||0)||0;
+      if(prestadorId>0&&itemPrest>0&&itemPrest!==prestadorId)return false;
+      if(unidadeId>0&&itemUnid>0&&itemUnid!==unidadeId)return false;
+      return true;
+    })
+    .map(item=>{
+      const ini=Number(item?.hora_inicio||0)||0;
+      let fim=Number(item?.hora_fim||0)||0;
+      if(fim<=ini)fim=ini+stepMs;
+      return {ini,fim};
+    })
+    .filter(ev=>ev.fim>inicioMs)
+    .sort((a,b)=>a.ini-b.ini);
+  for(const ev of eventos){
+    if(ev.ini<=inicioMs&&ev.fim>inicioMs){
+      limiteMs=inicioMs;
+      break;
+    }
+    if(ev.ini>inicioMs){
+      limiteMs=Math.min(limiteMs,ev.ini);
+      break;
+    }
+  }
+  const disponivelMin=Math.max(0,Math.floor((limiteMs-inicioMs)/60000));
+  return Math.max(5,Math.floor(disponivelMin/stepMin)*stepMin||0);
+}
 async function agendaLegadoAbrirModal(modo){
   if(!agendaLegado)return;
   agendaLegadoFecharDialogNomeNaoEncontrado();
@@ -7670,23 +8231,63 @@ async function agendaLegadoAbrirModal(modo){
     agendaLegado.modalTitle.textContent="Novo agendamento";
     agendaLegadoModalPreencher({});
   }
+  agendaLegadoAplicarFocoPorTipo();
 }
 function agendaLegadoFecharModal(){
   agendaLegadoFecharDialogNomeNaoEncontrado();
   if(agendaLegado?.modalBackdrop)agendaLegado.modalBackdrop.classList.add("hidden");
 }
 async function agendaLegadoSalvarModal(){
+  if(agendaLegado?.modalInicio){
+    const inicioNormalizado=agendaLegadoCoerceHoraTexto(agendaLegado.modalInicio.value,{forBlur:true});
+    if(!inicioNormalizado){
+      window.alert("Informe o horário no formato HH:MM.");
+      return;
+    }
+    agendaLegado.modalInicio.value=inicioNormalizado;
+    agendaLegadoSincronizarFimPorDuracao();
+  }
   const nomeResolvido=await agendaLegadoResolverNomeModal();
   if(!nomeResolvido)return;
   const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
   const forceNovo=String(agendaLegado?.modalBackdrop?.dataset?.forceNovo||"").trim()==="1";
+  const repeticaoCfg=agendaLegadoColetarRepeticaoConfig();
+  if(repeticaoCfg?.erro){
+    window.alert(repeticaoCfg.erro);
+    return;
+  }
   const payload=agendaLegadoModalPayload();
   if(!payload.data||!payload.hora_inicio){window.alert("Informe data e hora inicial.");return}
+  const faixaCheck=agendaLegadoHorarioDentroDaFaixa(payload);
+  if(!faixaCheck.ok){
+    await agendaLegadoAbrirDialogEscala();
+    return;
+  }
   const editId=agendaLegadoSelId;
   const modo=(forceNovo?"POST":(agendaLegado.modalTitle.textContent.includes("Editar")?"PUT":"POST"));
   const path=modo==="PUT"?`/agenda-legado/${editId}`:"/agenda-legado";
   const{res,data}=await requestJson(modo,path,payload,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao salvar agendamento.");return}
+  if(!res.ok){
+    if(Number(res?.status||0)===409){
+      const maxPermitido=agendaLegadoCalcularMaxDuracaoPermitida(payload);
+      await agendaLegadoAbrirDialogDuracaoPermitida(maxPermitido);
+      return;
+    }
+    window.alert(data.detail||"Falha ao salvar agendamento.");
+    return;
+  }
+  if(repeticaoCfg?.ativo&&repeticaoCfg?.payload){
+    const itemId=Number(data?.id||0)||0;
+    if(itemId<=0){
+      window.alert("Agendamento salvo, mas não foi possível repetir (ID inválido).");
+    }else{
+      const repPayload={item_id:itemId,...repeticaoCfg.payload};
+      const {res:resRep,data:dataRep}=await requestJson("POST","/agenda-legado/repetir",repPayload,true);
+      if(!resRep.ok){
+        window.alert(dataRep?.detail||"Agendamento salvo, mas a repetição falhou.");
+      }
+    }
+  }
   agendaLegadoFecharModal();
   agendaLegadoSelId=data?.id||agendaLegadoSelId;
   if(origem==="agenda-semana"){
@@ -7750,16 +8351,32 @@ async function agendaLegadoCarregarCombos(){
   const{res:resPrest,data:prest}=await requestJson("GET","/agenda-legado/prestadores",undefined,true);
   const{res:resUnid,data:unids}=await requestJson("GET","/agenda-legado/unidades",undefined,true);
   const{res:resTipoFone,data:tiposFoneData}=await requestJson("GET","/agenda-legado/tipos-fone",undefined,true);
+  const{res:resAssuntos,data:assuntosData}=await requestJson("GET","/agenda-legado/assuntos-compromisso",undefined,true);
   const prestadores=resPrest.ok&&Array.isArray(prest)?prest:[];
   const unidades=resUnid.ok&&Array.isArray(unids)?unids:[];
   agendaLegadoStatusCache=await agendaLegadoBuscarStatusAuxiliares();
   agendaLegadoTiposContatoCache=resTipoFone.ok&&Array.isArray(tiposFoneData)?tiposFoneData:[];
+  agendaLegadoAssuntosCompromissoCache=resAssuntos.ok&&Array.isArray(assuntosData)?(assuntosData.map(item=>({
+    id:Number(item?.id||0)||0,
+    codigo:String(item?.codigo??"").trim(),
+    descricao:String(item?.descricao||item?.nome||item?.codigo||"").trim(),
+    ordem:item?.ordem==null?null:Math.trunc(Number(item.ordem)),
+    valor_int:item?.valor_int!=null?Math.trunc(Number(item.valor_int)):(Number.isFinite(Number(item?.codigo))?Math.trunc(Number(item.codigo)):null)
+  })).filter(item=>item.descricao&&(item.valor_int!=null||item.codigo))):[];
+  if(agendaLegado){
+    agendaLegado.prestadorCfgMap=new Map(
+      prestadores
+        .map(item=>[Number(item?.id||0)||0,(item?.agenda_config&&typeof item.agenda_config==="object")?item.agenda_config:{}])
+        .filter(([id])=>id>0)
+    );
+  }
   agendaLegado.selectPrestador.innerHTML='<option value="">Todos</option>'+prestadores.map(p=>`<option value="${p.id}">${esc(p.nome||"")}</option>`).join("");
   agendaLegado.selectUnidade.innerHTML='<option value="">Todas</option>'+unidades.map(u=>`<option value="${u.id}">${esc(u.nome||"")}</option>`).join("");
   agendaLegadoRenderAuxSelect(agendaLegado.modalStatus,agendaLegadoStatusCache,"");
+  agendaLegadoSyncMotivoOptions(agendaLegado?.modalMotivo?.value||"");
   agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone1,"Residencial");
-  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone2,"Comercial");
-  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone3,"Celular");
+  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone2,"Celular");
+  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone3,"Comercial");
 }
 async function agendaLegadoBuscarStatusAuxiliares(){
   const normalizar=(lista)=>{
@@ -7934,7 +8551,10 @@ function agendaLegadoVincularEventos(){
   agendaLegado.modalOk.addEventListener("click",agendaLegadoSalvarModal);
   if(agendaLegado.modalNovo)agendaLegado.modalNovo.addEventListener("click",()=>agendaLegadoAbrirModal("novo"));
   if(agendaLegado.modalElimina)agendaLegado.modalElimina.addEventListener("click",agendaLegadoExcluir);
-  if(agendaLegado.modalTipo)agendaLegado.modalTipo.addEventListener("change",agendaLegadoAplicarBloqueioPorTipo);
+  if(agendaLegado.modalTipo)agendaLegado.modalTipo.addEventListener("change",()=>{
+    agendaLegadoAplicarBloqueioPorTipo();
+    agendaLegadoSyncMotivoOptions(agendaLegado?.modalMotivo?.value||"");
+  });
   const syncFimFromDuracao=()=>{
     if(agendaLegado?.modalDuracao){
       const dur=Math.max(5,parseInt(agendaLegado.modalDuracao.value||"0",10)||0);
@@ -7942,15 +8562,29 @@ function agendaLegadoVincularEventos(){
     }
     agendaLegadoSincronizarFimPorDuracao();
   };
+  const normalizarInicioInput=()=>{
+    if(agendaLegado?.modalInicio){
+      const normalizado=agendaLegadoCoerceHoraTexto(agendaLegado.modalInicio.value,{forInput:true});
+      if(normalizado!==agendaLegado.modalInicio.value)agendaLegado.modalInicio.value=normalizado;
+    }
+    syncFimFromDuracao();
+  };
+  const normalizarInicioBlur=()=>{
+    if(agendaLegado?.modalInicio){
+      const normalizado=agendaLegadoCoerceHoraTexto(agendaLegado.modalInicio.value,{forBlur:true});
+      agendaLegado.modalInicio.value=normalizado;
+    }
+    syncFimFromDuracao();
+  };
   if(agendaLegado.modalDuracao){
     agendaLegado.modalDuracao.addEventListener("input",syncFimFromDuracao);
     agendaLegado.modalDuracao.addEventListener("change",syncFimFromDuracao);
     agendaLegado.modalDuracao.addEventListener("blur",syncFimFromDuracao);
   }
   if(agendaLegado.modalInicio){
-    agendaLegado.modalInicio.addEventListener("input",syncFimFromDuracao);
-    agendaLegado.modalInicio.addEventListener("change",syncFimFromDuracao);
-    agendaLegado.modalInicio.addEventListener("blur",syncFimFromDuracao);
+    agendaLegado.modalInicio.addEventListener("input",normalizarInicioInput);
+    agendaLegado.modalInicio.addEventListener("change",normalizarInicioBlur);
+    agendaLegado.modalInicio.addEventListener("blur",normalizarInicioBlur);
   }
   agendaLegado.modalNome.addEventListener("input",ev=>{
     agendaLegadoAplicarContato(ev.target.value,agendaLegado?.modalNroPac);
@@ -8105,6 +8739,19 @@ function agendaSemanaEnsureUI(){
     calTitle:document.getElementById("agenda-semana-cal-title"),
     calGrid:document.getElementById("agenda-semana-cal-grid")
   };
+  if(agendaSemana.btnCal){
+    agendaSemana.btnCal.innerHTML='<img src="/desktop-assets/tabela.png" alt="">Calendário';
+  }
+  if(agendaSemana.btnHorario){
+    agendaSemana.btnHorario.innerHTML='<img src="/desktop-assets/editar.png" alt="">Horário...';
+  }
+  const agendaSemanaLblPrestador=agendaSemana.panel?.querySelector('label[for="agenda-semana-prestador"]');
+  if(agendaSemanaLblPrestador){
+    agendaSemanaLblPrestador.textContent="Cirurgião:";
+  }
+  if(agendaSemana.btnPublicar){
+    agendaSemana.btnPublicar.innerHTML='<img src="/desktop-assets/backup.png" alt="">Publicar no Google agenda...';
+  }
   agendaSemanaBindResize();
 }
 function agendaSemanaEnsureWindowControls(){
@@ -8697,7 +9344,8 @@ async function agendaSemanaAbrirModalNovo(dataIso,horaHHMM){
   }
   agendaLegado.modalTitle.textContent="Edita agendamento";
   agendaLegado.modalBackdrop.classList.remove("hidden");
-  agendaLegado.modalNome.focus();
+  agendaLegadoAtualizarBotoesPeriodo();
+  agendaLegadoAplicarFocoPorTipo();
 }
 function agendaSemanaPrestadorSelecionado(){
   const id=Number(agendaSemana?.selectPrestador?.value||0)||0;
@@ -8959,7 +9607,7 @@ function agendaSemanaVincularEventos(){
   agendaSemana.btnHorario.addEventListener("click",()=>{footerMsg.textContent="HorÃƒÂ¡rio: em planejamento."});
   agendaSemana.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃƒÂ£o da agenda: em planejamento."});
   agendaSemana.btnAviso.addEventListener("click",()=>{footerMsg.textContent="Envio de aviso: em planejamento."});
-  agendaSemana.btnPublicar.addEventListener("click",()=>{footerMsg.textContent="PublicaÃƒÂ§ÃƒÂ£o da agenda no MyEasy: em planejamento."});
+  agendaSemana.btnPublicar.addEventListener("click",()=>{footerMsg.textContent="Publicar no Google agenda: em planejamento."});
   agendaSemana.btnConfig.addEventListener("click",async()=>{
     if(typeof prestAgendaAbrir==="function"){
       try{
@@ -9028,8 +9676,10 @@ async function agendaSemanaAbrir(){
   agendaSemanaDiagLog("agendaSemanaAbrir","after_unhide_panel");
   agendaSemanaConectarResizeObserver();
   workspaceEmpty.classList.add("hidden");
-  if(!agendaSemanaState.focusDate)agendaSemanaSetFocusDate(agendaSemanaResolveDataInicial());
-  else if(!agendaSemanaState.weekStart)agendaSemanaState.weekStart=agendaSemanaStartOfWeek(agendaSemanaState.focusDate);
+  agendaSemanaSetFocusDate(agendaSemanaResolveDataInicial());
+  // Evita "piscada" da semana anterior: sincroniza a estrutura visível
+  // da semana vigente antes do primeiro await da abertura.
+  agendaSemanaRenderEstrutura(true);
   try{
     if(typeof agendaLegadoBuscarStatusAuxiliares==="function"){
       agendaLegadoStatusCache=await agendaLegadoBuscarStatusAuxiliares();
