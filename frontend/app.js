@@ -86,7 +86,7 @@ const licDlg={backdrop:document.getElementById("licenca-backdrop"),machine:docum
 const setLoginStatus=(m,e)=>{loginStatus.textContent=m||"";loginStatus.className="status "+(e?"err":"ok")};
 const showPanel=(t)=>{panelLogin.classList.add("hidden");panelSignup.classList.add("hidden");panelForgot.classList.add("hidden");t.classList.remove("hidden")};
 const setToken=(t)=>localStorage.setItem("brana_token",t||"");const getToken=()=>localStorage.getItem("brana_token")||"";
-const MODO_HORAS_FIXO="Perfil Fixo";const MODO_HORAS_FLEX="Perfil FlexÃ­vel";const isModoFlex=(v)=>String(v||"").toLowerCase().includes("flex");
+const MODO_HORAS_FIXO="Perfil Fixo";const MODO_HORAS_FLEX="Perfil FlexÃƒÂ­vel";const isModoFlex=(v)=>String(v||"").toLowerCase().includes("flex");
 let mpReturnPaymentId="";
 const bootstrapOauthFromUrl=()=>{const p=new URLSearchParams(window.location.search);const t=p.get("token");const e=p.get("oauth_error");const paymentId=(p.get("payment_id")||p.get("collection_id")||"").trim();if(paymentId)mpReturnPaymentId=paymentId;if(t){setToken(t);window.history.replaceState({},document.title,"/app")}else if(e){setLoginStatus("Falha no login Google: "+e,true);window.history.replaceState({},document.title,"/app")}else if(paymentId){window.history.replaceState({},document.title,"/app")}};
 const toFloat=(v)=>{if(v==null)return 0;const s=String(v).replace("R$","").replaceAll(".","").replace(",", ".").trim();const n=Number(s);return Number.isFinite(n)?n:0};
@@ -122,38 +122,118 @@ const usersHasOpenChildModal=()=>{
 };
 const usersCanClosePanel=()=>{
   if(usersHasOpenChildModal()){
-    footerMsg.textContent="Feche a janela aberta antes de fechar o mÃ³dulo de usuÃ¡rios.";
+    footerMsg.textContent="Feche a janela aberta antes de fechar o mÃƒÂ³dulo de usuÃƒÂ¡rios.";
     return false;
   }
   return true;
 };
 const protectedPassClose=(value)=>{if(protectedPassBackdrop)protectedPassBackdrop.classList.add("hidden");if(protectedPassInput)protectedPassInput.value="";if(protectedPassResolver){const resolve=protectedPassResolver;protectedPassResolver=null;protectedPassPending=null;resolve(value)}};
 const protectedPassSubmit=()=>{const senha=(protectedPassInput?.value||"").trim();protectedPassClose(senha||null)};
-const protectedPassDialog=(message)=>{if(!protectedPassBackdrop||!protectedPassInput)return Promise.reject(new Error("Janela de senha indisponÃ­vel."));if(protectedPassPending)return protectedPassPending;if(message){/* reservado para futura mensagem */}protectedPassInput.value="";protectedPassBackdrop.classList.remove("hidden");protectedPassInput.focus();protectedPassPending=new Promise(resolve=>{protectedPassResolver=resolve});return protectedPassPending};
-const parseProtectedError=(res,data)=>{if(!res||res.status!==403)return null;const detail=data&&typeof data==="object"?data.detail:null;if(!detail||typeof detail!=="object")return null;const err=String(detail.error||"").trim();if(err!=="protected_password_required")return null;const moduleCode=String(detail.module_code||"*").trim().toLowerCase()||"*";const message=String(detail.message||"MÃ³dulo protegido.").trim();return{moduleCode,message}};
+const protectedPassDialog=(message)=>{if(!protectedPassBackdrop||!protectedPassInput)return Promise.reject(new Error("Janela de senha indisponÃƒÂ­vel."));if(protectedPassPending)return protectedPassPending;if(message){/* reservado para futura mensagem */}protectedPassInput.value="";protectedPassBackdrop.classList.remove("hidden");protectedPassInput.focus();protectedPassPending=new Promise(resolve=>{protectedPassResolver=resolve});return protectedPassPending};
+const parseProtectedError=(res,data)=>{if(!res||res.status!==403)return null;const detail=data&&typeof data==="object"?data.detail:null;if(!detail||typeof detail!=="object")return null;const err=String(detail.error||"").trim();if(err!=="protected_password_required")return null;const moduleCode=String(detail.module_code||"*").trim().toLowerCase()||"*";const message=String(detail.message||"MÃƒÂ³dulo protegido.").trim();return{moduleCode,message}};
 const requestJsonBase=async(method,path,payload,auth=false,extraHeaders={})=>{const headers=auth?{Authorization:"Bearer "+getToken()}:{};if(payload!==undefined)headers["Content-Type"]="application/json";Object.assign(headers,extraHeaders||{});const res=await fetch(baseUrl+path,{method,headers,body:payload===undefined?undefined:JSON.stringify(payload)});let data={};try{data=await res.json()}catch{}return{res,data}};
-const unlockProtectedGrant=async(moduleCode,senha)=>{const token=getToken();if(!token)throw new Error("SessÃ£o invÃ¡lida para desbloqueio.");const body={senha:String(senha||""),module_code:moduleCode||"*"};const res=await fetch(baseUrl+"/auth/protected/unlock",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error((data&&data.detail)||"Falha ao desbloquear mÃ³dulo protegido.");const grant=String(data.grant_token||"").trim();if(!grant)throw new Error("Grant de acesso protegido nÃ£o retornado.");return grant};
-const ensureProtectedGrant=async(moduleCode,message)=>{const key=(moduleCode||"*").toLowerCase();if(protectedGrantCache.has(key))return protectedGrantCache.get(key)||"";if(protectedGrantCache.has("*"))return protectedGrantCache.get("*")||"";if(key==="usuarios"&&protectedGrantCache.has("configuracao"))return protectedGrantCache.get("configuracao")||"";if(protectedGrantPending.has(key))return protectedGrantPending.get(key);const promptMsg=(message||`O mÃ³dulo '${key}' estÃ¡ protegido.`)+"\n\nDigite a senha do administrador para continuar:";const senha=await protectedPassDialog(promptMsg);if(!senha){throw new Error("Acesso protegido cancelado pelo usuÃ¡rio.")}const pending=(async()=>{const grant=await unlockProtectedGrant(key,senha);protectedGrantCache.set(key,grant);return grant})();protectedGrantPending.set(key,pending);try{return await pending}finally{protectedGrantPending.delete(key)}};
-const requestJson=async(method,path,payload,auth=false)=>{let{res,data}=await requestJsonBase(method,path,payload,auth,{});const protectedErr=parseProtectedError(res,data);if(auth&&protectedErr){try{const grant=await ensureProtectedGrant(protectedErr.moduleCode,protectedErr.message);if(grant){protectedGrantCache.set(protectedErr.moduleCode,grant);({res,data}=await requestJsonBase(method,path,payload,auth,{"X-Protected-Grant":grant}));const protectedAfterRetry=parseProtectedError(res,data);if(protectedAfterRetry){protectedGrantCache.delete(protectedErr.moduleCode)}}}catch(err){return{res,data:{detail:err?.message||"Falha ao validar mÃ³dulo protegido."}}}}return{res,data}};
+const unlockProtectedGrant=async(moduleCode,senha)=>{const token=getToken();if(!token)throw new Error("SessÃƒÂ£o invÃƒÂ¡lida para desbloqueio.");const body={senha:String(senha||""),module_code:moduleCode||"*"};const res=await fetch(baseUrl+"/auth/protected/unlock",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error((data&&data.detail)||"Falha ao desbloquear mÃƒÂ³dulo protegido.");const grant=String(data.grant_token||"").trim();if(!grant)throw new Error("Grant de acesso protegido nÃƒÂ£o retornado.");return grant};
+const ensureProtectedGrant=async(moduleCode,message)=>{const key=(moduleCode||"*").toLowerCase();if(protectedGrantCache.has(key))return protectedGrantCache.get(key)||"";if(protectedGrantCache.has("*"))return protectedGrantCache.get("*")||"";if(key==="usuarios"&&protectedGrantCache.has("configuracao"))return protectedGrantCache.get("configuracao")||"";if(protectedGrantPending.has(key))return protectedGrantPending.get(key);const promptMsg=(message||`O mÃƒÂ³dulo '${key}' estÃƒÂ¡ protegido.`)+"\n\nDigite a senha do administrador para continuar:";const senha=await protectedPassDialog(promptMsg);if(!senha){throw new Error("Acesso protegido cancelado pelo usuÃƒÂ¡rio.")}const pending=(async()=>{const grant=await unlockProtectedGrant(key,senha);protectedGrantCache.set(key,grant);return grant})();protectedGrantPending.set(key,pending);try{return await pending}finally{protectedGrantPending.delete(key)}};
+const requestJson=async(method,path,payload,auth=false)=>{let{res,data}=await requestJsonBase(method,path,payload,auth,{});
+// Corrige textos mojibake (UTF-8 lido como ANSI/Latin-1) sem alterar regras de negocio.
+function fixMojibakeText(value){
+  const input=String(value??"");
+  if(!input)return input;
+  if(!/[???]/.test(input))return input;
+  let out=input;
+  for(let i=0;i<3;i++){
+    if(!/[???]/.test(out))break;
+    try{
+      const bytes=Uint8Array.from([...out].map(ch=>ch.charCodeAt(0)&0xFF));
+      const decoded=new TextDecoder("utf-8",{fatal:false}).decode(bytes);
+      if(!decoded||decoded===out)break;
+      out=decoded;
+    }catch{
+      break;
+    }
+  }
+  return out.replace(/ï¿½/g,"");
+}
+function normalizeMojibakeDom(root){
+  if(!root)return;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  let textNode=walker.nextNode();
+  while(textNode){
+    const parent=textNode.parentElement;
+    if(parent&&parent.tagName!=="SCRIPT"&&parent.tagName!=="STYLE"){
+      const fixed=fixMojibakeText(textNode.nodeValue||"");
+      if(fixed!==textNode.nodeValue)textNode.nodeValue=fixed;
+    }
+    textNode=walker.nextNode();
+  }
+  if(root instanceof Element){
+    const elems=[root,...root.querySelectorAll("*")];
+    elems.forEach(el=>{
+      if(el.hasAttribute("title")){
+        const v=el.getAttribute("title")||"";
+        const f=fixMojibakeText(v);
+        if(f!==v)el.setAttribute("title",f);
+      }
+      if(el.hasAttribute("aria-label")){
+        const v=el.getAttribute("aria-label")||"";
+        const f=fixMojibakeText(v);
+        if(f!==v)el.setAttribute("aria-label",f);
+      }
+      if(el.hasAttribute("placeholder")){
+        const v=el.getAttribute("placeholder")||"";
+        const f=fixMojibakeText(v);
+        if(f!==v)el.setAttribute("placeholder",f);
+      }
+      if(el.tagName==="OPTION"){
+        const txt=el.textContent||"";
+        const fixed=fixMojibakeText(txt);
+        if(fixed!==txt)el.textContent=fixed;
+      }
+    });
+  }
+}
+let mojibakeObserverTimer=null;
+function initMojibakeAutoFix(){
+  if(window.__mojibakeFixInit)return;
+  window.__mojibakeFixInit=true;
+  normalizeMojibakeDom(document.body);
+  const observer=new MutationObserver((mutations)=>{
+    if(mojibakeObserverTimer)clearTimeout(mojibakeObserverTimer);
+    mojibakeObserverTimer=setTimeout(()=>{
+      mutations.forEach(m=>{
+        if(m.type==="characterData"&&m.target?.parentElement){
+          normalizeMojibakeDom(m.target.parentElement);
+          return;
+        }
+        m.addedNodes?.forEach(node=>{
+          if(node.nodeType===Node.ELEMENT_NODE)normalizeMojibakeDom(node);
+          if(node.nodeType===Node.TEXT_NODE&&node.parentElement)normalizeMojibakeDom(node.parentElement);
+        });
+      });
+    },30);
+  });
+  observer.observe(document.body,{subtree:true,childList:true,characterData:true});
+}
+const protectedErr=parseProtectedError(res,data);if(auth&&protectedErr){try{const grant=await ensureProtectedGrant(protectedErr.moduleCode,protectedErr.message);if(grant){protectedGrantCache.set(protectedErr.moduleCode,grant);({res,data}=await requestJsonBase(method,path,payload,auth,{"X-Protected-Grant":grant}));const protectedAfterRetry=parseProtectedError(res,data);if(protectedAfterRetry){protectedGrantCache.delete(protectedErr.moduleCode)}}}catch(err){return{res,data:{detail:err?.message||"Falha ao validar mÃƒÂ³dulo protegido."}}}}return{res,data}};
 const postJson=async(path,payload,auth=false)=>requestJson("POST",path,payload,auth);
 const licSetStatus=(msg,erro=false,sucesso=false)=>{if(!licDlg.status)return;licDlg.status.textContent=msg||"";licDlg.status.style.color=erro?"#b00020":(sucesso?"#0a7a00":"#1f2937")};
-const licPlanoLabel=(info)=>{if(!info)return"LicenÃ§a";if(info.status==="OWNER")return"LicenÃ§a VitalÃ­cia";if(info.status==="SUPERADMIN")return"Super Admin";if(info.status==="DEMO")return`Demo (${info.dias_restantes||0} dias)`;if(info.status==="MENSAL")return"Plano Mensal";if(info.status==="ANUAL")return"Plano Anual";if(info.status==="EXPIRADO")return"LicenÃ§a Expirada";return"LicenÃ§a"};
+const licPlanoLabel=(info)=>{if(!info)return"LicenÃƒÂ§a";if(info.status==="OWNER")return"LicenÃƒÂ§a VitalÃƒÂ­cia";if(info.status==="SUPERADMIN")return"Super Admin";if(info.status==="DEMO")return`Demo (${info.dias_restantes||0} dias)`;if(info.status==="MENSAL")return"Plano Mensal";if(info.status==="ANUAL")return"Plano Anual";if(info.status==="EXPIRADO")return"LicenÃƒÂ§a Expirada";return"LicenÃƒÂ§a"};
 const licUpdateBadge=(info)=>{if(!userLicense)return;userLicense.textContent=licPlanoLabel(info)};
-async function licCarregarInfo(){const{res,data}=await requestJson("GET","/licenca/info",undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar licenÃ§a.");licInfoCache=data;licUpdateBadge(data);return data}
+async function licCarregarInfo(){const{res,data}=await requestJson("GET","/licenca/info",undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar licenÃƒÂ§a.");licInfoCache=data;licUpdateBadge(data);return data}
 function licPreencherSobre(info){sobreDlg.versao.textContent=info.versao_sistema||"1.0.0";sobreDlg.suporte.textContent=info.email_suporte||"institutobrana@gmail.com";sobreDlg.registrado.textContent=info.usuario_registro||"Registrado";sobreDlg.serial.textContent=info.serial||"-";sobreDlg.machine.textContent=info.machine_id||"-";sobreDlg.status.textContent=info.mensagem_sobre||"-"}
-async function abrirSobreModal(){try{const info=await licCarregarInfo();licPreencherSobre(info);sobreDlg.backdrop.classList.remove("hidden")}catch(err){footerMsg.textContent=err.message||"Falha ao abrir mÃ³dulo Sobre."}}
+async function abrirSobreModal(){try{const info=await licCarregarInfo();licPreencherSobre(info);sobreDlg.backdrop.classList.remove("hidden")}catch(err){footerMsg.textContent=err.message||"Falha ao abrir mÃƒÂ³dulo Sobre."}}
 function fecharSobreModal(){sobreDlg.backdrop.classList.add("hidden")}
 async function licConfirmarPagamentoRetorno(){if(!mpReturnPaymentId||!getToken())return false;const paymentId=mpReturnPaymentId;mpReturnPaymentId="";try{const{res,data}=await requestJson("POST","/licenca/confirmar",{payment_id:paymentId},true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao confirmar pagamento.";return false}if(data.info){licInfoCache=data.info;licUpdateBadge(licInfoCache)}if(data.detail)footerMsg.textContent=data.detail;return !!data.aplicado}catch{return false}}
-async function licIniciarCheckout(plano){try{licSetStatus("Gerando checkout...",false,false);const{res,data}=await requestJson("POST","/licenca/checkout",{plano},true);if(!res.ok){licSetStatus(data.detail||"Falha ao iniciar checkout.",true,false);return}const url=(data.checkout_url||"").trim();if(url)window.open(url,"_blank","noopener,noreferrer");licSetStatus(data.detail||"Checkout aberto. Conclua o pagamento e clique em Atualizar status.",false,true);footerMsg.textContent=data.detail||"Checkout aberto no Mercado Pago."}catch{licSetStatus("Erro de conexÃ£o ao iniciar checkout.",true,false)}}
-async function licSincronizarStatus(){try{licSetStatus("Sincronizando pagamento...",false,false);const{res,data}=await requestJson("POST","/licenca/sincronizar",{},true);if(!res.ok){licSetStatus(data.detail||"Falha ao sincronizar pagamento.",true,false);return}if(data.info){licInfoCache=data.info;licUpdateBadge(licInfoCache)}licSetStatus(data.detail||"Status atualizado.",false,true);if(data.detail)footerMsg.textContent=data.detail}catch{licSetStatus("Erro de conexÃ£o ao sincronizar pagamento.",true,false)}}
-async function abrirLicencaModal(){try{const info=await licCarregarInfo();licDlg.machine.value=info.machine_id||"";licDlg.usuario.value=info.usuario_registro||"";licSetStatus(info.mensagem_ativacao||"",info.status==="EXPIRADO",info.status!=="EXPIRADO");licDlg.backdrop.classList.remove("hidden")}catch(err){footerMsg.textContent=err.message||"Falha ao abrir ativaÃ§Ã£o."}}
+async function licIniciarCheckout(plano){try{licSetStatus("Gerando checkout...",false,false);const{res,data}=await requestJson("POST","/licenca/checkout",{plano},true);if(!res.ok){licSetStatus(data.detail||"Falha ao iniciar checkout.",true,false);return}const url=(data.checkout_url||"").trim();if(url)window.open(url,"_blank","noopener,noreferrer");licSetStatus(data.detail||"Checkout aberto. Conclua o pagamento e clique em Atualizar status.",false,true);footerMsg.textContent=data.detail||"Checkout aberto no Mercado Pago."}catch{licSetStatus("Erro de conexÃƒÂ£o ao iniciar checkout.",true,false)}}
+async function licSincronizarStatus(){try{licSetStatus("Sincronizando pagamento...",false,false);const{res,data}=await requestJson("POST","/licenca/sincronizar",{},true);if(!res.ok){licSetStatus(data.detail||"Falha ao sincronizar pagamento.",true,false);return}if(data.info){licInfoCache=data.info;licUpdateBadge(licInfoCache)}licSetStatus(data.detail||"Status atualizado.",false,true);if(data.detail)footerMsg.textContent=data.detail}catch{licSetStatus("Erro de conexÃƒÂ£o ao sincronizar pagamento.",true,false)}}
+async function abrirLicencaModal(){try{const info=await licCarregarInfo();licDlg.machine.value=info.machine_id||"";licDlg.usuario.value=info.usuario_registro||"";licSetStatus(info.mensagem_ativacao||"",info.status==="EXPIRADO",info.status!=="EXPIRADO");licDlg.backdrop.classList.remove("hidden")}catch(err){footerMsg.textContent=err.message||"Falha ao abrir ativaÃƒÂ§ÃƒÂ£o."}}
 function fecharLicencaModal(){licDlg.backdrop.classList.add("hidden")}
 async function login(){const email=emailEl.value.trim(),senha=senhaEl.value;if(!email||!senha){setLoginStatus("Informe email e senha.",true);return}const body=new URLSearchParams();body.append("username",email);body.append("password",senha);try{const res=await fetch(baseUrl+"/login",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body});const data=await res.json();if(!res.ok){setLoginStatus(data.detail||"Falha no login.",true);return}setToken(data.access_token||"");setLoginStatus("Login efetuado com sucesso.",false);await carregarSessao()}catch{setLoginStatus("Erro de conexao com backend.",true)}}
 async function signupRequestCode(){const p={nome:signupNomeEl.value.trim(),email:signupEmailEl.value.trim(),senha:signupSenhaEl.value};if(!p.nome||!p.email||!p.senha){setLoginStatus("Preencha nome, email e senha para cadastrar.",true);return}if((p.senha||"").length<6){setLoginStatus("A senha deve ter no minimo 6 digitos.",true);return}try{const{res,data}=await postJson("/signup/request-code",p);if(!res.ok){setLoginStatus(data.detail||"Falha ao enviar codigo.",true);return}setLoginStatus(data.detail||"Codigo enviado por e-mail.",false)}catch{setLoginStatus("Erro de conexao ao solicitar codigo.",true)}}
 async function signupConfirm(){const p={nome:signupNomeEl.value.trim(),email:signupEmailEl.value.trim(),senha:signupSenhaEl.value,codigo:signupCodigoEl.value.trim()};if(!p.nome||!p.email||!p.senha||!p.codigo){setLoginStatus("Preencha todos os campos do cadastro.",true);return}if((p.senha||"").length<6){setLoginStatus("A senha deve ter no minimo 6 digitos.",true);return}try{const{res,data}=await postJson("/signup/confirm",p);if(!res.ok){setLoginStatus(data.detail||"Falha ao confirmar cadastro.",true);return}setToken(data.access_token||"");setLoginStatus(data.detail||"Cadastro confirmado.",false);await carregarSessao()}catch{setLoginStatus("Erro de conexao ao confirmar cadastro.",true)}}
 async function forgotRequestCode(){const email=forgotEmailEl.value.trim();if(!email){setLoginStatus("Informe o e-mail para recuperar a senha.",true);return}try{const{res,data}=await postJson("/password/forgot",{email});if(!res.ok){setLoginStatus(data.detail||"Falha ao enviar codigo.",true);return}setLoginStatus(data.detail||"Codigo enviado para o e-mail.",false)}catch{setLoginStatus("Erro de conexao ao solicitar recuperacao.",true)}}
 async function forgotResetPassword(){const p={email:forgotEmailEl.value.trim(),codigo:forgotCodigoEl.value.trim(),nova_senha:forgotSenhaEl.value};if(!p.email||!p.codigo||!p.nova_senha){setLoginStatus("Preencha email, codigo e nova senha.",true);return}if((p.nova_senha||"").length<6){setLoginStatus("A senha deve ter no minimo 6 digitos.",true);return}try{const{res,data}=await postJson("/password/reset",p);if(!res.ok){setLoginStatus(data.detail||"Falha ao redefinir senha.",true);return}setLoginStatus(data.detail||"Senha redefinida. Faca login.",false);showPanel(panelLogin);emailEl.value=p.email}catch{setLoginStatus("Erro de conexao ao redefinir senha.",true)}}
-const hideAllPanels=()=>{if(preserveProtectedGrantOnHide){preserveProtectedGrantOnHide=false}else{clearProtectedGrants()}usersDetachOverlay();cenarioPanel.classList.add("hidden");materiaisPanel.classList.add("hidden");proc.panel.classList.add("hidden");proc.novoPanel.classList.add("hidden");usersPanel.classList.add("hidden");if(sa&&sa.panel){sa.panel.classList.add("hidden")}if(prot&&prot.panel){prot.panel.classList.add("hidden")}if(ctrlProt&&ctrlProt.panel){ctrlProt.panel.classList.add("hidden")}if(convPlanCfg&&convPlanCfg.panel){convPlanCfg.panel.classList.add("hidden")}if(convPlanCalCfg&&convPlanCalCfg.panel){convPlanCalCfg.panel.classList.add("hidden")}if(prestCfg&&prestCfg.panel){prestCfg.panel.classList.add("hidden")}if(unidadeCfg&&unidadeCfg.panel){unidadeCfg.panel.classList.add("hidden")}if(pgen&&pgen.panel){pgen.panel.classList.add("hidden")}if(ficha&&ficha.panel){ficha.panel.classList.add("hidden")}if(fichaMenuPac)fichaMenuPacFechar();if(cc){cc.panel.classList.add("hidden")}if(rcc){rcc.panel.classList.add("hidden");rcc.viewPanel.classList.add("hidden")}if(fcx&&fcx.panel){fcx.panel.classList.add("hidden")}if(dash&&dash.panel){dash.panel.classList.add("hidden")}if(plano){plano.panel.classList.add("hidden")}if(aux){aux.panel.classList.add("hidden")}if(agendaContatos&&agendaContatos.panel){agendaContatos.panel.classList.add("hidden")}if(agendaLegado&&agendaLegado.panel){agendaLegado.panel.classList.add("hidden")}if(agendaSemana&&agendaSemana.panel){agendaSemana.panel.classList.add("hidden")}if(cid&&cid.panel){cid.panel.classList.add("hidden")}usersStopRefresh();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();workspaceEmpty.classList.remove("hidden")};
+const hideAllPanels=()=>{if(preserveProtectedGrantOnHide){preserveProtectedGrantOnHide=false}else{clearProtectedGrants()}usersDetachOverlay();cenarioPanel.classList.add("hidden");materiaisPanel.classList.add("hidden");proc.panel.classList.add("hidden");proc.novoPanel.classList.add("hidden");usersPanel.classList.add("hidden");if(sa&&sa.panel){sa.panel.classList.add("hidden")}if(prot&&prot.panel){prot.panel.classList.add("hidden")}if(ctrlProt&&ctrlProt.panel){ctrlProt.panel.classList.add("hidden")}if(convPlanCfg&&convPlanCfg.panel){convPlanCfg.panel.classList.add("hidden")}if(convPlanCalCfg&&convPlanCalCfg.panel){convPlanCalCfg.panel.classList.add("hidden")}if(prestCfg&&prestCfg.panel){prestCfg.panel.classList.add("hidden")}if(unidadeCfg&&unidadeCfg.panel){unidadeCfg.panel.classList.add("hidden")}if(pgen&&pgen.panel){pgen.panel.classList.add("hidden")}if(ficha&&ficha.panel){ficha.panel.classList.add("hidden")}if(fichaMenuPac)fichaMenuPacFechar();if(cc){cc.panel.classList.add("hidden")}if(rcc){rcc.panel.classList.add("hidden");rcc.viewPanel.classList.add("hidden")}if(fcx&&fcx.panel){fcx.panel.classList.add("hidden")}if(dash&&dash.panel){dash.panel.classList.add("hidden")}if(plano){plano.panel.classList.add("hidden")}if(aux){aux.panel.classList.add("hidden")}if(agendaContatos&&agendaContatos.panel){agendaContatos.panel.classList.add("hidden")}if(agendaLegado&&agendaLegado.panel){agendaLegado.panel.classList.add("hidden")}if(agendaSemana&&agendaSemana.panel){agendaSemanaDesconectarResizeObserver();agendaSemana.panel.classList.add("hidden")}if(cid&&cid.panel){cid.panel.classList.add("hidden")}usersStopRefresh();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();workspaceEmpty.classList.remove("hidden")};
 const showScenarioPanel=(s)=>{hideAllPanels();if(s){cenarioPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")}};
 const showMateriaisPanel=(s)=>{hideAllPanels();if(s){materiaisPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")}};
 const usersAttachOverlay=()=>{if(usersPanelOverlay)return;const panel=usersPanel;if(!panel||!panel.parentElement)return;const backdrop=document.createElement("div");backdrop.id="users-panel-backdrop";backdrop.className="modal-backdrop";backdrop.style.background="rgba(0,0,0,0)";backdrop.style.zIndex="1100";usersPanelPlaceholder=document.createComment("users-panel-placeholder");panel.parentElement.insertBefore(usersPanelPlaceholder,panel);backdrop.appendChild(panel);document.body.appendChild(backdrop);panel.classList.add("panel-floating");chromeResetDragOffset(panel);ensurePanelChrome(panel);usersPanelOverlay=backdrop;if(!usersGrantOverride){const grant=getProtectedGrantFromCache("configuracao","usuarios","*");usersGrantOverride=grant||null}};
@@ -193,11 +273,11 @@ async function abrirPainelUsuariosConfig(preserveGrant=false,overlay=false){
   await carregarUsuarios()
 }
 function closeWorkspacePanel(panelId){if(panelId==="cenario-panel"){showScenarioPanel(false);return}if(panelId==="materiais-panel"){showMateriaisPanel(false);return}if(panelId==="procedimentos-panel"){if(proc&&proc.btnFechar){proc.btnFechar.click();return}}if(panelId==="novo-proc-panel"){if(proc&&proc.btnVoltar){proc.btnVoltar.click();return}}if(panelId==="users-panel"){showUsersPanel(false);return}if(panelId==="superadmin-panel"){if(sa&&sa.panel)sa.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");return}if(panelId==="proteticos-panel"){if(prot&&prot.btnFechar){prot.btnFechar.click();return}}if(panelId==="ctrl-proteticos-panel"){if(ctrlProt&&ctrlProt.btnFechar){ctrlProt.btnFechar.click();return}}if(panelId==="convenios-planos-panel"){if(convPlanCfg&&convPlanCfg.btnFechar){convPlanCfg.btnFechar.click();return}}if(panelId==="convplan-cal-panel"){if(convPlanCalCfg&&convPlanCalCfg.btnFechar){convPlanCalCfg.btnFechar.click();return}}if(panelId==="prestadores-panel"){if(prestCfg&&prestCfg.btnFechar){prestCfg.btnFechar.click();return}}if(panelId==="unidades-atendimento-panel"){if(unidadeCfg&&unidadeCfg.btnFechar){unidadeCfg.btnFechar.click();return}}if(panelId==="prest-cred-panel"){if(prestCredCfg&&prestCredCfg.btnFechar){prestCredCfg.btnFechar.click();return}}if(panelId==="prest-com-panel"){if(prestComCfg&&prestComCfg.btnFechar){prestComCfg.btnFechar.click();return}}if(panelId==="pgen-panel"){if(pgen&&pgen.btnFechar){pgen.btnFechar.click();return}}if(panelId==="ficha-panel"){if(ficha&&ficha.btnFechar){ficha.btnFechar.click();return}}if(panelId==="cc-panel"){if(cc&&cc.btnFechar){cc.btnFechar.click();return}}if(panelId==="plano-panel"){if(plano&&plano.btnFechar){plano.btnFechar.click();return}}if(panelId==="aux-panel"){if(aux&&aux.btnFechar){aux.btnFechar.click();return}}if(panelId==="rcc-panel"){if(typeof rccFechar==="function"){rccFechar();return}}if(panelId==="rview-panel"){if(rcc&&rcc.viewBtnFecha){rcc.viewBtnFecha.click();return}}if(panelId==="fcx-panel"){if(typeof fcxFechar==="function"){fcxFechar();return}}if(panelId==="dash-panel"){if(dash&&dash.btnVoltar){dash.btnVoltar.click();return}}if(panelId==="agenda-contatos-panel"){if(agendaContatos&&agendaContatos.btnFechar){agendaContatos.btnFechar.click();return}}if(panelId==="agenda-legado-panel"){if(agendaLegado&&agendaLegado.btnFechar){agendaLegado.btnFechar.click();return}}if(panelId==="agenda-semana-panel"){if(agendaSemana&&agendaSemana.btnFechar){agendaSemana.btnFechar.click();return}}if(panelId==="cid-panel"){if(cid&&cid.btnFechar){cid.btnFechar.click();return}}if(panelId==="simbolos-panel"){if(simbolosCfg&&simbolosCfg.btnFechar){simbolosCfg.btnFechar.click();return}}if(panelId==="anamnese-panel"){if(anamneseCfg&&anamneseCfg.btnFechar){anamneseCfg.btnFechar.click();return}}const panel=document.getElementById(panelId);if(panel){panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")}}
-const PANEL_TITLE_DEFAULTS={"workspace-empty":"Bem-vindo","cenario-panel":"ConfiguraÃ§Ã£o de cenÃ¡rio anual","materiais-panel":"Tabela de materiais","procedimentos-panel":"Configura tabela de preÃ§os","novo-proc-panel":"Insere intervenÃ§Ã£o","users-panel":"ConfiguraÃ§Ã£o de usuÃ¡rios do sistema","superadmin-panel":"Painel ADM","proteticos-panel":"Configura tabelas de protÃ©ticos","ctrl-proteticos-panel":"Controle de serviÃ§os de prÃ³tese","convenios-planos-panel":"ConvÃªnios e planos","convplan-cal-panel":"ConfiguraÃ§Ã£o de calendÃ¡rio de faturamento","prestadores-panel":"Cadastro de prestadores","prest-cred-panel":"Cadastro de credenciamentos","prest-com-panel":"Configura fatores de comissÃ£o","pgen-panel":"Cadastro de procedimentos genericos","cc-panel":"Conta corrente","plano-panel":"Plano de contas","aux-panel":"ConfiguraÃ§Ã£o de itens","rcc-panel":"Pesquisa fluxo de caixa","rview-panel":"VisualizaÃ§Ã£o de relatÃ³rio","fcx-panel":"AnÃ¡lise de fluxo de caixa","dash-panel":"Dashboard","agenda-contatos-panel":"Agenda de contatos","agenda-legado-panel":"Agenda (legado)","agenda-semana-panel":"Agenda da semana","cid-panel":"Tabela de doenÃ§as (CID)","simbolos-panel":"Configura sÃ­mbolos","anamnese-panel":"Configura questionÃ¡rios de anamnese"};
+const PANEL_TITLE_DEFAULTS={"workspace-empty":"Bem-vindo","cenario-panel":"ConfiguraÃƒÂ§ÃƒÂ£o de cenÃƒÂ¡rio anual","materiais-panel":"Tabela de materiais","procedimentos-panel":"Configura tabela de preÃƒÂ§os","novo-proc-panel":"Insere intervenÃƒÂ§ÃƒÂ£o","users-panel":"ConfiguraÃƒÂ§ÃƒÂ£o de usuÃƒÂ¡rios do sistema","superadmin-panel":"Painel ADM","proteticos-panel":"Configura tabelas de protÃƒÂ©ticos","ctrl-proteticos-panel":"Controle de serviÃƒÂ§os de prÃƒÂ³tese","convenios-planos-panel":"ConvÃƒÂªnios e planos","convplan-cal-panel":"ConfiguraÃƒÂ§ÃƒÂ£o de calendÃƒÂ¡rio de faturamento","prestadores-panel":"Cadastro de prestadores","prest-cred-panel":"Cadastro de credenciamentos","prest-com-panel":"Configura fatores de comissÃƒÂ£o","pgen-panel":"Cadastro de procedimentos genericos","cc-panel":"Conta corrente","plano-panel":"Plano de contas","aux-panel":"ConfiguraÃƒÂ§ÃƒÂ£o de itens","rcc-panel":"Pesquisa fluxo de caixa","rview-panel":"VisualizaÃƒÂ§ÃƒÂ£o de relatÃƒÂ³rio","fcx-panel":"AnÃƒÂ¡lise de fluxo de caixa","dash-panel":"Dashboard","agenda-contatos-panel":"Agenda de contatos","agenda-legado-panel":"Agenda (legado)","agenda-semana-panel":"Agenda da semana","cid-panel":"Tabela de doenÃƒÂ§as (CID)","simbolos-panel":"Configura sÃƒÂ­mbolos","anamnese-panel":"Configura questionÃƒÂ¡rios de anamnese"};
 function panelInsetsById(panelId){const m={"workspace-empty":[12,12],"cenario-panel":[12,12],"materiais-panel":[10,10],"procedimentos-panel":[10,10],"novo-proc-panel":[12,12],"users-panel":[12,12],"superadmin-panel":[12,12],"proteticos-panel":[10,10],"ctrl-proteticos-panel":[10,10],"convenios-planos-panel":[10,10],"convplan-cal-panel":[10,10],"prestadores-panel":[10,10],"prest-cred-panel":[10,10],"prest-com-panel":[10,10],"pgen-panel":[8,8],"cc-panel":[8,8],"plano-panel":[8,8],"aux-panel":[9,9],"rcc-panel":[8,8],"rview-panel":[8,8],"fcx-panel":[0,0],"dash-panel":[10,8],"agenda-contatos-panel":[10,10],"agenda-legado-panel":[10,10],"agenda-semana-panel":[10,10],"cid-panel":[10,10],"simbolos-panel":[10,10],"anamnese-panel":[10,10]};return m[panelId]||[12,12]}
 function modalInsetsById(backdropId){const m={"materiais-modal-backdrop":[10,10],"materiais-tabela-modal-backdrop":[12,10],"vincula-backdrop":[12,12],"proc-tabela-modal-backdrop":[11,0],"proc-relatorio-backdrop":[12,12],"users-modal-backdrop":[12,12],"users-pass-backdrop":[12,12],"protected-pass-backdrop":[12,12],"users-perm-backdrop":[12,12],"sobre-backdrop":[12,12],"licenca-backdrop":[12,12],"ficha-menu-backdrop":[0,0],"cc-modal-backdrop":[8,8],"cad-modal-backdrop":[8,8],"prot-modal-backdrop":[8,8],"prot-relatorio-backdrop":[8,8],"prot-relatorio-arquivo-backdrop":[8,8],"agenda-contatos-modal-backdrop":[10,10],"cid-modal-backdrop":[10,10],"simbolos-modal-backdrop":[8,8],"config-relatorios-backdrop":[10,10],"config-impressora-backdrop":[10,10],"config-relatorios-teste-backdrop":[10,10],"config-relatorios-fonte-backdrop":[10,10],"config-relatorios-rede-backdrop":[0,0],"config-preferencias-backdrop":[10,10],"config-opcoes-sistema-backdrop":[10,10],"config-indices-backdrop":[10,10],"config-etiquetas-backdrop":[10,10],"config-etiquetas-edit-backdrop":[10,10],"convplan-convenio-modal-backdrop":[10,10],"convplan-plano-modal-backdrop":[10,10],"convplan-cal-modal-backdrop":[10,10],"prest-modal-backdrop":[10,10],"prest-agenda-backdrop":[10,10],"prest-agenda-bloqueio-backdrop":[10,10],"prest-agenda-fonte-backdrop":[10,10],"prest-cred-modal-backdrop":[10,10],"prest-com-modal-backdrop":[10,10]};return m[backdropId]||[12,12]}
 function closeModalByBackdropId(backdropId){if(backdropId==="materiais-modal-backdrop"){materiaisFecharModal();return}if(backdropId==="materiais-tabela-modal-backdrop"){materiaisTabelaFecharModal();return}if(backdropId==="vincula-backdrop"){procFecharVincular();return}if(backdropId==="proc-tabela-modal-backdrop"){procTabelaFecharModal();return}if(backdropId==="proc-relatorio-backdrop"){procRelatorioFechar();return}if(backdropId==="users-modal-backdrop"){usersFecharModal();return}if(backdropId==="users-pass-backdrop"){usersFecharModalSenha();return}if(backdropId==="protected-pass-backdrop"){protectedPassClose(null);return}if(backdropId==="users-perm-backdrop"){usersFecharPermissoes();return}if(backdropId==="sobre-backdrop"){fecharSobreModal();return}if(backdropId==="licenca-backdrop"){fecharLicencaModal();return}if(backdropId==="ficha-menu-backdrop"){fichaMenuPacFechar();return}if(backdropId==="cc-modal-backdrop"){ccFecharModal();return}if(backdropId==="cad-modal-backdrop"){const mb=document.getElementById("cad-modal-backdrop");if(mb)mb.classList.add("hidden");return}if(backdropId==="prot-modal-backdrop"){protFecharModal();return}if(backdropId==="prot-relatorio-backdrop"){protFecharRelatorio();return}if(backdropId==="prot-relatorio-arquivo-backdrop"){protFecharRelatorioArquivo();return}if(backdropId==="agenda-contatos-modal-backdrop"){agendaContatosFecharModal();return}if(backdropId==="cid-modal-backdrop"){cidFecharModal();return}if(backdropId==="simbolos-modal-backdrop"){simbolosFecharModal();return}if(backdropId==="config-relatorios-backdrop"){if(cnfRelatorio?.backdrop)cnfRelatorio.backdrop.classList.add("hidden");return}if(backdropId==="config-impressora-backdrop"){if(cnfRelatorioDlgImp?.backdrop)cnfRelatorioDlgImp.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-teste-backdrop"){if(cnfRelatorioDlgTeste?.backdrop)cnfRelatorioDlgTeste.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-fonte-backdrop"){if(cnfRelatorioDlgFonte?.backdrop)cnfRelatorioDlgFonte.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-rede-backdrop"){if(cnfRelatorioDlgRede?.backdrop)cnfRelatorioDlgRede.backdrop.classList.add("hidden");return}if(backdropId==="config-preferencias-backdrop"){if(prefCfg?.backdrop)prefCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-opcoes-sistema-backdrop"){if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-indices-backdrop"){indicesFechar();return}if(backdropId==="config-etiquetas-backdrop"){if(etqCfg?.backdrop)etqCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-etiquetas-edit-backdrop"){if(etqCfg?.editBackdrop)etqCfg.editBackdrop.classList.add("hidden");return}if(backdropId==="convplan-convenio-modal-backdrop"){if(convPlanCfg?.convenioModal?.backdrop)convPlanCfg.convenioModal.backdrop.classList.add("hidden");return}if(backdropId==="convplan-plano-modal-backdrop"){if(convPlanCfg?.planoModal?.backdrop)convPlanCfg.planoModal.backdrop.classList.add("hidden");return}if(backdropId==="convplan-cal-modal-backdrop"){if(convPlanCalCfg?.modal?.backdrop)convPlanCalCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-modal-backdrop"){if(prestCfg?.modal?.backdrop)prestCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-backdrop"){if(prestCfg?.agenda?.backdrop)prestCfg.agenda.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-bloqueio-backdrop"){if(prestCfg?.agendaBloqueioModal?.backdrop)prestCfg.agendaBloqueioModal.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-fonte-backdrop"){if(prestCfg?.agendaFonteModal?.backdrop)prestCfg.agendaFonteModal.backdrop.classList.add("hidden");return}if(backdropId==="prest-cred-modal-backdrop"){if(prestCredCfg?.modal?.backdrop)prestCredCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-com-modal-backdrop"){if(prestComCfg?.modal?.backdrop)prestComCfg.modal.backdrop.classList.add("hidden");return}}
-function modalTitleByBackdropId(backdropId){const m={"materiais-modal-backdrop":"Material","materiais-tabela-modal-backdrop":"Tabela de materiais","vincula-backdrop":"Vincular material","proc-tabela-modal-backdrop":"Tabela de preÃ§os","proc-relatorio-backdrop":"Tabela de intervenÃ§Ãµes","users-modal-backdrop":"UsuÃ¡rio","users-pass-backdrop":"Troca de senha","protected-pass-backdrop":"Senha","users-perm-backdrop":"PermissÃµes do usuÃ¡rio","sobre-backdrop":"Sobre","licenca-backdrop":"LicenÃ§a","ficha-menu-backdrop":"Menu de pacientes","cc-modal-backdrop":"Conta corrente","cad-modal-backdrop":"Cadastro","prot-modal-backdrop":"Insere serviÃ§o","prot-relatorio-backdrop":"Tabela de serviÃ§os de protÃ©tico","prot-relatorio-arquivo-backdrop":"Salvar relatÃ³rio em arquivo","agenda-contatos-modal-backdrop":"Novo contato","cid-modal-backdrop":"Nova doenÃ§a","simbolos-modal-backdrop":"Edita sÃ­mbolo grÃ¡fico","config-relatorios-backdrop":"Configura impressos","config-impressora-backdrop":"Configurar ImpressÃ£o","config-relatorios-teste-backdrop":"Imprimir","config-relatorios-fonte-backdrop":"Fonte","config-relatorios-rede-backdrop":"Rede","config-preferencias-backdrop":"Configura preferÃªncias do usuÃ¡rio","config-opcoes-sistema-backdrop":"OpÃ§Ãµes do sistema","config-indices-backdrop":"ConfiguraÃ§Ã£o de Ã­ndices financeiros","config-etiquetas-backdrop":"ConfiguraÃ§Ã£o de modelos de etiqueta","config-etiquetas-edit-backdrop":"Novo modelo de etiqueta","convplan-convenio-modal-backdrop":"Novo convÃªnio","convplan-plano-modal-backdrop":"Novo plano","convplan-cal-modal-backdrop":"Nova data de faturamento","prest-modal-backdrop":"Novo prestador","prest-agenda-backdrop":"Configura horÃ¡rios de agendamento","prest-agenda-bloqueio-backdrop":"Novo bloqueio","prest-agenda-fonte-backdrop":"Fonte","prest-cred-modal-backdrop":"Novo credenciamento","prest-com-modal-backdrop":"Novo fator de comiss?o"};return m[backdropId]||"Detalhes"}
+function modalTitleByBackdropId(backdropId){const m={"materiais-modal-backdrop":"Material","materiais-tabela-modal-backdrop":"Tabela de materiais","vincula-backdrop":"Vincular material","proc-tabela-modal-backdrop":"Tabela de preÃƒÂ§os","proc-relatorio-backdrop":"Tabela de intervenÃƒÂ§ÃƒÂµes","users-modal-backdrop":"UsuÃƒÂ¡rio","users-pass-backdrop":"Troca de senha","protected-pass-backdrop":"Senha","users-perm-backdrop":"PermissÃƒÂµes do usuÃƒÂ¡rio","sobre-backdrop":"Sobre","licenca-backdrop":"LicenÃƒÂ§a","ficha-menu-backdrop":"Menu de pacientes","cc-modal-backdrop":"Conta corrente","cad-modal-backdrop":"Cadastro","prot-modal-backdrop":"Insere serviÃƒÂ§o","prot-relatorio-backdrop":"Tabela de serviÃƒÂ§os de protÃƒÂ©tico","prot-relatorio-arquivo-backdrop":"Salvar relatÃƒÂ³rio em arquivo","agenda-contatos-modal-backdrop":"Novo contato","cid-modal-backdrop":"Nova doenÃƒÂ§a","simbolos-modal-backdrop":"Edita sÃƒÂ­mbolo grÃƒÂ¡fico","config-relatorios-backdrop":"Configura impressos","config-impressora-backdrop":"Configurar ImpressÃƒÂ£o","config-relatorios-teste-backdrop":"Imprimir","config-relatorios-fonte-backdrop":"Fonte","config-relatorios-rede-backdrop":"Rede","config-preferencias-backdrop":"Configura preferÃƒÂªncias do usuÃƒÂ¡rio","config-opcoes-sistema-backdrop":"OpÃƒÂ§ÃƒÂµes do sistema","config-indices-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de ÃƒÂ­ndices financeiros","config-etiquetas-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de modelos de etiqueta","config-etiquetas-edit-backdrop":"Novo modelo de etiqueta","convplan-convenio-modal-backdrop":"Novo convÃƒÂªnio","convplan-plano-modal-backdrop":"Novo plano","convplan-cal-modal-backdrop":"Nova data de faturamento","prest-modal-backdrop":"Novo prestador","prest-agenda-backdrop":"Configura horÃ¡rios de agendamento","prest-agenda-bloqueio-backdrop":"Novo bloqueio","prest-agenda-fonte-backdrop":"Fonte","prest-cred-modal-backdrop":"Novo credenciamento","prest-com-modal-backdrop":"Novo fator de comiss?o"};return m[backdropId]||"Detalhes"}
 function directChildBySelector(parent,selector){return Array.from(parent.children||[]).find(el=>el.matches&&el.matches(selector))||null}
 function applyPanelChromeInsets(panel){const[x,y]=panelInsetsById(panel.id);panel.style.setProperty("--panel-pad-x",`${x}px`);panel.style.setProperty("--panel-pad-top",`${y}px`)}
 function applyModalChromeInsets(modal,backdropId){const[x,y]=modalInsetsById(backdropId);modal.style.setProperty("--modal-pad-x",`${x}px`);modal.style.setProperty("--modal-pad-top",`${y}px`)}
@@ -220,7 +300,7 @@ function syncModalHeaders(root=document.body){if(!root)return;const modals=[];co
 function initModalChrome(){if(!document.body)return;syncModalHeaders(document.body);const obs=new MutationObserver(muts=>{muts.forEach(m=>{m.addedNodes.forEach(node=>{if(!(node instanceof HTMLElement))return;syncModalHeaders(node)})})});obs.observe(document.body,{childList:true,subtree:true})}
 const formatDec2=(v)=>Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
 const formatDec2Dot=(v)=>{const n=Number(v||0);return Number.isFinite(n)?n.toFixed(2):"0.00"};
-const parseMaterialNumber=(v)=>{const s=String(v??"").trim().replace(",",".");if(!s)return 0;const n=Number(s);if(!Number.isFinite(n))throw new Error("NÃºmero invÃ¡lido");return n};
+const parseMaterialNumber=(v)=>{const s=String(v??"").trim().replace(",",".");if(!s)return 0;const n=Number(s);if(!Number.isFinite(n))throw new Error("NÃƒÂºmero invÃƒÂ¡lido");return n};
 const materiaisListaIdAtual=()=>Number(m.cboListas.value||"0");
 const materiaisListaAtual=()=>materiaisListasCache.find(x=>Number(x.id)===materiaisListaIdAtual())||null;
 const materiaisSetTotal=()=>{m.lblTotal.textContent="Total de Materiais: "+m.tbody.querySelectorAll("tr").length};
@@ -233,7 +313,7 @@ const materiaisSetSelectValue=(el,val)=>{if(!el)return;const alvo=String(val??""
 const materiaisUniqueAuxDescricoes=(arr)=>{const out=[];const seen=new Set();(Array.isArray(arr)?arr:[]).forEach(x=>{const d=String(x?.descricao??"").trim();if(!d)return;const k=d.toLowerCase();if(seen.has(k))return;seen.add(k);out.push(d)});return out};
 async function materiaisCarregarAuxTipo(tipo){const t=(tipo||"").trim();if(!t)return[];const{res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent(t)}`,undefined,true);if(!res.ok)return[];return materiaisUniqueAuxDescricoes(data)}
 async function materiaisCarregarFiltroClassificacao(prefer=null){if(!m.cboClassificacao)return;const valorPreferido=prefer??materiaisFiltroClassificacaoAtual();const tipos=await materiaisCarregarAuxTipo("Tipos de material");materiaisAuxTiposCache=tipos;const op=['<option value="__mais_usados__">Mais usados</option>','<option value="__todos__">Todos</option>',...tipos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)];m.cboClassificacao.innerHTML=op.join("");materiaisSetSelectValue(m.cboClassificacao,valorPreferido)}
-async function materiaisCarregarCombosModal(){const [tipos,unds,fabricantes,apresentacoes]=await Promise.all([materiaisCarregarAuxTipo("Tipos de material"),materiaisCarregarAuxTipo("Unidades de medida"),materiaisCarregarAuxTipo("Fabricantes"),materiaisCarregarAuxTipo("Tipos de apresentaÃ§Ã£o")]);materiaisAuxTiposCache=tipos;materiaisAuxUndsCache=unds;if(m.cboModalClassificacao){m.cboModalClassificacao.innerHTML=['<option value=""></option>',...tipos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalUndCompra){m.cboModalUndCompra.innerHTML=['<option value=""></option>',...unds.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalUndConsumo){m.cboModalUndConsumo.innerHTML=['<option value=""></option>',...unds.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalFabricante){m.cboModalFabricante.innerHTML=['<option value=""></option>',...fabricantes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalApresentacao){m.cboModalApresentacao.innerHTML=['<option value=""></option>',...apresentacoes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}}
+async function materiaisCarregarCombosModal(){const [tipos,unds,fabricantes,apresentacoes]=await Promise.all([materiaisCarregarAuxTipo("Tipos de material"),materiaisCarregarAuxTipo("Unidades de medida"),materiaisCarregarAuxTipo("Fabricantes"),materiaisCarregarAuxTipo("Tipos de apresentaÃƒÂ§ÃƒÂ£o")]);materiaisAuxTiposCache=tipos;materiaisAuxUndsCache=unds;if(m.cboModalClassificacao){m.cboModalClassificacao.innerHTML=['<option value=""></option>',...tipos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalUndCompra){m.cboModalUndCompra.innerHTML=['<option value=""></option>',...unds.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalUndConsumo){m.cboModalUndConsumo.innerHTML=['<option value=""></option>',...unds.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalFabricante){m.cboModalFabricante.innerHTML=['<option value=""></option>',...fabricantes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}if(m.cboModalApresentacao){m.cboModalApresentacao.innerHTML=['<option value=""></option>',...apresentacoes.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`)].join("")}}
 async function materiaisCarregarIndicesTabela(prefer=null){const preferido=String(prefer??(materiaisTabelaModal.cboIndice?.value||MATERIAIS_INDICES_FALLBACK[0].id));let indices=[...materiaisIndicesCache];if(!indices.length){const{res,data}=await requestJson("GET","/materiais/indices",undefined,true);indices=res.ok&&Array.isArray(data)&&data.length?data:MATERIAIS_INDICES_FALLBACK}materiaisIndicesCache=indices.map(x=>({id:Number(x?.id??255),sigla:String(x?.sigla??""),nome:String(x?.nome??"")}));if(!materiaisTabelaModal.cboIndice)return;materiaisTabelaModal.cboIndice.innerHTML=materiaisIndicesCache.map(x=>`<option value="${x.id}">${esc(x.sigla)} - ${esc(x.nome)}</option>`).join("");const alvo=materiaisIndicesCache.some(x=>String(x.id)===preferido)?preferido:String(materiaisIndicesCache[0]?.id??255);materiaisTabelaModal.cboIndice.value=alvo}
 async function materiaisCarregarListas(preferId=null){await materiaisCarregarFiltroClassificacao(materiaisFiltroClassificacaoAtual());const{res,data}=await requestJson("GET","/materiais/listas",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar tabelas de materiais.";return}const listas=Array.isArray(data)?data:[];materiaisListasCache=listas.map(x=>({id:Number(x.id||0),nome:String(x.nome||""),nro_indice:Number(x.nro_indice||x.indice_id||255),indice_sigla:String(x.indice_sigla||""),indice_nome:String(x.indice_nome||"")}));m.cboListas.innerHTML=materiaisListasCache.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join("");if(!materiaisListasCache.length){materiaisLimparTabela();return}const alvo=preferId&&materiaisListasCache.some(x=>x.id===preferId)?String(preferId):String(materiaisListasCache[0].id);m.cboListas.value=alvo;await materiaisCarregar()}
 async function materiaisCarregar(){const listaId=materiaisListaIdAtual();if(!listaId){materiaisLimparTabela();return}const q=encodeURIComponent(m.txtPesquisar.value.trim());const cls=encodeURIComponent(materiaisFiltroClassificacaoAtual());const{res,data}=await requestJson("GET",`/materiais?lista_id=${listaId}&q=${q}&classificacao=${cls}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar materiais.";return}materiaisCache=Array.isArray(data)?data:[];materialSelecionadoId=null;materiaisRender()}
@@ -241,8 +321,8 @@ async function materiaisNovoCodigo(listaId){const{res,data}=await requestJson("G
 function materiaisCalcularCustoModal(){try{const preco=parseMaterialNumber(m.txtPreco.value),rel=parseMaterialNumber(m.txtRelacao.value);m.txtCusto.value=rel>0?formatDec2Dot(preco/rel):""}catch{m.txtCusto.value=""}}
 async function materiaisAbrirModal(item){materialModalId=item?item.id:null;m.modalTitle.textContent="Novo Material";await materiaisCarregarCombosModal();materiaisSetModalTab("principal");m.txtNome.value=item?item.nome:"";m.txtPreco.value=item?formatDec2Dot(item.preco):"";m.txtRelacao.value=item?formatDec2Dot(item.relacao):"";m.txtCusto.value=item?formatDec2Dot(item.custo):"";m.txtModalValidade.value=item?String(Number(item.validade_dias||0)):"0";m.chkModalPreferido.checked=!!(item&&item.preferido);if(m.txtModalObservacao)m.txtModalObservacao.value="";const filtroCls=materiaisFiltroClassificacaoAtual();const clsDefault=item?String(item.classificacao||"").trim():(filtroCls!=="__mais_usados__"&&filtroCls!=="__todos__"?filtroCls:"");materiaisSetSelectValue(m.cboModalClassificacao,clsDefault);materiaisSetSelectValue(m.cboModalUndCompra,item?String(item.unidade_compra||"").trim():"");materiaisSetSelectValue(m.cboModalUndConsumo,item?String(item.unidade_consumo||"").trim():"");materiaisSetSelectValue(m.cboModalFabricante,"");materiaisSetSelectValue(m.cboModalApresentacao,"");m.modalBackdrop.classList.remove("hidden");if(item){m.txtCodigo.value=item.codigo}else{m.txtCodigo.value="";materiaisNovoCodigo(materiaisListaIdAtual()).then(c=>m.txtCodigo.value=c)}}
 function materiaisFecharModal(){materialModalId=null;m.modalBackdrop.classList.add("hidden")}
-async function materiaisSalvarModal(){const listaId=materiaisListaIdAtual();if(!listaId)return;const codigo=m.txtCodigo.value.trim(),nome=m.txtNome.value.trim();if(!codigo||!nome){window.alert("CÃ³digo e Nome sÃ£o obrigatÃ³rios.");return}let preco=0,relacao=0,custo=0;try{preco=parseMaterialNumber(m.txtPreco.value);relacao=parseMaterialNumber(m.txtRelacao.value);custo=parseMaterialNumber(m.txtCusto.value)}catch{window.alert("Informe valores numÃ©ricos vÃ¡lidos.");return}const validade=Math.max(0,Number.parseInt(String(m.txtModalValidade.value||"0"),10)||0);const payload={codigo,nome,preco,relacao,custo,lista_id:listaId,unidade_compra:(m.cboModalUndCompra?.value||"").trim(),unidade_consumo:(m.cboModalUndConsumo?.value||"").trim(),validade_dias:validade,preferido:!!m.chkModalPreferido?.checked,classificacao:(m.cboModalClassificacao?.value||"").trim()};const method=materialModalId?"PUT":"POST";const path=materialModalId?`/materiais/${materialModalId}`:"/materiais";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){const msg=(data.detail||"").toLowerCase();if(msg.includes("codigo")&&msg.includes("uso")){window.alert("CÃ³digo jÃ¡ estÃ¡ em uso.");return}window.alert(data.detail||"Falha ao gravar material.");return}materiaisFecharModal();await materiaisCarregar()}
-async function materiaisExcluirSelecionado(){const item=materiaisSelecionadoAtual();if(!item){window.alert("Selecione um material para excluir.");return}if(!window.confirm(`Deseja realmente excluir o material '${item.nome}' (CÃ³d: ${item.codigo})?`))return;const{res,data}=await requestJson("DELETE",`/materiais/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir material.");return}await materiaisCarregar();window.alert("Material excluÃ­do com sucesso.")}
+async function materiaisSalvarModal(){const listaId=materiaisListaIdAtual();if(!listaId)return;const codigo=m.txtCodigo.value.trim(),nome=m.txtNome.value.trim();if(!codigo||!nome){window.alert("CÃƒÂ³digo e Nome sÃƒÂ£o obrigatÃƒÂ³rios.");return}let preco=0,relacao=0,custo=0;try{preco=parseMaterialNumber(m.txtPreco.value);relacao=parseMaterialNumber(m.txtRelacao.value);custo=parseMaterialNumber(m.txtCusto.value)}catch{window.alert("Informe valores numÃƒÂ©ricos vÃƒÂ¡lidos.");return}const validade=Math.max(0,Number.parseInt(String(m.txtModalValidade.value||"0"),10)||0);const payload={codigo,nome,preco,relacao,custo,lista_id:listaId,unidade_compra:(m.cboModalUndCompra?.value||"").trim(),unidade_consumo:(m.cboModalUndConsumo?.value||"").trim(),validade_dias:validade,preferido:!!m.chkModalPreferido?.checked,classificacao:(m.cboModalClassificacao?.value||"").trim()};const method=materialModalId?"PUT":"POST";const path=materialModalId?`/materiais/${materialModalId}`:"/materiais";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){const msg=(data.detail||"").toLowerCase();if(msg.includes("codigo")&&msg.includes("uso")){window.alert("CÃƒÂ³digo jÃƒÂ¡ estÃƒÂ¡ em uso.");return}window.alert(data.detail||"Falha ao gravar material.");return}materiaisFecharModal();await materiaisCarregar()}
+async function materiaisExcluirSelecionado(){const item=materiaisSelecionadoAtual();if(!item){window.alert("Selecione um material para excluir.");return}if(!window.confirm(`Deseja realmente excluir o material '${item.nome}' (CÃƒÂ³d: ${item.codigo})?`))return;const{res,data}=await requestJson("DELETE",`/materiais/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir material.");return}await materiaisCarregar();window.alert("Material excluÃƒÂ­do com sucesso.")}
 function materiaisTabelaFecharModal(){materiaisTabelaModalModo="nova";materiaisTabelaModalListaId=0;if(materiaisTabelaModal.nome)materiaisTabelaModal.nome.value="";if(materiaisTabelaModal.cboIndice&&materiaisTabelaModal.cboIndice.options.length)materiaisTabelaModal.cboIndice.selectedIndex=0;if(materiaisTabelaModal.backdrop)materiaisTabelaModal.backdrop.classList.add("hidden")}
 function materiaisTabelaAtualNome(){const atual=materiaisListaAtual();return String(atual?.nome||m.cboListas?.options?.[m.cboListas.selectedIndex]?.textContent||"").trim()}
 function materiaisTabelaAtualIndice(){const atual=materiaisListaAtual();return String(Number(atual?.nro_indice||255))}
@@ -279,7 +359,7 @@ const procEditorLinksVazio={itens:[],total_materiais:0,total_custo_und:0,total_c
 const procFmtAuxLabel=(item)=>{const codigo=String(item?.codigo??"").trim();const descricao=String(item?.descricao??item?.nome??"").trim();if(codigo&&descricao)return`${codigo} - ${descricao}`;return descricao||codigo||""};
 const procFmtSimboloLabel=(item)=>{const descricao=String(item?.descricao??item?.nome??"").trim();const codigo=String(item?.codigo??"").trim();return descricao||codigo||""};
 async function procCarregarFormasCobrancaAux(){
-  const {res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃ§a")}`,undefined,true);
+  const {res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃƒÂ§a")}`,undefined,true);
   if(res.ok&&Array.isArray(data)&&data.length){
     return data.map(item=>({
       codigo:String(item?.codigo??"").trim(),
@@ -294,44 +374,44 @@ function procPreencherEspecialidadesEditor(){const especialidades=Array.isArray(
 function procBuscarSimbolo(valor){const alvo=String(valor??"").trim().toLowerCase();if(!alvo)return null;return procSimbolosCache.find(item=>String(item?.codigo??"").trim().toLowerCase()===alvo)||null}
 function procSimboloDescricao(codigo){const item=procBuscarSimbolo(codigo);const desc=String(item?.descricao??item?.nome??"").trim();return desc||String(codigo??"").trim()}
 function procAtualizarPreviewSimbolo(valor){if(!proc.simboloFrame||!proc.simboloImg)return;const simbolo=procBuscarSimbolo(valor);const codigo=String(valor??"").trim();const src=(simbolo?.imagem_url||"").trim()||(codigo?`/desktop-assets/easy/${codigo}`:"");if(src){proc.simboloImg.src=src;proc.simboloImg.alt=String(simbolo?.descricao||codigo||"Simbolo grafico");proc.simboloFrame.classList.add("has-image");return}proc.simboloImg.removeAttribute("src");proc.simboloImg.alt="Simbolo grafico";proc.simboloFrame.classList.remove("has-image")}
-async function procCarregarCombosEditor(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp,cobrancasResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("SÃ­mbolo grÃ¡fico")}`,undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃ§a")}`,undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];const cobrancas=cobrancasResp.res.ok&&Array.isArray(cobrancasResp.data)?cobrancasResp.data:[];procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,cobrancas,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtAuxLabel(item)})}
+async function procCarregarCombosEditor(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp,cobrancasResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("SÃƒÂ­mbolo grÃƒÂ¡fico")}`,undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃƒÂ§a")}`,undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];const cobrancas=cobrancasResp.res.ok&&Array.isArray(cobrancasResp.data)?cobrancasResp.data:[];procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,cobrancas,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtAuxLabel(item)})}
 function procAplicarDadosEditor(data={},resetLinks=false){proc.txtCodigo.value=String(data?.codigo??"");proc.txtNome.value=String(data?.nome??"");proc.txtTempo.value=String(data?.tempo??0);proc.txtPreco.value=procFmtBr(data?.preco??0);proc.txtLab.value=procFmtBr(data?.custo_lab??0);if(proc.txtGarantia)proc.txtGarantia.value=String(data?.garantia_meses??0);if(proc.txtRepasse)proc.txtRepasse.value=procFmtBr(data?.valor_repasse??0);if(proc.chkInativar)proc.chkInativar.checked=Boolean(data?.inativo);if(proc.chkPreferidos)proc.chkPreferidos.checked=Boolean(data?.preferido);if(proc.txtObs)proc.txtObs.value=String(data?.observacoes??"");if(proc.lblInclusao)proc.lblInclusao.textContent=String(data?.data_inclusao??"");if(proc.lblAlteracao)proc.lblAlteracao.textContent=String(data?.data_alteracao??"");procPreencherEspecialidadesEditor();const genericoAtual=data?.procedimento_generico_id==null?"":String(data.procedimento_generico_id);procGarantirOpcaoSelect(proc.cboGenerico,genericoAtual,genericoAtual?`Registro atual (${genericoAtual})`:"");procSetSelectValue(proc.cboGenerico,genericoAtual);const especialidadeAtual=String(data?.especialidade??"").trim();procGarantirOpcaoSelect(proc.cboEditorEspecialidade,especialidadeAtual,especialidadeAtual);procSetSelectValue(proc.cboEditorEspecialidade,especialidadeAtual);const simboloAtual=String(data?.simbolo_grafico??"").trim();procGarantirOpcaoSelect(proc.cboSimbolo,simboloAtual,procSimboloDescricao(simboloAtual));procSetSelectValue(proc.cboSimbolo,simboloAtual);const cobrancaAtual=String(data?.forma_cobranca??"").trim();procGarantirOpcaoSelect(proc.cboCobranca,cobrancaAtual,cobrancaAtual);procSetSelectValue(proc.cboCobranca,cobrancaAtual);if(Object.prototype.hasOwnProperty.call(data,"materiais_vinculados"))procRenderLinks(data.materiais_vinculados||procEditorLinksVazio);else if(resetLinks)procRenderLinks(procEditorLinksVazio);procAtualizarFinanceiro()}
-async function procCarregarCombosEditor(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp,cobrancasResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET","/cadastros/simbolos-graficos?scope=procedimentos",undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃƒÂ§a")}`,undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];const cobrancas=cobrancasResp.res.ok&&Array.isArray(cobrancasResp.data)?cobrancasResp.data:[];procSimbolosCache=simbolos;procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,cobrancas,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtAuxLabel(item)})}
+async function procCarregarCombosEditor(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp,cobrancasResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET","/cadastros/simbolos-graficos?scope=procedimentos",undefined,true),requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent("Tipos de cobranÃƒÆ’Ã‚Â§a")}`,undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];const cobrancas=cobrancasResp.res.ok&&Array.isArray(cobrancasResp.data)?cobrancasResp.data:[];procSimbolosCache=simbolos;procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,cobrancas,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtAuxLabel(item)})}
 function procAplicarDadosEditor(data={},resetLinks=false){proc.txtCodigo.value=String(data?.codigo??"");proc.txtNome.value=String(data?.nome??"");proc.txtTempo.value=String(data?.tempo??0);proc.txtPreco.value=procFmtBr(data?.preco??0);proc.txtLab.value=procFmtBr(data?.custo_lab??0);if(proc.txtGarantia)proc.txtGarantia.value=String(data?.garantia_meses??0);if(proc.txtRepasse)proc.txtRepasse.value=procFmtBr(data?.valor_repasse??0);if(proc.chkInativar)proc.chkInativar.checked=Boolean(data?.inativo);if(proc.chkPreferidos)proc.chkPreferidos.checked=Boolean(data?.preferido);if(proc.txtObs)proc.txtObs.value=String(data?.observacoes??"");if(proc.lblInclusao)proc.lblInclusao.textContent=String(data?.data_inclusao??"");if(proc.lblAlteracao)proc.lblAlteracao.textContent=String(data?.data_alteracao??"");procPreencherEspecialidadesEditor();const genericoAtual=data?.procedimento_generico_id==null?"":String(data.procedimento_generico_id);procGarantirOpcaoSelect(proc.cboGenerico,genericoAtual,genericoAtual?`Registro atual (${genericoAtual})`:"");procSetSelectValue(proc.cboGenerico,genericoAtual);const especialidadeAtual=String(data?.especialidade??"").trim();procGarantirOpcaoSelect(proc.cboEditorEspecialidade,especialidadeAtual,especialidadeAtual);procSetSelectValue(proc.cboEditorEspecialidade,especialidadeAtual);const simboloAtual=String(data?.simbolo_grafico??"").trim();procGarantirOpcaoSelect(proc.cboSimbolo,simboloAtual,procSimboloDescricao(simboloAtual));procSetSelectValue(proc.cboSimbolo,simboloAtual);procAtualizarPreviewSimbolo(simboloAtual);const cobrancaAtual=String(data?.forma_cobranca??"").trim();procGarantirOpcaoSelect(proc.cboCobranca,cobrancaAtual,cobrancaAtual);procSetSelectValue(proc.cboCobranca,cobrancaAtual);if(Object.prototype.hasOwnProperty.call(data,"materiais_vinculados"))procRenderLinks(data.materiais_vinculados||procEditorLinksVazio);else if(resetLinks)procRenderLinks(procEditorLinksVazio);procAtualizarFinanceiro()}
 async function procCarregarFiltros(){const tabAtual=String(proc.cboTabela?.value||"1");const espAtual=String(proc.cboEspecialidade?.value||"");const{res,data}=await requestJson("GET","/procedimentos/filtros",undefined,true);if(!res.ok){procFiltros={tabelas:[],especialidades:[],tipos_tiss:[],indices:[]};if(proc.cboTabela){proc.cboTabela.innerHTML='<option value="1">Tabela Exemplo</option>';proc.cboTabela.value="1"}if(proc.cboEspecialidade){proc.cboEspecialidade.innerHTML='<option value="">Todas</option>';proc.cboEspecialidade.value=""}procPreencherEspecialidadesEditor();procAplicarRegrasTabelaSelecionada();return}const tabelas=Array.isArray(data?.tabelas)?data.tabelas:[];const especialidades=Array.isArray(data?.especialidades)?data.especialidades:[];const tipos_tiss=Array.isArray(data?.tipos_tiss)?data.tipos_tiss:[];const indices=Array.isArray(data?.indices)?data.indices:[];procFiltros={tabelas,especialidades,tipos_tiss,indices};if(proc.cboTabela){const base=tabelas.length?tabelas:[{id:"1",nome:"Tabela Exemplo"}];proc.cboTabela.innerHTML=base.map(x=>`<option value="${esc(String(x.id??""))}">${esc(String(x.nome??""))}</option>`).join("");procSetSelectValue(proc.cboTabela,tabAtual||"1")}if(proc.cboEspecialidade){proc.cboEspecialidade.innerHTML=['<option value="">Todas</option>',...especialidades.map(x=>`<option value="${esc(String(x.codigo??""))}">${esc(String(x.nome??""))}</option>`)].join("");procSetSelectValue(proc.cboEspecialidade,espAtual)}procPreencherEspecialidadesEditor();procAplicarRegrasTabelaSelecionada()}
 const procRenderList=()=>{proc.tbody.innerHTML=procedimentosCache.map(p=>`<tr data-id="${p.id}"><td>${p.codigo}</td><td>${esc(p.nome)}</td><td>${p.tempo} min</td><td>${formatDec2(p.preco)}</td><td>${formatDec2(p.custo_lab)}</td></tr>`).join("");proc.lblTotal.textContent="Total de Procedimentos: "+procedimentosCache.length};
 const procSelectRow=(id)=>{procedimentoSelecionadoId=id;proc.tbody.querySelectorAll("tr").forEach(tr=>tr.classList.toggle("selected",Number(tr.dataset.id)===id))};
 const procSelecionado=()=>procedimentosCache.find(x=>x.id===procedimentoSelecionadoId)||null;
 async function procCarregarLista(){const q=encodeURIComponent(proc.txtPesquisar.value.trim());const tabela=encodeURIComponent(String(proc.cboTabela?.value||"1"));const especialidade=encodeURIComponent(String(proc.cboEspecialidade?.value||""));const{res,data}=await requestJson("GET",`/procedimentos?q=${q}&tabela_id=${tabela}&especialidade=${especialidade}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar procedimentos.";return}procedimentosCache=Array.isArray(data)?data:[];procedimentoSelecionadoId=null;procRenderList();procAplicarRegrasTabelaSelecionada()}
-async function abrirProcedimentos(){hideAllPanels();proc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await procCarregarFiltros();await procCarregarLista();footerMsg.textContent="Modulo Configura tabela de preÃ§os aberto."}
+async function abrirProcedimentos(){hideAllPanels();proc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await procCarregarFiltros();await procCarregarLista();footerMsg.textContent="Modulo Configura tabela de preÃƒÂ§os aberto."}
 const procTabelaAtualId=()=>String(proc.cboTabela?.value||"");
 const procTabelaAtualNome=()=>String(proc.cboTabela?.options?.[proc.cboTabela.selectedIndex]?.textContent||"").trim();
 function procTabelaFecharModal(){if(procTabelaModal.backdrop)procTabelaModal.backdrop.classList.add("hidden")}
 function procTabelaAtualizarCopia(){const ativa=procTabelaModalModo==="nova"&&!!procTabelaModal.chkCopiar?.checked;if(procTabelaModal.cboOrigem)procTabelaModal.cboOrigem.disabled=!ativa;if(procTabelaModal.copyRow)procTabelaModal.copyRow.classList.toggle("disabled",!ativa)}
 function procTabelaTabelaSelecionada(id=null){const alvo=String((id??procTabelaAtualId())||"");const tabelas=Array.isArray(procFiltros?.tabelas)?procFiltros.tabelas:[];return tabelas.find(x=>String(x?.id??"")===alvo)||null}
 function procTabelaSelecionadaAtual(){return procTabelaTabelaSelecionada(procTabelaAtualId())}
-function procAplicarRegrasTabelaSelecionada(){const tabSel=procTabelaSelecionadaAtual();const inativa=!!tabSel?.inativo;[proc.btnNovo,proc.btnEditar,proc.btnExcluir,proc.btnReajuste].forEach(btn=>{if(btn)btn.disabled=inativa});if(proc.btnGravar)proc.btnGravar.disabled=inativa;if(proc.btnVincular)proc.btnVincular.disabled=inativa;if(proc.btnDesvincular)proc.btnDesvincular.disabled=inativa;if(inativa&&proc.panel&&!proc.panel.classList.contains("hidden"))footerMsg.textContent="Tabela selecionada estÃ¡ inativa. Reative a tabela para alterar procedimentos."}
+function procAplicarRegrasTabelaSelecionada(){const tabSel=procTabelaSelecionadaAtual();const inativa=!!tabSel?.inativo;[proc.btnNovo,proc.btnEditar,proc.btnExcluir,proc.btnReajuste].forEach(btn=>{if(btn)btn.disabled=inativa});if(proc.btnGravar)proc.btnGravar.disabled=inativa;if(proc.btnVincular)proc.btnVincular.disabled=inativa;if(proc.btnDesvincular)proc.btnDesvincular.disabled=inativa;if(inativa&&proc.panel&&!proc.panel.classList.contains("hidden"))footerMsg.textContent="Tabela selecionada estÃƒÂ¡ inativa. Reative a tabela para alterar procedimentos."}
 function procTabelaPreencherOrigens(){if(!procTabelaModal.cboOrigem)return;const atual=procTabelaAtualId();const tabelas=Array.isArray(procFiltros?.tabelas)?procFiltros.tabelas:[];procTabelaModal.cboOrigem.innerHTML=tabelas.map(x=>`<option value="${esc(String(x.id??""))}">${esc(String(x.nome??""))}</option>`).join("");if(atual)procSetSelectValue(procTabelaModal.cboOrigem,atual);if(!procTabelaModal.cboOrigem.value&&procTabelaModal.cboOrigem.options.length)procTabelaModal.cboOrigem.selectedIndex=0}
 function procTabelaPreencherIndices(tabSel=null){if(!procTabelaModal.cboIndice)return;const indices=Array.isArray(procFiltros?.indices)?procFiltros.indices:[];const base=indices.length?indices:[{id:255,sigla:"R$",nome:"Reais"},{id:2,sigla:"UHO",nome:"Unid. Honorario"},{id:3,sigla:"UPO",nome:"Unid. Procedimento Odontologico"},{id:1,sigla:"USO",nome:"Unid. Servico"}];procTabelaModal.cboIndice.innerHTML=base.map(x=>`<option value="${esc(procIndiceSiglaFromValor(x?.sigla??x?.id))}">${esc(procIndiceSiglaFromValor(x?.sigla??x?.id))}</option>`).join("");const alvo=procTabelaModalModo==="nova"?"R$":procIndiceSiglaFromValor(tabSel?.indice_sigla??tabSel?.indice);procSetSelectValue(procTabelaModal.cboIndice,alvo||"R$");if(!procTabelaModal.cboIndice.value&&procTabelaModal.cboIndice.options.length)procTabelaModal.cboIndice.selectedIndex=0}
 function procTabelaPreencherTiposTiss(valor){if(!procTabelaModal.cboTipoTiss)return;const tipos=Array.isArray(procFiltros?.tipos_tiss)?procFiltros.tipos_tiss:[];if(tipos.length){procTabelaModal.cboTipoTiss.innerHTML=tipos.map(x=>`<option value="${esc(String(x.id??""))}">${esc(String(x.codigo??""))} - ${esc(String(x.nome??""))}</option>`).join("")}else{procTabelaModal.cboTipoTiss.innerHTML='<option value="1">00 - Outras Tabelas</option>'}const legado=String(valor??"").trim().toLowerCase();let alvo=String(valor??"").trim();if(!/^\d+$/.test(alvo))alvo=["consulta","procedimento","diaria","taxa","pacote"].includes(legado)?"1":"1";procSetSelectValue(procTabelaModal.cboTipoTiss,alvo||"1");if(!procTabelaModal.cboTipoTiss.value&&procTabelaModal.cboTipoTiss.options.length)procTabelaModal.cboTipoTiss.selectedIndex=0}
 function procTabelaAtualizarFonte(){const convenio=String(procTabelaModal.cboFonte?.value||"")==="convenio";if(procTabelaModal.credRow)procTabelaModal.credRow.classList.toggle("hidden",!convenio);if(procTabelaModal.txtCred&&!convenio)procTabelaModal.txtCred.value="";if(procTabelaModal.cboIndice){const atual=procIndiceSiglaFromValor(procTabelaModal.cboIndice.value);if(procTabelaModalModo==="nova"){if(!convenio)procSetSelectValue(procTabelaModal.cboIndice,"R$");else if(atual==="R$")procSetSelectValue(procTabelaModal.cboIndice,"UPO")}}if(procTabelaModal.cboTipoTiss){procTabelaModal.cboTipoTiss.disabled=false;if(!convenio)procSetSelectValue(procTabelaModal.cboTipoTiss,"1");if(!String(procTabelaModal.cboTipoTiss.value||"").trim())procSetSelectValue(procTabelaModal.cboTipoTiss,"1")}}
 function procTabelaAbrirModal(modo){if(!procTabelaModal.backdrop)return;procTabelaModalModo=modo==="altera"?"altera":"nova";procTabelaModalCodigo=procTabelaAtualId();if(procTabelaModalModo==="altera"&&!procTabelaModalCodigo){window.alert("Selecione uma tabela para alterar.");return}const nomeAtual=procTabelaAtualNome();const tabSel=procTabelaModalModo==="altera"?procTabelaTabelaSelecionada(procTabelaModalCodigo||procTabelaAtualId()):null;procTabelaModal.title.textContent=procTabelaModalModo==="nova"?"Insere nova tabela":"Altera dados da tabela";procTabelaModal.nome.value=procTabelaModalModo==="nova"?"":nomeAtual;procTabelaPreencherIndices(tabSel);procTabelaPreencherTiposTiss(tabSel?.tipo_tiss_id??1);if(procTabelaModal.cboFonte)procTabelaModal.cboFonte.value=tabSel?.fonte_pagadora==="convenio"?"convenio":"particular";if(procTabelaModal.txtCred)procTabelaModal.txtCred.value=procTabelaModalModo==="altera"?String(tabSel?.nro_credenciamento||"").trim():"";if(procTabelaModal.chkInativo){procTabelaModal.chkInativo.checked=!!tabSel?.inativo;procTabelaModal.chkInativo.disabled=false}if(procTabelaModal.chkCopiar){procTabelaModal.chkCopiar.checked=false;procTabelaModal.chkCopiar.disabled=procTabelaModalModo!=="nova"}if(procTabelaModal.cboOrigem)procTabelaPreencherOrigens();procTabelaAtualizarFonte();procTabelaAtualizarCopia();procTabelaModal.backdrop.classList.remove("hidden");procTabelaModal.nome.focus();procTabelaModal.nome.select()}
-async function procTabelaSalvarModal(){const nome=String(procTabelaModal.nome?.value||"").trim();if(!nome){window.alert("Informe o nome da tabela.");return}const indiceRaw=procIndiceSiglaFromValor(procTabelaModal.cboIndice?.value||"R$");const fonte=String(procTabelaModal.cboFonte?.value||"particular").trim().toLowerCase()==="convenio"?"convenio":"particular";const credenciamento=String(procTabelaModal.txtCred?.value||"").trim();const codigoAtual=procTabelaModalCodigo||procTabelaAtualId();const tipoTissRaw=String(procTabelaModal.cboTipoTiss?.value||"").trim();const tipoTissId=/^\\d+$/.test(tipoTissRaw)?tipoTissRaw:"1";const payloadBase={nome,nro_indice:indiceRaw||"R$",fonte_pagadora:fonte,nro_credenciamento:fonte==="convenio"?(credenciamento||null):null,inativo:!!procTabelaModal.chkInativo?.checked,tipo_tiss_id:fonte==="convenio"?tipoTissId:"1"};let destinoId=procTabelaAtualId();if(procTabelaModalModo==="nova"){const copiar=!!procTabelaModal.chkCopiar?.checked;const origem=String(procTabelaModal.cboOrigem?.value||"").trim();if(copiar&&!origem){window.alert("Selecione a tabela de origem para cÃ³pia.");return}const payload={...payloadBase,copiar_de_tabela_id:copiar?origem:null};const{res,data}=await requestJson("POST","/procedimentos/tabelas",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao criar tabela.");return}destinoId=String(data.id||"");const copiados=Number(data.copiados||0);footerMsg.textContent=copiados>0?`Tabela criada com sucesso (${copiados} procedimentos copiados).`:"Tabela criada com sucesso."}else{const codigo=codigoAtual;if(!codigo){window.alert("Selecione uma tabela para alterar.");return}const{res,data}=await requestJson("PATCH",`/procedimentos/tabelas/${encodeURIComponent(String(codigo))}`,payloadBase,true);if(!res.ok){window.alert(data.detail||"Falha ao alterar tabela.");return}destinoId=String(data.id||codigo);footerMsg.textContent="Tabela alterada com sucesso."}await procCarregarFiltros();if(proc.cboTabela&&destinoId)procSetSelectValue(proc.cboTabela,destinoId);await procCarregarLista();procTabelaFecharModal()}
+async function procTabelaSalvarModal(){const nome=String(procTabelaModal.nome?.value||"").trim();if(!nome){window.alert("Informe o nome da tabela.");return}const indiceRaw=procIndiceSiglaFromValor(procTabelaModal.cboIndice?.value||"R$");const fonte=String(procTabelaModal.cboFonte?.value||"particular").trim().toLowerCase()==="convenio"?"convenio":"particular";const credenciamento=String(procTabelaModal.txtCred?.value||"").trim();const codigoAtual=procTabelaModalCodigo||procTabelaAtualId();const tipoTissRaw=String(procTabelaModal.cboTipoTiss?.value||"").trim();const tipoTissId=/^\\d+$/.test(tipoTissRaw)?tipoTissRaw:"1";const payloadBase={nome,nro_indice:indiceRaw||"R$",fonte_pagadora:fonte,nro_credenciamento:fonte==="convenio"?(credenciamento||null):null,inativo:!!procTabelaModal.chkInativo?.checked,tipo_tiss_id:fonte==="convenio"?tipoTissId:"1"};let destinoId=procTabelaAtualId();if(procTabelaModalModo==="nova"){const copiar=!!procTabelaModal.chkCopiar?.checked;const origem=String(procTabelaModal.cboOrigem?.value||"").trim();if(copiar&&!origem){window.alert("Selecione a tabela de origem para cÃƒÂ³pia.");return}const payload={...payloadBase,copiar_de_tabela_id:copiar?origem:null};const{res,data}=await requestJson("POST","/procedimentos/tabelas",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao criar tabela.");return}destinoId=String(data.id||"");const copiados=Number(data.copiados||0);footerMsg.textContent=copiados>0?`Tabela criada com sucesso (${copiados} procedimentos copiados).`:"Tabela criada com sucesso."}else{const codigo=codigoAtual;if(!codigo){window.alert("Selecione uma tabela para alterar.");return}const{res,data}=await requestJson("PATCH",`/procedimentos/tabelas/${encodeURIComponent(String(codigo))}`,payloadBase,true);if(!res.ok){window.alert(data.detail||"Falha ao alterar tabela.");return}destinoId=String(data.id||codigo);footerMsg.textContent="Tabela alterada com sucesso."}await procCarregarFiltros();if(proc.cboTabela&&destinoId)procSetSelectValue(proc.cboTabela,destinoId);await procCarregarLista();procTabelaFecharModal()}
 async function procCriarTabela(){procTabelaAbrirModal("nova")}
 async function procAlterarTabela(){procTabelaAbrirModal("altera")}
-async function procExcluirTabela(){const codigo=procTabelaAtualId();if(!codigo){window.alert("Selecione uma tabela para eliminar.");return}const nome=procTabelaAtualNome();if(!window.confirm(`Deseja realmente excluir a tabela '${nome}'?\n\nTodos os procedimentos desta tabela serÃ£o excluÃ­dos.`))return;const{res,data}=await requestJson("DELETE",`/procedimentos/tabelas/${encodeURIComponent(codigo)}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir tabela.");return}await procCarregarFiltros();await procCarregarLista();footerMsg.textContent="Tabela excluÃ­da com sucesso."}
+async function procExcluirTabela(){const codigo=procTabelaAtualId();if(!codigo){window.alert("Selecione uma tabela para eliminar.");return}const nome=procTabelaAtualNome();if(!window.confirm(`Deseja realmente excluir a tabela '${nome}'?\n\nTodos os procedimentos desta tabela serÃƒÂ£o excluÃƒÂ­dos.`))return;const{res,data}=await requestJson("DELETE",`/procedimentos/tabelas/${encodeURIComponent(codigo)}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir tabela.");return}await procCarregarFiltros();await procCarregarLista();footerMsg.textContent="Tabela excluÃƒÂ­da com sucesso."}
 function procReajustarTabela(){footerMsg.textContent="Procedimentos: reajuste de tabela em planejamento."}
 async function procCarregarCenario(){const{res,data}=await requestJson("GET","/cenario",undefined,true);if(res.ok){procCenario={cfph:Number(data.cfph||0),cfpm:Number(data.cfpm||0),ir:Number(data.ir||0),cd:Number(data.cd||0),cartao:Number(data.cartao||0)}}}
 function procAtualizarFinanceiro(){let tempo=0,preco=0,lab=0;try{tempo=Number(proc.txtTempo.value||0)}catch{};try{preco=procParse(proc.txtPreco.value)}catch{};try{lab=procParse(proc.txtLab.value)}catch{};const material=Number((proc.totalCusto.dataset.valor)||0);const custo_fph=procCenario.cfpm*tempo;const irv=preco*procCenario.ir/100;const cdv=preco*procCenario.cd/100;const cartv=preco*procCenario.cartao/100;const custo_proc=custo_fph+material+lab;const valor_min=custo_proc+(custo_proc*procCenario.ir/100)+(custo_proc*procCenario.cd/100)+(custo_proc*procCenario.cartao/100)+(custo_proc*0.1);const lucro_bruto=preco-custo_proc;const lucro_liq=preco-custo_proc-irv-cdv-cartv;const rend_proc=custo_proc>0?(lucro_bruto*100/custo_proc):0;const rend3040=preco>0?(lucro_bruto*100/preco):0;const rend1020=preco>0?(lucro_liq*100/preco):0;const lucro_hora=tempo>0?(lucro_liq*60/tempo):0;proc.lblCFPH.textContent=procFmtMoeda(custo_fph);proc.lblMaterialConsumo.textContent=procFmtMoeda(material);proc.lblCustoProc.textContent=procFmtMoeda(custo_proc);proc.lblIR.textContent=procFmtMoeda(irv);proc.lblCD.textContent=procFmtMoeda(cdv);proc.lblCartao.textContent=procFmtMoeda(cartv);proc.lblValorMinimo.textContent=procFmtMoeda(valor_min);proc.lblLucroBruto.textContent=procFmtMoeda(lucro_bruto);proc.lblLucroLiquido.textContent=procFmtMoeda(lucro_liq);proc.lblRendProc.textContent=rend_proc.toFixed(2);proc.lblRend3040.textContent=rend3040.toFixed(2);proc.lblRend1020.textContent=rend1020.toFixed(2);proc.lblRend3040.className="nproc-box note "+(rend3040>=30?"good":"bad");proc.lblRend1020.className="nproc-box note "+(rend1020>=10?"good":"bad");proc.lblLucroHora.textContent=procFmtMoeda(lucro_hora)}
 function procRenderLinks(data){procedimentoLinks=data?.itens||[];proc.linksTbody.innerHTML=procedimentoLinks.map(x=>`<tr data-codigo="${esc(x.codigo)}"><td>${esc(x.codigo)}</td><td>${esc(x.nome)}</td><td>${Number.isInteger(x.relacao)?x.relacao:x.relacao}</td><td>${x.preco.toFixed(2)}</td><td>${x.custo_und.toFixed(2)}</td><td>${Number.isInteger(x.quantidade)?x.quantidade:x.quantidade}</td><td>${x.custo_total.toFixed(2)}</td></tr>`).join("");proc.totalMats.textContent=String(data?.total_materiais||0);proc.totalCustoUnd.textContent=procFmtMoeda(data?.total_custo_und||0);proc.totalCusto.textContent=procFmtMoeda(data?.total_custo||0);proc.totalCusto.dataset.valor=String(Number(data?.total_custo||0));procAtualizarFinanceiro()}
-async function procAbrirEditor(id=null){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de alterar procedimentos.");return}hideAllPanels();proc.novoPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");procedimentoAtualId=id;procMaterialSelecionadoId=null;await Promise.all([procCarregarCenario(),procCarregarCombosEditor()]);if(id){const{res,data}=await requestJson("GET",`/procedimentos/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Procedimento nÃ£o encontrado.");return}procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks()}else{const tabela=encodeURIComponent(String(proc.cboTabela?.value||"1"));const{res,data}=await requestJson("GET",`/procedimentos/proximo-codigo?tabela_id=${tabela}`,undefined,true);procAplicarDadosEditor({codigo:res?String(data.codigo||1):"1",nome:"",tempo:0,preco:0,custo_lab:0,garantia_meses:0,valor_repasse:0,especialidade:"",procedimento_generico_id:null,simbolo_grafico:"",forma_cobranca:"",preferido:false,inativo:false,observacoes:"",data_inclusao:"",data_alteracao:""},true)}}
-async function procSalvar(){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de gravar procedimentos.");return}let codigo=0,tempo=0,preco=0,lab=0,repasse=0,garantia=0;const nome=proc.txtNome.value.trim();try{codigo=parseInt(proc.txtCodigo.value||"0",10);tempo=parseInt(proc.txtTempo.value||"0",10);preco=procParse(proc.txtPreco.value);lab=procParse(proc.txtLab.value);repasse=procParse(proc.txtRepasse?.value||"0");garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0)}catch{window.alert("Valores numÃ©ricos invÃ¡lidos.");return}if(!nome){window.alert("Informe o nome.");return}const genericoValue=String(proc.cboGenerico?.value||"").trim();const simboloSelecionado=String(proc.cboSimbolo?.value||"").trim();const payload={codigo,nome,tempo,preco,custo_lab:lab,custo:0,tabela_id:String(proc.cboTabela?.value||"1"),especialidade:String(proc.cboEditorEspecialidade?.value||"").trim(),procedimento_generico_id:genericoValue?Number(genericoValue):null,simbolo_grafico:simboloSelecionado,mostrar_simbolo:!!simboloSelecionado,garantia_meses:garantia,forma_cobranca:String(proc.cboCobranca?.value||"").trim(),valor_repasse:repasse,preferido:!!proc.chkPreferidos?.checked,inativo:!!proc.chkInativar?.checked,observacoes:String(proc.txtObs?.value||"").trim()};const method=procedimentoAtualId?"PUT":"POST";const path=procedimentoAtualId?`/procedimentos/${procedimentoAtualId}`:"/procedimentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento.");return}if(!procedimentoAtualId)procedimentoAtualId=data.id;procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks();window.alert("Procedimento salvo.");await procCarregarLista()}
-async function procExcluirSelecionado(){const p=procSelecionado();if(!p){window.alert("Selecione um procedimento.");return}if(!window.confirm(`Deseja excluir definitivamente o procedimento:\n${p.nome}?`))return;const{res,data}=await requestJson("DELETE",`/procedimentos/${p.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Erro ao excluir.");return}await procCarregarLista();window.alert("Procedimento excluÃ­do.")}
+async function procAbrirEditor(id=null){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de alterar procedimentos.");return}hideAllPanels();proc.novoPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");procedimentoAtualId=id;procMaterialSelecionadoId=null;await Promise.all([procCarregarCenario(),procCarregarCombosEditor()]);if(id){const{res,data}=await requestJson("GET",`/procedimentos/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Procedimento nÃƒÂ£o encontrado.");return}procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks()}else{const tabela=encodeURIComponent(String(proc.cboTabela?.value||"1"));const{res,data}=await requestJson("GET",`/procedimentos/proximo-codigo?tabela_id=${tabela}`,undefined,true);procAplicarDadosEditor({codigo:res?String(data.codigo||1):"1",nome:"",tempo:0,preco:0,custo_lab:0,garantia_meses:0,valor_repasse:0,especialidade:"",procedimento_generico_id:null,simbolo_grafico:"",forma_cobranca:"",preferido:false,inativo:false,observacoes:"",data_inclusao:"",data_alteracao:""},true)}}
+async function procSalvar(){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de gravar procedimentos.");return}let codigo=0,tempo=0,preco=0,lab=0,repasse=0,garantia=0;const nome=proc.txtNome.value.trim();try{codigo=parseInt(proc.txtCodigo.value||"0",10);tempo=parseInt(proc.txtTempo.value||"0",10);preco=procParse(proc.txtPreco.value);lab=procParse(proc.txtLab.value);repasse=procParse(proc.txtRepasse?.value||"0");garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0)}catch{window.alert("Valores numÃƒÂ©ricos invÃƒÂ¡lidos.");return}if(!nome){window.alert("Informe o nome.");return}const genericoValue=String(proc.cboGenerico?.value||"").trim();const simboloSelecionado=String(proc.cboSimbolo?.value||"").trim();const payload={codigo,nome,tempo,preco,custo_lab:lab,custo:0,tabela_id:String(proc.cboTabela?.value||"1"),especialidade:String(proc.cboEditorEspecialidade?.value||"").trim(),procedimento_generico_id:genericoValue?Number(genericoValue):null,simbolo_grafico:simboloSelecionado,mostrar_simbolo:!!simboloSelecionado,garantia_meses:garantia,forma_cobranca:String(proc.cboCobranca?.value||"").trim(),valor_repasse:repasse,preferido:!!proc.chkPreferidos?.checked,inativo:!!proc.chkInativar?.checked,observacoes:String(proc.txtObs?.value||"").trim()};const method=procedimentoAtualId?"PUT":"POST";const path=procedimentoAtualId?`/procedimentos/${procedimentoAtualId}`:"/procedimentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento.");return}if(!procedimentoAtualId)procedimentoAtualId=data.id;procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks();window.alert("Procedimento salvo.");await procCarregarLista()}
+async function procExcluirSelecionado(){const p=procSelecionado();if(!p){window.alert("Selecione um procedimento.");return}if(!window.confirm(`Deseja excluir definitivamente o procedimento:\n${p.nome}?`))return;const{res,data}=await requestJson("DELETE",`/procedimentos/${p.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Erro ao excluir.");return}await procCarregarLista();window.alert("Procedimento excluÃƒÂ­do.")}
 function procFecharEditor(){proc.novoPanel.classList.add("hidden");proc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")}
 async function procAbrirVincular(){if(!procedimentoAtualId){window.alert("Salve o procedimento antes de vincular materiais.");return}proc.vinculaBackdrop.classList.remove("hidden");if(proc.vinculaQ)proc.vinculaQ.value="";await procVinculaCarregarListas();proc.vinculaQuantidade.value="0";proc.vinculaCustoUnit.value="0,00";proc.vinculaCustoTotal.value="0,00"}
 function procFecharVincular(){proc.vinculaBackdrop.classList.add("hidden")}
 const PROC_RELATORIO_CAMPOS_PADRAO=[];
-const PROC_RELATORIO_CAMPOS_DISPONIVEIS=["CÃ³digo","Cst fixo %","Cst fixo (R$)","Cst mat %","Cst mat (R$)","Cst prot %","Cst prot (R$)","Especialidade","Imp. diretos (R$)","Ãndice","IntervenÃ§Ã£o","Lucro (R$)","Lucro mens (R$)","Val convÃªnio %","Val convÃªnio (R$)","Val inter (R$)","Val paciente","Val paciente (R$)"];
+const PROC_RELATORIO_CAMPOS_DISPONIVEIS=["CÃƒÂ³digo","Cst fixo %","Cst fixo (R$)","Cst mat %","Cst mat (R$)","Cst prot %","Cst prot (R$)","Especialidade","Imp. diretos (R$)","ÃƒÂndice","IntervenÃƒÂ§ÃƒÂ£o","Lucro (R$)","Lucro mens (R$)","Val convÃƒÂªnio %","Val convÃƒÂªnio (R$)","Val inter (R$)","Val paciente","Val paciente (R$)"];
 function procRelatorioStorageKey(){return `brana_proc_relatorio_campos_v1_${String(sessaoAtual?.clinica_id||"global")}`}
 function procRelatorioLerCamposMemorizados(){
   try{
@@ -353,7 +433,7 @@ function procRelatorioMemorizarCampos(){
     localStorage.setItem(procRelatorioStorageKey(),JSON.stringify(selecionados))
   }catch{}
 }
-function procRelatorioEnsureUI(){if(procRelatorio)return;const style=document.createElement("style");style.textContent=".proc-rel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.22);display:grid;place-items:center;z-index:5600}.proc-rel-modal{width:min(640px,96vw);background:#f3f3f1;border:1px solid #bfc9d6;border-radius:12px;box-sizing:border-box;overflow:hidden;font:12px Tahoma,sans-serif}.proc-rel-banner{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #dad7ba;background:linear-gradient(180deg,#faf7d8,#f8f4cd)}.proc-rel-banner img{width:48px;height:48px;object-fit:contain;flex:0 0 48px}.proc-rel-banner strong{display:block;font:700 13px Tahoma,sans-serif;line-height:1.35;color:#2d2d2d}.proc-rel-body{padding:10px 14px 12px;background:#f3f3f1}.proc-rel-tabs{display:flex;gap:4px;margin-bottom:10px}.proc-rel-tab-btn{height:28px;padding:0 12px;border:1px solid #bfc9d6;border-bottom:none;background:#ececec;font:12px Tahoma,sans-serif;cursor:pointer}.proc-rel-tab-btn.active{background:#fff;font-weight:700}.proc-rel-pane{border:1px solid #bfc9d6;background:#fff;padding:12px 12px 14px;min-height:314px}.proc-rel-pane.hidden{display:none}.proc-rel-row{display:grid;grid-template-columns:178px 1fr;gap:12px;align-items:center;margin-bottom:12px}.proc-rel-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}.proc-rel-row label span:last-child{display:block;flex:1;border-bottom:1px dotted #808080;transform:translateY(-1px)}.proc-rel-row select,.proc-rel-row input[type='text']{width:100%;height:28px;border:1px solid #bfc9d6;padding:0 8px;font:12px Tahoma,sans-serif;background:#fff}.proc-rel-opc-grid{display:grid;grid-template-columns:1fr 76px 1fr 170px;gap:12px;align-items:start}.proc-rel-list label,.proc-rel-side label,.proc-rel-report-name label{display:block;margin-bottom:4px}.proc-rel-list select{width:100%;height:176px;border:1px solid #bfc9d6;background:#fff;font:12px Tahoma,sans-serif}.proc-rel-transfer{display:flex;flex-direction:column;gap:10px;align-self:center}.proc-rel-transfer .materiais-btn{justify-content:center;min-width:74px;padding:0 10px}.proc-rel-side{display:grid;gap:12px}.proc-rel-side select,.proc-rel-side input[type='text']{width:100%;height:28px;border:1px solid #bfc9d6;padding:0 8px;font:12px Tahoma,sans-serif;background:#fff}.proc-rel-radio-wrap{display:grid;gap:4px;margin-top:4px}.proc-rel-radio-wrap label{display:flex;align-items:center;gap:6px}.proc-rel-radio-wrap input{width:auto;height:auto}.proc-rel-report-name{margin-top:12px}.proc-rel-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 0 0}.proc-rel-actions .materiais-btn{min-width:88px;justify-content:center}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<div id="proc-relatorio-backdrop" class="proc-rel-backdrop hidden"><div class="proc-rel-modal"><div class="proc-rel-banner"><img src="/desktop-assets/relatorio.png" alt=""><strong>Tabela de intervenÃ§Ãµes - selecione os critÃ©rios de pesquisa e os dados desejados para visualizaÃ§Ã£o do relatÃ³rio.</strong></div><div class="proc-rel-body"><div class="proc-rel-tabs"><button id="proc-rel-tab-geral-btn" class="proc-rel-tab-btn active" type="button">CritÃ©rios gerais</button><button id="proc-rel-tab-opcoes-btn" class="proc-rel-tab-btn" type="button">OpÃ§Ãµes de relatÃ³rio</button></div><div id="proc-rel-tab-geral" class="proc-rel-pane"><div class="proc-rel-row"><label for="proc-rel-tabela"><span>Tabela</span></label><select id="proc-rel-tabela"></select></div><div class="proc-rel-row"><label for="proc-rel-especialidade"><input id="proc-rel-chk-especialidade" type="checkbox"><span>Especialidade</span></label><select id="proc-rel-especialidade" disabled></select></div></div><div id="proc-rel-tab-opcoes" class="proc-rel-pane hidden"><div class="proc-rel-opc-grid"><div class="proc-rel-list"><label for="proc-rel-disp">Dados disponÃ­veis:</label><select id="proc-rel-disp" multiple></select></div><div class="proc-rel-transfer"><button id="proc-rel-incluir" class="materiais-btn" type="button">Inclui &gt;&gt;</button><button id="proc-rel-excluir" class="materiais-btn" type="button">&lt;&lt; Exclui</button></div><div class="proc-rel-list"><label for="proc-rel-sel">Dados selecionados:</label><select id="proc-rel-sel" multiple></select></div><div class="proc-rel-side"><div><label for="proc-rel-ordem">Ordem de impressÃ£o:</label><select id="proc-rel-ordem"></select></div><div><label for="proc-rel-saida">SaÃ­da do relatÃ³rio:</label><select id="proc-rel-saida"><option>Tela</option><option>Arquivo</option><option>Impressora</option></select></div><div><label>Modo de impressÃ£o:</label><div class="proc-rel-radio-wrap"><label><input id="proc-rel-retrato" type="radio" name="proc-rel-modo" checked>Modo \"Retrato\"</label><label><input id="proc-rel-paisagem" type="radio" name="proc-rel-modo">Modo \"Paisagem\"</label></div></div></div></div><div class="proc-rel-report-name"><label for="proc-rel-nome">Nome do relatÃ³rio:</label><input id="proc-rel-nome" type="text" value="RelatÃ³rio de tabela de procedimentos"></div></div><div class="proc-rel-actions"><button id="proc-rel-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo</button><button id="proc-rel-btn-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="proc-rel-btn-cancela" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div></div>`);procRelatorio={backdrop:document.getElementById("proc-relatorio-backdrop"),modal:document.querySelector("#proc-relatorio-backdrop .proc-rel-modal"),tabBtnGeral:document.getElementById("proc-rel-tab-geral-btn"),tabBtnOpcoes:document.getElementById("proc-rel-tab-opcoes-btn"),tabGeral:document.getElementById("proc-rel-tab-geral"),tabOpcoes:document.getElementById("proc-rel-tab-opcoes"),cboTabela:document.getElementById("proc-rel-tabela"),chkEspecialidade:document.getElementById("proc-rel-chk-especialidade"),cboEspecialidade:document.getElementById("proc-rel-especialidade"),lstDisponiveis:document.getElementById("proc-rel-disp"),lstSelecionados:document.getElementById("proc-rel-sel"),btnIncluir:document.getElementById("proc-rel-incluir"),btnExcluir:document.getElementById("proc-rel-excluir"),cboOrdem:document.getElementById("proc-rel-ordem"),cboSaida:document.getElementById("proc-rel-saida"),radRetrato:document.getElementById("proc-rel-retrato"),radPaisagem:document.getElementById("proc-rel-paisagem"),txtNome:document.getElementById("proc-rel-nome"),btnNovo:document.getElementById("proc-rel-btn-novo"),btnOk:document.getElementById("proc-rel-btn-ok"),btnCancela:document.getElementById("proc-rel-btn-cancela")};ensureModalChrome(procRelatorio.modal)}
+function procRelatorioEnsureUI(){if(procRelatorio)return;const style=document.createElement("style");style.textContent=".proc-rel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.22);display:grid;place-items:center;z-index:5600}.proc-rel-modal{width:min(640px,96vw);background:#f3f3f1;border:1px solid #bfc9d6;border-radius:12px;box-sizing:border-box;overflow:hidden;font:12px Tahoma,sans-serif}.proc-rel-banner{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #dad7ba;background:linear-gradient(180deg,#faf7d8,#f8f4cd)}.proc-rel-banner img{width:48px;height:48px;object-fit:contain;flex:0 0 48px}.proc-rel-banner strong{display:block;font:700 13px Tahoma,sans-serif;line-height:1.35;color:#2d2d2d}.proc-rel-body{padding:10px 14px 12px;background:#f3f3f1}.proc-rel-tabs{display:flex;gap:4px;margin-bottom:10px}.proc-rel-tab-btn{height:28px;padding:0 12px;border:1px solid #bfc9d6;border-bottom:none;background:#ececec;font:12px Tahoma,sans-serif;cursor:pointer}.proc-rel-tab-btn.active{background:#fff;font-weight:700}.proc-rel-pane{border:1px solid #bfc9d6;background:#fff;padding:12px 12px 14px;min-height:314px}.proc-rel-pane.hidden{display:none}.proc-rel-row{display:grid;grid-template-columns:178px 1fr;gap:12px;align-items:center;margin-bottom:12px}.proc-rel-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}.proc-rel-row label span:last-child{display:block;flex:1;border-bottom:1px dotted #808080;transform:translateY(-1px)}.proc-rel-row select,.proc-rel-row input[type='text']{width:100%;height:28px;border:1px solid #bfc9d6;padding:0 8px;font:12px Tahoma,sans-serif;background:#fff}.proc-rel-opc-grid{display:grid;grid-template-columns:1fr 76px 1fr 170px;gap:12px;align-items:start}.proc-rel-list label,.proc-rel-side label,.proc-rel-report-name label{display:block;margin-bottom:4px}.proc-rel-list select{width:100%;height:176px;border:1px solid #bfc9d6;background:#fff;font:12px Tahoma,sans-serif}.proc-rel-transfer{display:flex;flex-direction:column;gap:10px;align-self:center}.proc-rel-transfer .materiais-btn{justify-content:center;min-width:74px;padding:0 10px}.proc-rel-side{display:grid;gap:12px}.proc-rel-side select,.proc-rel-side input[type='text']{width:100%;height:28px;border:1px solid #bfc9d6;padding:0 8px;font:12px Tahoma,sans-serif;background:#fff}.proc-rel-radio-wrap{display:grid;gap:4px;margin-top:4px}.proc-rel-radio-wrap label{display:flex;align-items:center;gap:6px}.proc-rel-radio-wrap input{width:auto;height:auto}.proc-rel-report-name{margin-top:12px}.proc-rel-actions{display:flex;justify-content:flex-end;gap:8px;padding:10px 0 0}.proc-rel-actions .materiais-btn{min-width:88px;justify-content:center}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<div id="proc-relatorio-backdrop" class="proc-rel-backdrop hidden"><div class="proc-rel-modal"><div class="proc-rel-banner"><img src="/desktop-assets/relatorio.png" alt=""><strong>Tabela de intervenÃƒÂ§ÃƒÂµes - selecione os critÃƒÂ©rios de pesquisa e os dados desejados para visualizaÃƒÂ§ÃƒÂ£o do relatÃƒÂ³rio.</strong></div><div class="proc-rel-body"><div class="proc-rel-tabs"><button id="proc-rel-tab-geral-btn" class="proc-rel-tab-btn active" type="button">CritÃƒÂ©rios gerais</button><button id="proc-rel-tab-opcoes-btn" class="proc-rel-tab-btn" type="button">OpÃƒÂ§ÃƒÂµes de relatÃƒÂ³rio</button></div><div id="proc-rel-tab-geral" class="proc-rel-pane"><div class="proc-rel-row"><label for="proc-rel-tabela"><span>Tabela</span></label><select id="proc-rel-tabela"></select></div><div class="proc-rel-row"><label for="proc-rel-especialidade"><input id="proc-rel-chk-especialidade" type="checkbox"><span>Especialidade</span></label><select id="proc-rel-especialidade" disabled></select></div></div><div id="proc-rel-tab-opcoes" class="proc-rel-pane hidden"><div class="proc-rel-opc-grid"><div class="proc-rel-list"><label for="proc-rel-disp">Dados disponÃƒÂ­veis:</label><select id="proc-rel-disp" multiple></select></div><div class="proc-rel-transfer"><button id="proc-rel-incluir" class="materiais-btn" type="button">Inclui &gt;&gt;</button><button id="proc-rel-excluir" class="materiais-btn" type="button">&lt;&lt; Exclui</button></div><div class="proc-rel-list"><label for="proc-rel-sel">Dados selecionados:</label><select id="proc-rel-sel" multiple></select></div><div class="proc-rel-side"><div><label for="proc-rel-ordem">Ordem de impressÃƒÂ£o:</label><select id="proc-rel-ordem"></select></div><div><label for="proc-rel-saida">SaÃƒÂ­da do relatÃƒÂ³rio:</label><select id="proc-rel-saida"><option>Tela</option><option>Arquivo</option><option>Impressora</option></select></div><div><label>Modo de impressÃƒÂ£o:</label><div class="proc-rel-radio-wrap"><label><input id="proc-rel-retrato" type="radio" name="proc-rel-modo" checked>Modo \"Retrato\"</label><label><input id="proc-rel-paisagem" type="radio" name="proc-rel-modo">Modo \"Paisagem\"</label></div></div></div></div><div class="proc-rel-report-name"><label for="proc-rel-nome">Nome do relatÃƒÂ³rio:</label><input id="proc-rel-nome" type="text" value="RelatÃƒÂ³rio de tabela de procedimentos"></div></div><div class="proc-rel-actions"><button id="proc-rel-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo</button><button id="proc-rel-btn-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="proc-rel-btn-cancela" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div></div>`);procRelatorio={backdrop:document.getElementById("proc-relatorio-backdrop"),modal:document.querySelector("#proc-relatorio-backdrop .proc-rel-modal"),tabBtnGeral:document.getElementById("proc-rel-tab-geral-btn"),tabBtnOpcoes:document.getElementById("proc-rel-tab-opcoes-btn"),tabGeral:document.getElementById("proc-rel-tab-geral"),tabOpcoes:document.getElementById("proc-rel-tab-opcoes"),cboTabela:document.getElementById("proc-rel-tabela"),chkEspecialidade:document.getElementById("proc-rel-chk-especialidade"),cboEspecialidade:document.getElementById("proc-rel-especialidade"),lstDisponiveis:document.getElementById("proc-rel-disp"),lstSelecionados:document.getElementById("proc-rel-sel"),btnIncluir:document.getElementById("proc-rel-incluir"),btnExcluir:document.getElementById("proc-rel-excluir"),cboOrdem:document.getElementById("proc-rel-ordem"),cboSaida:document.getElementById("proc-rel-saida"),radRetrato:document.getElementById("proc-rel-retrato"),radPaisagem:document.getElementById("proc-rel-paisagem"),txtNome:document.getElementById("proc-rel-nome"),btnNovo:document.getElementById("proc-rel-btn-novo"),btnOk:document.getElementById("proc-rel-btn-ok"),btnCancela:document.getElementById("proc-rel-btn-cancela")};ensureModalChrome(procRelatorio.modal)}
 function procRelatorioAtualizarOrdem(){
   if(!procRelatorio?.cboOrdem||!procRelatorio?.lstSelecionados)return;
   const itens=[...procRelatorio.lstSelecionados.options].map(opt=>String(opt.value||"")).filter(Boolean);
@@ -402,7 +482,7 @@ function procRelatorioResetar(){
   procRelatorio.cboSaida.value="Tela";
   procRelatorio.radRetrato.checked=true;
   procRelatorio.radPaisagem.checked=false;
-  procRelatorio.txtNome.value="RelatÃ³rio de tabela de procedimentos";
+  procRelatorio.txtNome.value="RelatÃƒÂ³rio de tabela de procedimentos";
   procRelatorioAtualizarOrdem();
   procRelatorioMemorizarCampos();
   procRelatorioMostrarAba("geral");
@@ -416,9 +496,9 @@ async function procRelatorioAbrir(){
   procRelatorio.backdrop.classList.remove("hidden");
 }
 function procRelatorioFechar(){if(procRelatorio?.backdrop)procRelatorio.backdrop.classList.add("hidden")}
-const PROC_RELATORIO_CAMPOS_MOEDA=new Set(["Cst fixo (R$)","Cst mat (R$)","Cst prot (R$)","Imp. diretos (R$)","Lucro (R$)","Lucro mens (R$)","Val convÃªnio (R$)","Val inter (R$)","Val paciente (R$)","PreÃ§o","Preco"]);
-const PROC_RELATORIO_CAMPOS_PERCENTUAL=new Set(["Cst fixo %","Cst mat %","Cst prot %","Val convÃªnio %"]);
-const PROC_RELATORIO_CAMPOS_CENTER=new Set(["Ãndice","Indice","Prazo"]);
+const PROC_RELATORIO_CAMPOS_MOEDA=new Set(["Cst fixo (R$)","Cst mat (R$)","Cst prot (R$)","Imp. diretos (R$)","Lucro (R$)","Lucro mens (R$)","Val convÃƒÂªnio (R$)","Val inter (R$)","Val paciente (R$)","PreÃƒÂ§o","Preco"]);
+const PROC_RELATORIO_CAMPOS_PERCENTUAL=new Set(["Cst fixo %","Cst mat %","Cst prot %","Val convÃƒÂªnio %"]);
+const PROC_RELATORIO_CAMPOS_CENTER=new Set(["ÃƒÂndice","Indice","Prazo"]);
 function procRelatorioClasseCampo(campo){
   if(PROC_RELATORIO_CAMPOS_MOEDA.has(campo)||PROC_RELATORIO_CAMPOS_PERCENTUAL.has(campo))return "money";
   if(PROC_RELATORIO_CAMPOS_CENTER.has(campo))return "center";
@@ -459,7 +539,7 @@ function procRelatorioEnsurePreviewUI(){
         <button id="proc-rview-btn-filtra" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Filtra</button>
         <button id="proc-rview-btn-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime</button>
         <button id="proc-rview-btn-fecha" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button>
-        <label for="proc-rview-pag">PÃ¡gina:</label>
+        <label for="proc-rview-pag">PÃƒÂ¡gina:</label>
         <input id="proc-rview-pag" type="number" min="1" value="1">
         <span id="proc-rview-pag-total" class="pct">de 1</span>
         <label for="proc-rview-zoom">Zoom:</label>
@@ -474,7 +554,7 @@ function procRelatorioEnsurePreviewUI(){
                 <img id="proc-rview-logo" class="proc-rview-logo" alt="">
                 <div class="proc-rview-head-text">
                   <div id="proc-rview-head-caption" class="proc-rview-head-caption"></div>
-                  <div id="proc-rview-title" class="proc-rview-report-title">RelatÃ³rio</div>
+                  <div id="proc-rview-title" class="proc-rview-report-title">RelatÃƒÂ³rio</div>
                   <div id="proc-rview-user" class="proc-rview-user"></div>
                 </div>
               </div>
@@ -646,13 +726,13 @@ function procRelatorioRenderPagina(){
   const dataAgora=new Date();
   if(procRelatorioView.date)procRelatorioView.date.textContent=cfg?.printDateTime?`Data: ${dataAgora.toLocaleDateString("pt-BR")}`:"";
   if(procRelatorioView.time)procRelatorioView.time.textContent=cfg?.printDateTime?`Hora: ${dataAgora.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}`:"";
-  if(procRelatorioView.pageMeta)procRelatorioView.pageMeta.textContent=cfg?.printPage?`PÃ¡g.: ${procRelatorioView.pagina}`:"";
-  if(procRelatorioView.title)procRelatorioView.title.textContent=procRelatorioView.titulo||"RelatÃ³rio";
+  if(procRelatorioView.pageMeta)procRelatorioView.pageMeta.textContent=cfg?.printPage?`PÃƒÂ¡g.: ${procRelatorioView.pagina}`:"";
+  if(procRelatorioView.title)procRelatorioView.title.textContent=procRelatorioView.titulo||"RelatÃƒÂ³rio";
   if(procRelatorioView.headCaption)procRelatorioView.headCaption.textContent=String(cfg?.headerText||"").trim();
   if(procRelatorioView.user){
     const usuarioAtual=relatorioUsuarioAtual();
     const showUser=cfg?.printUser&&usuarioAtual;
-    procRelatorioView.user.textContent=showUser?`UsuÃ¡rio: ${usuarioAtual}`:"";
+    procRelatorioView.user.textContent=showUser?`UsuÃƒÂ¡rio: ${usuarioAtual}`:"";
     procRelatorioView.user.style.display=showUser?"block":"none";
   }
   if(procRelatorioView.logo){
@@ -758,7 +838,7 @@ function procRelatorioAbrirPreview(campos,rows,titulo,note,opts={}){
   procRelatorioView.onPrint=typeof opts?.onPrint==="function"?opts.onPrint:null;
   procRelatorioView.campos=[...(campos||[])];
   procRelatorioView.rows=Array.isArray(rows)?rows:[];
-  procRelatorioView.titulo=titulo||"RelatÃ³rio de tabela de procedimentos";
+  procRelatorioView.titulo=titulo||"RelatÃƒÂ³rio de tabela de procedimentos";
   procRelatorioView.observacao=note||"";
   procRelatorioView._linhasPorPagina=null;
   procRelatorioView.config=procRelatorioConfigAtual();
@@ -813,17 +893,17 @@ function procRelatorioMontarHtml(campos,rows,titulo){
       <img class="rel-logo" src="${esc(logoSrc)}" alt="" style="display:${logoSrc?"block":"none"}">
       <div class="rel-head-text">
         ${cfg?.headerText?`<div class="rel-head-caption">${esc(cfg.headerText)}</div>`:""}
-        <div class="rel-title">${esc(titulo||"RelatÃ³rio")}</div>
-        ${showUser?`<div class="rel-user">UsuÃ¡rio: ${esc(usuario)}</div>`:""}
+        <div class="rel-title">${esc(titulo||"RelatÃƒÂ³rio")}</div>
+        ${showUser?`<div class="rel-user">UsuÃƒÂ¡rio: ${esc(usuario)}</div>`:""}
       </div>
     </div>
     <div class="rel-meta" style="${cssCab}">
       ${showDateTime?`<div>Data: ${esc(data)}</div><div>Hora: ${esc(hora)}</div>`:""}
-      ${showPage?`<div>PÃ¡g.: 1</div>`:""}
+      ${showPage?`<div>PÃƒÂ¡g.: 1</div>`:""}
     </div>
   </div>`;
   const bodyRows=(rows||[]).length?(rows||[]).map(row=>`<tr>${campos.map(c=>`<td class="${procRelatorioClasseCampo(c)}">${esc(procRelatorioFormatarCampo(c,procRelatorioValorCampo(row,c)))}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${Math.max(1,campos.length)}" style="text-align:center">Sem dados.</td></tr>`;
-  return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo||"RelatÃ³rio")}</title><style>
+  return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo||"RelatÃƒÂ³rio")}</title><style>
     @page { size: ${pageW}cm ${pageH}cm; margin: ${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm; }
     body{margin:${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm;font-family:Tahoma,Arial,sans-serif;font-size:11px;color:#000}
     .rel-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
@@ -842,12 +922,12 @@ function procRelatorioMontarHtml(campos,rows,titulo){
     tfoot td{${cssRod}}
   </style></head><body>${headerHtml}<table><thead><tr>${campos.map(c=>`<th class="${procRelatorioClasseCampo(c)}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${bodyRows}</tbody></table></body></html>`;
 }
-function procRelatorioAbrirDialogoImpressao(campos,rows,titulo){const html=procRelatorioMontarHtml(campos,rows,titulo);const frame=document.createElement("iframe");frame.style.position="fixed";frame.style.right="0";frame.style.bottom="0";frame.style.width="0";frame.style.height="0";frame.style.border="0";document.body.appendChild(frame);const win=frame.contentWindow;const doc=win?.document;if(!doc){frame.remove();window.alert("NÃ£o foi possÃ­vel iniciar a impressÃ£o.");return false}doc.open();doc.write(html);doc.close();let printed=false;const doPrint=()=>{if(printed)return;printed=true;try{win.focus();win.print()}catch{}};frame.onload=doPrint;setTimeout(doPrint,180);const cleanup=()=>{setTimeout(()=>{try{frame.remove()}catch{}},1200)};try{win.addEventListener("afterprint",cleanup)}catch{}setTimeout(cleanup,60000);return true}
+function procRelatorioAbrirDialogoImpressao(campos,rows,titulo){const html=procRelatorioMontarHtml(campos,rows,titulo);const frame=document.createElement("iframe");frame.style.position="fixed";frame.style.right="0";frame.style.bottom="0";frame.style.width="0";frame.style.height="0";frame.style.border="0";document.body.appendChild(frame);const win=frame.contentWindow;const doc=win?.document;if(!doc){frame.remove();window.alert("NÃƒÂ£o foi possÃƒÂ­vel iniciar a impressÃƒÂ£o.");return false}doc.open();doc.write(html);doc.close();let printed=false;const doPrint=()=>{if(printed)return;printed=true;try{win.focus();win.print()}catch{}};frame.onload=doPrint;setTimeout(doPrint,180);const cleanup=()=>{setTimeout(()=>{try{frame.remove()}catch{}},1200)};try{win.addEventListener("afterprint",cleanup)}catch{}setTimeout(cleanup,60000);return true}
 function procRelatorioExportarArquivo(campos,rows,titulo){const linhas=[];linhas.push(campos.join(";"));(rows||[]).forEach(row=>{linhas.push(campos.map(c=>`"${String(procRelatorioFormatarCampo(c,procRelatorioValorCampo(row,c))||"").replace(/"/g,'""')}"`).join(";"))});const conteudo="\ufeff"+linhas.join("\r\n");const blob=new Blob([conteudo],{type:"text/csv;charset=utf-8;"});const url=URL.createObjectURL(blob);const nome=(titulo||"relatorio_tabela_procedimentos").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_").replace(/_+/g,"_").replace(/^_+|_+$/g,"").toLowerCase()||"relatorio_tabela_procedimentos";const a=document.createElement("a");a.href=url;a.download=`${nome}.csv`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url)}
 function procRelatorioImprimirPreview(){
   const campos=procRelatorioView?.campos||[];
   const rows=procRelatorioView?.rows||[];
-  const titulo=procRelatorioView?.titulo||"RelatÃ³rio";
+  const titulo=procRelatorioView?.titulo||"RelatÃƒÂ³rio";
   if(!campos.length)return;
   procRelatorioAbrirDialogoImpressao(campos,rows,titulo);
 }
@@ -857,16 +937,16 @@ let cnfRelatorioDlgImp=null;
 let cnfRelatorioDlgTeste=null;
 let cnfRelatorioDlgRede=null;
 const CNF_RELATORIO_SECOES=[
-  {id:"titulo",label:"TÃ­tulo do relatÃ³rio",preview:"TÃ­tulo do relatÃ³rio"},
-  {id:"cabecalho",label:"CabeÃ§alho principal",preview:"CabeÃ§alho principal"},
-  {id:"colunas",label:"TÃ­tulos das colunas",preview:"TÃ­tulos das colunas"},
-  {id:"corpo",label:"Corpo do relatÃ³rio",preview:"Corpo do relatÃ³rio"},
-  {id:"rodape",label:"RodapÃ© e totais",preview:"RodapÃ© e totais"}
+  {id:"titulo",label:"TÃƒÂ­tulo do relatÃƒÂ³rio",preview:"TÃƒÂ­tulo do relatÃƒÂ³rio"},
+  {id:"cabecalho",label:"CabeÃƒÂ§alho principal",preview:"CabeÃƒÂ§alho principal"},
+  {id:"colunas",label:"TÃƒÂ­tulos das colunas",preview:"TÃƒÂ­tulos das colunas"},
+  {id:"corpo",label:"Corpo do relatÃƒÂ³rio",preview:"Corpo do relatÃƒÂ³rio"},
+  {id:"rodape",label:"RodapÃƒÂ© e totais",preview:"RodapÃƒÂ© e totais"}
 ];
 const CNF_RELATORIO_DESTINOS=[
-  {id:"browser",nome:"Escolher no navegador",tipo:"Destino do navegador",onde:"Definido pelo sistema",status:"DisponÃ­vel ao imprimir",comentario:"A impressora fÃ­sica Ã© escolhida no diÃ¡logo final do navegador."},
-  {id:"pdf",nome:"Salvar em PDF",tipo:"PDF do navegador",onde:"Download local",status:"DisponÃ­vel ao imprimir",comentario:"O navegador permitirÃ¡ salvar em PDF na etapa final."},
-  {id:"preview",nome:"PrÃ©via no navegador",tipo:"PrÃ©via do navegador",onde:"Tela",status:"DisponÃ­vel",comentario:"A impressÃ£o fÃ­sica serÃ¡ escolhida depois, no navegador."}
+  {id:"browser",nome:"Escolher no navegador",tipo:"Destino do navegador",onde:"Definido pelo sistema",status:"DisponÃƒÂ­vel ao imprimir",comentario:"A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador."},
+  {id:"pdf",nome:"Salvar em PDF",tipo:"PDF do navegador",onde:"Download local",status:"DisponÃƒÂ­vel ao imprimir",comentario:"O navegador permitirÃƒÂ¡ salvar em PDF na etapa final."},
+  {id:"preview",nome:"PrÃƒÂ©via no navegador",tipo:"PrÃƒÂ©via do navegador",onde:"Tela",status:"DisponÃƒÂ­vel",comentario:"A impressÃƒÂ£o fÃƒÂ­sica serÃƒÂ¡ escolhida depois, no navegador."}
 ];
 function cnfRelatorioEnsureUI(){
   if(cnfRelatorio)return;
@@ -941,14 +1021,14 @@ function cnfRelatorioEnsureUI(){
     backdrop.innerHTML=`
       <div class="cnf-rel-modal">
         <div class="cnf-rel-tabs">
-          <button id="cnf-rel-tab-rel" class="cnf-rel-tab active" type="button">RelatÃ³rios e fichas</button>
-          <button id="cnf-rel-tab-pap" class="cnf-rel-tab" type="button">DimensÃµes do papel</button>
+          <button id="cnf-rel-tab-rel" class="cnf-rel-tab active" type="button">RelatÃƒÂ³rios e fichas</button>
+          <button id="cnf-rel-tab-pap" class="cnf-rel-tab" type="button">DimensÃƒÂµes do papel</button>
         </div>
         <div id="cnf-rel-pane-rel" class="cnf-rel-pane">
           <div class="cnf-rel-layout">
             <div class="cnf-rel-left">
               <div class="cnf-rel-row">
-                <label class="cnf-rel-label" for="cnf-rel-cabecalho">Texto para cabeÃ§alho:</label>
+                <label class="cnf-rel-label" for="cnf-rel-cabecalho">Texto para cabeÃƒÂ§alho:</label>
                 <input id="cnf-rel-cabecalho" type="text">
               </div>
               <div class="cnf-rel-row">
@@ -962,18 +1042,18 @@ function cnfRelatorioEnsureUI(){
                 </div>
               </div>
               <div class="cnf-rel-row cnf-rel-row-checks">
-                <label><input id="cnf-rel-user-check" type="checkbox"> Imprimir nome do usuÃ¡rio</label>
-                <label><input id="cnf-rel-page-check" type="checkbox"> Imprimir nÃºmero da pÃ¡gina</label>
+                <label><input id="cnf-rel-user-check" type="checkbox"> Imprimir nome do usuÃƒÂ¡rio</label>
+                <label><input id="cnf-rel-page-check" type="checkbox"> Imprimir nÃƒÂºmero da pÃƒÂ¡gina</label>
               </div>
               <div class="cnf-rel-row cnf-rel-row-checks">
                 <label><input id="cnf-rel-date-check" type="checkbox"> Imprimir data e hora</label>
               </div>
               <div class="cnf-rel-section">
-                <div class="cnf-rel-section-title">ApresentaÃ§Ã£o (letras e cores)</div>
+                <div class="cnf-rel-section-title">ApresentaÃƒÂ§ÃƒÂ£o (letras e cores)</div>
                 <div class="cnf-rel-section-grid">
                   <div>
                     <div class="cnf-rel-section-label-row">
-                      <label class="cnf-rel-label" for="cnf-rel-secoes">SeÃ§Ã£o:</label>
+                      <label class="cnf-rel-label" for="cnf-rel-secoes">SeÃƒÂ§ÃƒÂ£o:</label>
                     </div>
                     <select id="cnf-rel-secoes" size="6"></select>
                   </div>
@@ -995,13 +1075,13 @@ function cnfRelatorioEnsureUI(){
                     <div id="cnf-rel-mock-header-text" class="cnf-rel-mock-header-text"></div>
                     <div class="cnf-rel-mock-meta">
                       <span id="cnf-rel-mock-date" class="cnf-rel-mock-date">20/03/2026</span>
-                      <span id="cnf-rel-mock-page" class="cnf-rel-mock-page">PÃ¡g.1</span>
+                      <span id="cnf-rel-mock-page" class="cnf-rel-mock-page">PÃƒÂ¡g.1</span>
                       <span id="cnf-rel-mock-user" class="cnf-rel-mock-user">Usr</span>
                     </div>
                   </div>
                   <div id="cnf-rel-mock-body" class="cnf-rel-mock-body">
-                    <div id="cnf-rel-mock-title" class="cnf-rel-mock-title">TÃ­tulo do relatÃ³rio</div>
-                    <div id="cnf-rel-mock-columns" class="cnf-rel-mock-columns">TÃ­tulos das colunas</div>
+                    <div id="cnf-rel-mock-title" class="cnf-rel-mock-title">TÃƒÂ­tulo do relatÃƒÂ³rio</div>
+                    <div id="cnf-rel-mock-columns" class="cnf-rel-mock-columns">TÃƒÂ­tulos das colunas</div>
                     <div id="cnf-rel-mock-content" class="cnf-rel-mock-content"></div>
                   </div>
                   <div id="cnf-rel-mock-footer" class="cnf-rel-mock-footer"></div>
@@ -1014,9 +1094,9 @@ function cnfRelatorioEnsureUI(){
           <div class="cnf-rel-paper-layout">
             <div class="cnf-rel-paper-left">
               <div class="cnf-rel-group">
-                <div class="cnf-rel-group-title">DimensÃµes do papel na impressora</div>
-                <div id="cnf-rel-printer-name" style="margin-bottom:6px;font:12px Tahoma,sans-serif">Impressora padrÃ£o</div>
-                <div class="cnf-rel-radio-row"><label><input id="cnf-rel-rb-imp" type="radio" name="cnf-rel-papel"> Utilizar configuraÃ§Ã£o da impressora:</label></div>
+                <div class="cnf-rel-group-title">DimensÃƒÂµes do papel na impressora</div>
+                <div id="cnf-rel-printer-name" style="margin-bottom:6px;font:12px Tahoma,sans-serif">Impressora padrÃƒÂ£o</div>
+                <div class="cnf-rel-radio-row"><label><input id="cnf-rel-rb-imp" type="radio" name="cnf-rel-papel"> Utilizar configuraÃƒÂ§ÃƒÂ£o da impressora:</label></div>
                 <div class="cnf-rel-dim-row"><span class="cnf-rel-dim-label">Altura:</span><span id="cnf-rel-imp-altura" class="cnf-rel-dim-value">29,7</span><span>cm</span></div>
                 <div class="cnf-rel-dim-row"><span class="cnf-rel-dim-label">Largura:</span><span id="cnf-rel-imp-largura" class="cnf-rel-dim-value">21,0</span><span>cm</span></div>
                 <div class="cnf-rel-radio-row" style="margin-top:6px"><label><input id="cnf-rel-rb-fixo" type="radio" name="cnf-rel-papel"> Fixar tamanho em:</label></div>
@@ -1045,7 +1125,7 @@ function cnfRelatorioEnsureUI(){
           </div>
         </div>
         <div class="cnf-rel-actions">
-          <button id="cnf-rel-btn-padrao" class="materiais-btn" type="button">PadrÃ£o</button>
+          <button id="cnf-rel-btn-padrao" class="materiais-btn" type="button">PadrÃƒÂ£o</button>
           <button id="cnf-rel-btn-impressora" class="materiais-btn" type="button">Impressora...</button>
           <button id="cnf-rel-btn-teste" class="materiais-btn" type="button">Teste</button>
           <button id="cnf-rel-btn-ok" class="materiais-btn" type="button">Ok</button>
@@ -1145,12 +1225,12 @@ function cnfRelatorioContextoPadrao(){const userId=Number(sessaoAtual?.user_id||
 function cnfRelatorioResolverContexto(user=null,origin="menu"){if(user){return{scope:"usuario",origin,userId:Number(user.id||0)||0,userNome:String(user.nome||"").trim(),userApelido:String(user.apelido||user.nome||"").trim()}}const padrao=cnfRelatorioContextoPadrao();return{...padrao,origin}}
 function cnfRelatorioContextoAtual(){return cnfRelatorio?.context||cnfRelatorioContextoPadrao()}
 function cnfRelatorioStorageKey(){const clinicaId=Number(sessaoAtual?.clinica_id||0);const ctx=cnfRelatorioContextoAtual();const userKey=Number(ctx?.userId||0)||String(ctx?.scope||"sessao");return`brana_relatorios_cfg_${clinicaId||"global"}_${userKey}`}
-function cnfRelatorioPadrao(){return{headerText:"",printLogo:true,logoPath:"C:\\EDS70\\Textos\\CABECALHO.bmp",logoDataUrl:"",printUser:false,printPage:true,printDateTime:true,sectionId:"titulo",sectionStyles:{titulo:{fontFamily:"Tahoma",fontSize:22,bold:true,italic:false,underline:false,strike:false,color:"#111111"},cabecalho:{fontFamily:"Tahoma",fontSize:12,bold:true,italic:false,underline:false,strike:false,color:"#111111"},colunas:{fontFamily:"Tahoma",fontSize:10,bold:true,italic:false,underline:false,strike:false,color:"#111111"},corpo:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"},rodape:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"}},usePrinterPaper:true,paperHeightCm:29.7,paperWidthCm:21,paperMarginPreset:"custom",marginLeftCm:1,marginRightCm:1,marginTopCm:1,marginBottomCm:1,printerName:"Escolher no navegador",printerStatus:"DisponÃ­vel ao imprimir",printerType:"Destino do navegador",printerWhere:"Definido pelo sistema",printerComment:"A impressora fÃ­sica Ã© escolhida no diÃ¡logo final do navegador.",paperSize:"A4",paperSource:"Origem padrÃ£o",printerOrientation:"retrato"}}
+function cnfRelatorioPadrao(){return{headerText:"",printLogo:true,logoPath:"C:\\EDS70\\Textos\\CABECALHO.bmp",logoDataUrl:"",printUser:false,printPage:true,printDateTime:true,sectionId:"titulo",sectionStyles:{titulo:{fontFamily:"Tahoma",fontSize:22,bold:true,italic:false,underline:false,strike:false,color:"#111111"},cabecalho:{fontFamily:"Tahoma",fontSize:12,bold:true,italic:false,underline:false,strike:false,color:"#111111"},colunas:{fontFamily:"Tahoma",fontSize:10,bold:true,italic:false,underline:false,strike:false,color:"#111111"},corpo:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"},rodape:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"}},usePrinterPaper:true,paperHeightCm:29.7,paperWidthCm:21,paperMarginPreset:"custom",marginLeftCm:1,marginRightCm:1,marginTopCm:1,marginBottomCm:1,printerName:"Escolher no navegador",printerStatus:"DisponÃƒÂ­vel ao imprimir",printerType:"Destino do navegador",printerWhere:"Definido pelo sistema",printerComment:"A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador.",paperSize:"A4",paperSource:"Origem padrÃƒÂ£o",printerOrientation:"retrato"}}
 function cnfRelatorioNormalizarConfig(data){const padrao=cnfRelatorioPadrao();const parsed=data&&typeof data==="object"?data:{};return{...padrao,...parsed,sectionStyles:{...padrao.sectionStyles,...(parsed?.sectionStyles||{})}}}
 function cnfRelatorioCarregarLocal(){try{const raw=localStorage.getItem(cnfRelatorioStorageKey());const parsed=raw?JSON.parse(raw):{};return cnfRelatorioNormalizarConfig(parsed)}catch{return cnfRelatorioPadrao()}}
 function cnfRelatorioSalvarEstado(){if(cnfRelatorio?.state)localStorage.setItem(cnfRelatorioStorageKey(),JSON.stringify(cnfRelatorio.state))}
 async function cnfRelatorioCarregarServidor(){const ctx=cnfRelatorioContextoAtual();const params=new URLSearchParams();if(ctx?.scope==="usuario"&&ctx.userId)params.set("user_id",String(ctx.userId));const path=`/preferences/report-config${params.toString()?`?${params.toString()}`:""}`;const{res,data}=await requestJson("GET",path,undefined,true);if(!res.ok)return null;return cnfRelatorioNormalizarConfig(data?.config||{})}
-async function cnfRelatorioSalvarServidor(){const ctx=cnfRelatorioContextoAtual();const payload={user_id:ctx?.scope==="usuario"?ctx.userId:null,config:cnfRelatorio?.state||cnfRelatorioPadrao()};const{res,data}=await requestJson("PATCH","/preferences/report-config",payload,true);if(!res.ok)return{ok:false,message:data.detail||"Falha ao salvar a configuraÃ§Ã£o de impressos."};const config=cnfRelatorioNormalizarConfig(data?.config||payload.config||{});return{ok:true,config}}
+async function cnfRelatorioSalvarServidor(){const ctx=cnfRelatorioContextoAtual();const payload={user_id:ctx?.scope==="usuario"?ctx.userId:null,config:cnfRelatorio?.state||cnfRelatorioPadrao()};const{res,data}=await requestJson("PATCH","/preferences/report-config",payload,true);if(!res.ok)return{ok:false,message:data.detail||"Falha ao salvar a configuraÃƒÂ§ÃƒÂ£o de impressos."};const config=cnfRelatorioNormalizarConfig(data?.config||payload.config||{});return{ok:true,config}}
 function cnfRelatorioLerNumero(valor,padrao){const num=Number(String(valor||"").replace(",","."));return Number.isFinite(num)?num:padrao}
 function cnfRelatorioCarregar(){return cnfRelatorioCarregarLocal()}
 function cnfRelatorioSalvarPapel(){if(!cnfRelatorio)return;cnfRelatorio.state.usePrinterPaper=cnfRelatorio.rbImpressora.checked;cnfRelatorio.state.paperHeightCm=cnfRelatorioLerNumero(cnfRelatorio.edAltura.value,29.7);cnfRelatorio.state.paperWidthCm=cnfRelatorioLerNumero(cnfRelatorio.edLargura.value,21);cnfRelatorio.state.marginLeftCm=cnfRelatorioLerNumero(cnfRelatorio.edMargEsq.value,1);cnfRelatorio.state.marginRightCm=cnfRelatorioLerNumero(cnfRelatorio.edMargDir.value,1);cnfRelatorio.state.marginTopCm=cnfRelatorioLerNumero(cnfRelatorio.edMargSup.value,1);cnfRelatorio.state.marginBottomCm=cnfRelatorioLerNumero(cnfRelatorio.edMargInf.value,1);cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI()}
@@ -1204,7 +1284,7 @@ function cnfRelatorioAplicarPreview(){
   else if(secao.id==="corpo"&&cnfRelatorio.mockContent)cnfRelatorio.mockContent.classList.add("cnf-rel-highlight");
   else if(secao.id==="rodape"&&cnfRelatorio.mockFooter)cnfRelatorio.mockFooter.classList.add("cnf-rel-highlight");
 }
-function cnfRelatorioSincronizarUI(){if(!cnfRelatorio)return;const st=cnfRelatorio.state;cnfRelatorioAtualizarContextoUI();cnfRelatorio.txtCabecalho.value=st.headerText||"";cnfRelatorio.cxLogo.checked=!!st.printLogo;cnfRelatorio.edLogo.value=st.logoPath||"";cnfRelatorio.cxNomeUsuario.checked=!!st.printUser;cnfRelatorio.cxNroPagina.checked=!!st.printPage;cnfRelatorio.cxDataHora.checked=!!st.printDateTime;cnfRelatorio.lstSecoes.innerHTML=CNF_RELATORIO_SECOES.map(sec=>`<option value="${sec.id}" ${sec.id===st.sectionId?"selected":""}>${sec.label}</option>`).join("");cnfRelatorio.rbImpressora.checked=!!st.usePrinterPaper;cnfRelatorio.rbFixo.checked=!st.usePrinterPaper;cnfRelatorio.edAltura.value=Number(st.paperHeightCm||29.7).toFixed(1).replace(".",",");cnfRelatorio.edLargura.value=Number(st.paperWidthCm||21).toFixed(1).replace(".",",");cnfRelatorio.edMargEsq.value=Number(st.marginLeftCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargDir.value=Number(st.marginRightCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargSup.value=Number(st.marginTopCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargInf.value=Number(st.marginBottomCm||1).toFixed(1).replace(".",",");cnfRelatorio.lblImpressora.textContent=st.printerName||"Impressora padrÃ£o";cnfRelatorio.edAltura.disabled=!!st.usePrinterPaper;cnfRelatorio.edLargura.disabled=!!st.usePrinterPaper;cnfRelatorioAplicarPreview()}
+function cnfRelatorioSincronizarUI(){if(!cnfRelatorio)return;const st=cnfRelatorio.state;cnfRelatorioAtualizarContextoUI();cnfRelatorio.txtCabecalho.value=st.headerText||"";cnfRelatorio.cxLogo.checked=!!st.printLogo;cnfRelatorio.edLogo.value=st.logoPath||"";cnfRelatorio.cxNomeUsuario.checked=!!st.printUser;cnfRelatorio.cxNroPagina.checked=!!st.printPage;cnfRelatorio.cxDataHora.checked=!!st.printDateTime;cnfRelatorio.lstSecoes.innerHTML=CNF_RELATORIO_SECOES.map(sec=>`<option value="${sec.id}" ${sec.id===st.sectionId?"selected":""}>${sec.label}</option>`).join("");cnfRelatorio.rbImpressora.checked=!!st.usePrinterPaper;cnfRelatorio.rbFixo.checked=!st.usePrinterPaper;cnfRelatorio.edAltura.value=Number(st.paperHeightCm||29.7).toFixed(1).replace(".",",");cnfRelatorio.edLargura.value=Number(st.paperWidthCm||21).toFixed(1).replace(".",",");cnfRelatorio.edMargEsq.value=Number(st.marginLeftCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargDir.value=Number(st.marginRightCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargSup.value=Number(st.marginTopCm||1).toFixed(1).replace(".",",");cnfRelatorio.edMargInf.value=Number(st.marginBottomCm||1).toFixed(1).replace(".",",");cnfRelatorio.lblImpressora.textContent=st.printerName||"Impressora padrÃƒÂ£o";cnfRelatorio.edAltura.disabled=!!st.usePrinterPaper;cnfRelatorio.edLargura.disabled=!!st.usePrinterPaper;cnfRelatorioAplicarPreview()}
 function cnfRelatorioSelecionarAba(tab){if(!cnfRelatorio)return;const rel=tab==="relatorios";cnfRelatorio.tabRel.classList.toggle("active",rel);cnfRelatorio.tabPap.classList.toggle("active",!rel);cnfRelatorio.paneRel.classList.toggle("hidden",!rel);cnfRelatorio.panePap.classList.toggle("hidden",rel)}
 function cnfRelatorioFontesDisponiveis(){const candidatas=["Arial","Arial Black","Bahnschrift","Book Antiqua","Calibri","Cambria","Candara","Comic Sans MS","Consolas","Constantia","Corbel","Courier New","Franklin Gothic Medium","Gadugi","Georgia","Impact","Lucida Console","Lucida Sans Unicode","Microsoft Sans Serif","Palatino Linotype","Segoe Print","Segoe Script","Segoe UI","Tahoma","Times New Roman","Trebuchet MS","Verdana"];try{const canvas=document.createElement("canvas");const ctx=canvas.getContext("2d");if(!ctx)return candidatas;const texto="mmmmmmmmmmlliOO00AaBbYyZz";const bases=["monospace","serif","sans-serif"];const refs={};bases.forEach(base=>{ctx.font=`32px ${base}`;refs[base]=ctx.measureText(texto).width});const disponiveis=candidatas.filter(nome=>bases.some(base=>{ctx.font=`32px '${nome}', ${base}`;return Math.abs(ctx.measureText(texto).width-refs[base])>0.1}));return (disponiveis.length?disponiveis:candidatas).sort((a,b)=>a.localeCompare(b,"pt-BR"))}catch{return candidatas}}
 function cnfRelatorioFonteEnsureUI(){
@@ -1215,10 +1295,10 @@ function cnfRelatorioFonteEnsureUI(){
   const backdrop=document.createElement("div");
   backdrop.id="config-relatorios-fonte-backdrop";
   backdrop.className="modal-backdrop hidden";
-  backdrop.innerHTML=`<div class="cnf-font-modal"><div class="cnf-font-grid"><div class="cnf-font-col"><label>Fonte:</label><input id="cnf-font-familia-input" class="cnf-font-input" type="text"><div id="cnf-font-familia" class="cnf-font-list"></div></div><div class="cnf-font-col"><label>Estilo da fonte:</label><input id="cnf-font-estilo-input" class="cnf-font-input" type="text" readonly><div id="cnf-font-estilo" class="cnf-font-list"></div></div><div class="cnf-font-col"><label>Tamanho:</label><input id="cnf-font-tamanho-input" class="cnf-font-input" type="text"><div id="cnf-font-tamanho" class="cnf-font-list"></div></div><div class="cnf-font-actions"><button id="cnf-font-ok" class="materiais-btn" type="button">OK</button><button id="cnf-font-cancel" class="materiais-btn" type="button">Cancelar</button></div></div><div style="display:grid;grid-template-columns:190px 1fr;gap:10px;margin-top:12px"><div class="cnf-font-box cnf-font-checks"><div style="margin-bottom:8px">Efeitos</div><label><input id="cnf-font-riscado" type="checkbox"> Riscado</label><label><input id="cnf-font-sublinhado" type="checkbox"> Sublinhado</label><div class="cnf-font-row" style="margin-top:12px"><span>Cor:</span><span id="cnf-font-colorbox" class="cnf-font-color"></span><select id="cnf-font-cor"><option value="#000000">Preto</option><option value="#800000">BordÃ´</option><option value="#008000">Verde</option><option value="#808000">Verde-oliva</option><option value="#000080">Azul-marinho</option><option value="#800080">Roxo</option><option value="#008080">Azul-petrÃ³leo</option><option value="#808080">Cinza</option><option value="#c0c0c0">Prateado</option><option value="#ff0000">Vermelho</option><option value="#00ff00">Verde-limÃ£o</option><option value="#ffff00">Amarelo</option><option value="#0000ff">Azul</option><option value="#ff00ff">FÃºcsia</option><option value="#00ffff">Azul-piscina</option><option value="#ffffff">Branco</option></select></div></div><div><div class="cnf-font-box" style="margin-bottom:10px"><div style="margin-bottom:8px">Exemplo</div><div id="cnf-font-preview" class="cnf-font-preview">AaBbYyZz</div></div><div class="cnf-font-row"><span>Script:</span><select id="cnf-font-script" style="min-width:180px"><option>Ocidental</option></select></div></div></div></div>`;
+  backdrop.innerHTML=`<div class="cnf-font-modal"><div class="cnf-font-grid"><div class="cnf-font-col"><label>Fonte:</label><input id="cnf-font-familia-input" class="cnf-font-input" type="text"><div id="cnf-font-familia" class="cnf-font-list"></div></div><div class="cnf-font-col"><label>Estilo da fonte:</label><input id="cnf-font-estilo-input" class="cnf-font-input" type="text" readonly><div id="cnf-font-estilo" class="cnf-font-list"></div></div><div class="cnf-font-col"><label>Tamanho:</label><input id="cnf-font-tamanho-input" class="cnf-font-input" type="text"><div id="cnf-font-tamanho" class="cnf-font-list"></div></div><div class="cnf-font-actions"><button id="cnf-font-ok" class="materiais-btn" type="button">OK</button><button id="cnf-font-cancel" class="materiais-btn" type="button">Cancelar</button></div></div><div style="display:grid;grid-template-columns:190px 1fr;gap:10px;margin-top:12px"><div class="cnf-font-box cnf-font-checks"><div style="margin-bottom:8px">Efeitos</div><label><input id="cnf-font-riscado" type="checkbox"> Riscado</label><label><input id="cnf-font-sublinhado" type="checkbox"> Sublinhado</label><div class="cnf-font-row" style="margin-top:12px"><span>Cor:</span><span id="cnf-font-colorbox" class="cnf-font-color"></span><select id="cnf-font-cor"><option value="#000000">Preto</option><option value="#800000">BordÃƒÂ´</option><option value="#008000">Verde</option><option value="#808000">Verde-oliva</option><option value="#000080">Azul-marinho</option><option value="#800080">Roxo</option><option value="#008080">Azul-petrÃƒÂ³leo</option><option value="#808080">Cinza</option><option value="#c0c0c0">Prateado</option><option value="#ff0000">Vermelho</option><option value="#00ff00">Verde-limÃƒÂ£o</option><option value="#ffff00">Amarelo</option><option value="#0000ff">Azul</option><option value="#ff00ff">FÃƒÂºcsia</option><option value="#00ffff">Azul-piscina</option><option value="#ffffff">Branco</option></select></div></div><div><div class="cnf-font-box" style="margin-bottom:10px"><div style="margin-bottom:8px">Exemplo</div><div id="cnf-font-preview" class="cnf-font-preview">AaBbYyZz</div></div><div class="cnf-font-row"><span>Script:</span><select id="cnf-font-script" style="min-width:180px"><option>Ocidental</option></select></div></div></div></div>`;
   document.body.appendChild(backdrop);
   const familias=cnfRelatorioFontesDisponiveis();
-  const estilos=[{id:"normal",label:"Normal",weight:"400",italic:false},{id:"negrito",label:"Negrito",weight:"700",italic:false},{id:"italico",label:"ItÃ¡lico",weight:"400",italic:true},{id:"negrito-italico",label:"ItÃ¡lico e negrito",weight:"700",italic:true}];
+  const estilos=[{id:"normal",label:"Normal",weight:"400",italic:false},{id:"negrito",label:"Negrito",weight:"700",italic:false},{id:"italico",label:"ItÃƒÂ¡lico",weight:"400",italic:true},{id:"negrito-italico",label:"ItÃƒÂ¡lico e negrito",weight:"700",italic:true}];
   const tamanhos=[8,9,10,11,12,...Array.from({length:31},(_,i)=>14+i*2)];
   cnfRelatorioDlgFonte={backdrop,modal:backdrop.querySelector(".cnf-font-modal"),familia:backdrop.querySelector("#cnf-font-familia"),estilo:backdrop.querySelector("#cnf-font-estilo"),tamanho:backdrop.querySelector("#cnf-font-tamanho"),familiaInput:backdrop.querySelector("#cnf-font-familia-input"),estiloInput:backdrop.querySelector("#cnf-font-estilo-input"),tamanhoInput:backdrop.querySelector("#cnf-font-tamanho-input"),ok:backdrop.querySelector("#cnf-font-ok"),cancel:backdrop.querySelector("#cnf-font-cancel"),riscado:backdrop.querySelector("#cnf-font-riscado"),sublinhado:backdrop.querySelector("#cnf-font-sublinhado"),cor:backdrop.querySelector("#cnf-font-cor"),colorbox:backdrop.querySelector("#cnf-font-colorbox"),preview:backdrop.querySelector("#cnf-font-preview"),script:backdrop.querySelector("#cnf-font-script"),familias,estilos,tamanhos,filterFamilia:"",state:{family:"Tahoma",styleId:"normal",size:12,color:"#000000",strike:false,underline:false},sync:null};
   ensureModalChrome(cnfRelatorioDlgFonte.modal);
@@ -1275,12 +1355,12 @@ function cnfRelatorioAlterarFonte(){
 }
 function cnfRelatorioImpressoraAplicarPapel(st){const size=String(st.paperSize||"A4").toUpperCase();const retrato=String(st.printerOrientation||"retrato")!=="paisagem";let altura=29.7,largura=21;if(size==="LETTER"){altura=27.94;largura=21.59}else if(size==="A5"){altura=21;largura=14.8}else if(size==="A3"){altura=42;largura=29.7}st.paperHeightCm=retrato?altura:largura;st.paperWidthCm=retrato?largura:altura}
 function cnfRelatorioDestinoPorId(id){return CNF_RELATORIO_DESTINOS.find(item=>item.id===id)||CNF_RELATORIO_DESTINOS[0]}
-function cnfRelatorioDestinoAtual(st){const nome=String(st?.printerName||"").toLowerCase();if(nome.includes("pdf"))return cnfRelatorioDestinoPorId("pdf");if(nome.includes("prÃ©via")||nome.includes("previa"))return cnfRelatorioDestinoPorId("preview");return cnfRelatorioDestinoPorId("browser")}
-function cnfRelatorioImpressoraEnsureUI(){if(cnfRelatorioDlgImp)return;const style=document.createElement("style");style.textContent=".cnf-imp-modal{width:min(520px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-imp-grid{display:grid;grid-template-columns:1fr 150px;gap:12px}.cnf-imp-box{border:1px solid #c7ced8;background:#fff;padding:10px}.cnf-imp-row{display:grid;grid-template-columns:64px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}.cnf-imp-label{white-space:nowrap}.cnf-imp-value{min-height:16px}.cnf-imp-input,.cnf-imp-select{height:26px;border:1px solid #b9c4d3;padding:0 8px;background:#fff;font:12px Tahoma,sans-serif;width:100%;box-sizing:border-box}.cnf-imp-paper{display:grid;grid-template-columns:1fr 150px;gap:12px;margin-top:10px}.cnf-imp-radios label{display:flex;align-items:center;gap:6px;margin-bottom:8px}.cnf-imp-icon{width:40px;height:58px;border:1px solid #555;display:flex;align-items:center;justify-content:center;font:700 28px Tahoma,sans-serif;background:#fff}.cnf-imp-icon.landscape{width:58px;height:40px}.cnf-imp-bottom{display:flex;justify-content:flex-end;align-items:center;padding-top:10px}.cnf-imp-actions{display:flex;gap:8px}.cnf-imp-muted{color:#777}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-impressora-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-imp-modal"><div class="cnf-imp-grid"><div class="cnf-imp-box"><div style="margin-bottom:8px">ConfiguraÃ§Ã£o de impressÃ£o</div><div class="cnf-imp-row"><div class="cnf-imp-label">Destino:</div><select id="cnf-imp-nome" class="cnf-imp-select"><option>Escolher no navegador</option><option>Salvar em PDF</option><option>PrÃ©via no navegador</option></select><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Status:</div><div id="cnf-imp-status" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Tipo:</div><div id="cnf-imp-tipo" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Onde:</div><div id="cnf-imp-onde" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">ComentÃ¡rio:</div><div id="cnf-imp-coment" class="cnf-imp-value cnf-imp-muted"></div><div></div></div></div><div></div></div><div class="cnf-imp-paper"><div class="cnf-imp-box"><div style="margin-bottom:8px">Papel</div><div class="cnf-imp-row"><div class="cnf-imp-label">Tamanho:</div><select id="cnf-imp-papel" class="cnf-imp-select"><option value="A4">A4</option><option value="Letter">Letter</option><option value="A5">A5</option><option value="A3">A3</option></select><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">Origem:</div><select id="cnf-imp-origem" class="cnf-imp-select" disabled><option>Origem padrÃ£o</option></select><div></div></div></div><div class="cnf-imp-box"><div style="margin-bottom:8px">OrientaÃ§Ã£o</div><div style="display:flex;gap:10px;align-items:flex-start"><div id="cnf-imp-icon" class="cnf-imp-icon">A</div><div class="cnf-imp-radios"><label><input id="cnf-imp-retrato" type="radio" name="cnf-imp-orient" checked> Retrato</label><label><input id="cnf-imp-paisagem" type="radio" name="cnf-imp-orient"> Paisagem</label></div></div></div></div><div class="cnf-imp-bottom"><div class="cnf-imp-actions"><button id="cnf-imp-ok" class="materiais-btn" type="button">OK</button><button id="cnf-imp-cancel" class="materiais-btn" type="button">Cancelar</button></div></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgImp={backdrop,modal:backdrop.querySelector(".cnf-imp-modal"),nome:backdrop.querySelector("#cnf-imp-nome"),status:backdrop.querySelector("#cnf-imp-status"),tipo:backdrop.querySelector("#cnf-imp-tipo"),onde:backdrop.querySelector("#cnf-imp-onde"),coment:backdrop.querySelector("#cnf-imp-coment"),prop:null,papel:backdrop.querySelector("#cnf-imp-papel"),origem:backdrop.querySelector("#cnf-imp-origem"),retrato:backdrop.querySelector("#cnf-imp-retrato"),paisagem:backdrop.querySelector("#cnf-imp-paisagem"),icon:backdrop.querySelector("#cnf-imp-icon"),rede:null,ok:backdrop.querySelector("#cnf-imp-ok"),cancel:backdrop.querySelector("#cnf-imp-cancel")};ensureModalChrome(cnfRelatorioDlgImp.modal);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});const sync=()=>{const paisagem=cnfRelatorioDlgImp.paisagem.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",paisagem)};cnfRelatorioDlgImp.retrato.addEventListener("change",sync);cnfRelatorioDlgImp.paisagem.addEventListener("change",sync);cnfRelatorioDlgImp.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgImp.ok.addEventListener("click",()=>{if(!cnfRelatorio)return;const st=cnfRelatorio.state;st.printerName=String(cnfRelatorioDlgImp.nome.value||"").trim()||st.printerName;st.printerStatus=String(cnfRelatorioDlgImp.status.textContent||st.printerStatus||"").trim();st.printerType=String(cnfRelatorioDlgImp.tipo.textContent||st.printerType||st.printerName||"").trim();st.printerWhere=String(cnfRelatorioDlgImp.onde.textContent||st.printerWhere||"").trim();st.printerComment=String(cnfRelatorioDlgImp.coment.textContent||st.printerComment||"").trim();st.paperSize=String(cnfRelatorioDlgImp.papel.value||"A4");st.paperSource=String(cnfRelatorioDlgImp.origem.value||"Origem padrÃ£o");st.printerOrientation=cnfRelatorioDlgImp.paisagem.checked?"paisagem":"retrato";cnfRelatorioImpressoraAplicarPapel(st);cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();backdrop.classList.add("hidden")})}
-function cnfRelatorioAbrirDlgImpressora(){if(!cnfRelatorio)return;cnfRelatorioImpressoraEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();const destinoAtual=cnfRelatorioDestinoAtual(st);cnfRelatorioDlgImp.nome.innerHTML=CNF_RELATORIO_DESTINOS.map(dest=>`<option value="${dest.nome}" ${dest.nome===destinoAtual.nome?"selected":""}>${dest.nome}</option>`).join("");cnfRelatorioDlgImp.nome.value=destinoAtual.nome;cnfRelatorioDlgImp.status.textContent=st.printerStatus||destinoAtual.status;cnfRelatorioDlgImp.tipo.textContent=st.printerType||destinoAtual.tipo;cnfRelatorioDlgImp.onde.textContent=st.printerWhere||destinoAtual.onde;cnfRelatorioDlgImp.coment.textContent=st.printerComment||destinoAtual.comentario;cnfRelatorioDlgImp.papel.value=st.paperSize||"A4";cnfRelatorioDlgImp.origem.value=st.paperSource||"Origem padrÃ£o";cnfRelatorioDlgImp.retrato.checked=String(st.printerOrientation||"retrato")!=="paisagem";cnfRelatorioDlgImp.paisagem.checked=!cnfRelatorioDlgImp.retrato.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",cnfRelatorioDlgImp.paisagem.checked);cnfRelatorioDlgImp.nome.onchange=()=>{const destino=CNF_RELATORIO_DESTINOS.find(item=>item.nome===cnfRelatorioDlgImp.nome.value)||CNF_RELATORIO_DESTINOS[0];cnfRelatorioDlgImp.status.textContent=destino.status;cnfRelatorioDlgImp.tipo.textContent=destino.tipo;cnfRelatorioDlgImp.onde.textContent=destino.onde;cnfRelatorioDlgImp.coment.textContent=destino.comentario};cnfRelatorioDlgImp.backdrop.classList.remove("hidden")}
-function cnfRelatorioRedeEnsureUI(){if(cnfRelatorioDlgRede)return;const style=document.createElement("style");style.textContent=".cnf-rede-modal{width:min(620px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:14px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-rede-top{margin-bottom:12px;font-size:13px;line-height:1.4}.cnf-rede-list{display:grid;gap:10px}.cnf-rede-item{border:1px solid #c7ced8;background:#fff;padding:12px;cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start}.cnf-rede-item.active{border-color:#2f79d8;background:#eef5ff}.cnf-rede-item strong{display:block;margin-bottom:4px}.cnf-rede-item small{color:#566579;line-height:1.35}.cnf-rede-bottom{display:flex;justify-content:flex-end;gap:8px;padding-top:14px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-rede-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-rede-modal"><div class="cnf-rede-top">No SaaS, a escolha da impressora fÃ­sica Ã© feita no diÃ¡logo final do navegador. Aqui vocÃª define apenas o destino preferencial de saÃ­da.</div><div id="cnf-rede-list" class="cnf-rede-list"><div class="cnf-rede-item active" data-destino="browser"><input type="radio" checked><div><strong>Escolher ao imprimir</strong><small>Usa o diÃ¡logo nativo do navegador para escolher a impressora instalada na hora da impressÃ£o.</small></div></div><div class="cnf-rede-item" data-destino="pdf"><input type="radio"><div><strong>Salvar em PDF</strong><small>Prioriza a geraÃ§Ã£o em PDF para download ou arquivamento antes da impressÃ£o.</small></div></div><div class="cnf-rede-item" data-destino="preview"><input type="radio"><div><strong>PrÃ©via no navegador</strong><small>Abre a prÃ©via e deixa a decisÃ£o final de impressÃ£o para o usuÃ¡rio no navegador.</small></div></div></div><div class="cnf-rede-bottom"><button id="cnf-rede-select" class="materiais-btn" type="button">Selecionar</button><button id="cnf-rede-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgRede={backdrop,modal:backdrop.querySelector(".cnf-rede-modal"),list:backdrop.querySelector("#cnf-rede-list"),select:backdrop.querySelector("#cnf-rede-select"),cancel:backdrop.querySelector("#cnf-rede-cancel"),destino:"browser"};ensureModalChrome(cnfRelatorioDlgRede.modal);const marcar=dest=>{cnfRelatorioDlgRede.destino=dest;cnfRelatorioDlgRede.list.querySelectorAll(".cnf-rede-item").forEach(item=>{const active=item.dataset.destino===dest;item.classList.toggle("active",active);const radio=item.querySelector("input[type='radio']");if(radio)radio.checked=active})};cnfRelatorioDlgRede.list.addEventListener("click",ev=>{const item=ev.target.closest(".cnf-rede-item");if(!item)return;marcar(item.dataset.destino||"browser")});backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgRede.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgRede.select.addEventListener("click",()=>{if(!cnfRelatorio)return;const dest=cnfRelatorioDlgRede.destino||"browser";if(dest==="pdf"){cnfRelatorio.state.printerName="Salvar em PDF";cnfRelatorio.state.printerType="PDF do navegador";cnfRelatorio.state.printerWhere="Download local";cnfRelatorio.state.printerStatus="DisponÃ­vel ao imprimir";cnfRelatorio.state.printerComment="O navegador permitirÃ¡ salvar em PDF na etapa final."}else if(dest==="preview"){cnfRelatorio.state.printerName="PrÃ©via no navegador";cnfRelatorio.state.printerType="PrÃ©via do navegador";cnfRelatorio.state.printerWhere="Tela";cnfRelatorio.state.printerStatus="DisponÃ­vel";cnfRelatorio.state.printerComment="A impressÃ£o fÃ­sica serÃ¡ escolhida depois, no navegador."}else{cnfRelatorio.state.printerName="Escolher no navegador";cnfRelatorio.state.printerType="Destino do navegador";cnfRelatorio.state.printerWhere="Definido pelo sistema";cnfRelatorio.state.printerStatus="DisponÃ­vel ao imprimir";cnfRelatorio.state.printerComment="A impressora fÃ­sica Ã© escolhida no diÃ¡logo final do navegador."}cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();if(cnfRelatorioDlgImp){cnfRelatorioDlgImp.nome.value=cnfRelatorio.state.printerName;cnfRelatorioDlgImp.status.textContent=cnfRelatorio.state.printerStatus;cnfRelatorioDlgImp.tipo.textContent=cnfRelatorio.state.printerType;cnfRelatorioDlgImp.onde.textContent=cnfRelatorio.state.printerWhere;cnfRelatorioDlgImp.coment.textContent=cnfRelatorio.state.printerComment}backdrop.classList.add("hidden")})}
+function cnfRelatorioDestinoAtual(st){const nome=String(st?.printerName||"").toLowerCase();if(nome.includes("pdf"))return cnfRelatorioDestinoPorId("pdf");if(nome.includes("prÃƒÂ©via")||nome.includes("previa"))return cnfRelatorioDestinoPorId("preview");return cnfRelatorioDestinoPorId("browser")}
+function cnfRelatorioImpressoraEnsureUI(){if(cnfRelatorioDlgImp)return;const style=document.createElement("style");style.textContent=".cnf-imp-modal{width:min(520px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-imp-grid{display:grid;grid-template-columns:1fr 150px;gap:12px}.cnf-imp-box{border:1px solid #c7ced8;background:#fff;padding:10px}.cnf-imp-row{display:grid;grid-template-columns:64px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}.cnf-imp-label{white-space:nowrap}.cnf-imp-value{min-height:16px}.cnf-imp-input,.cnf-imp-select{height:26px;border:1px solid #b9c4d3;padding:0 8px;background:#fff;font:12px Tahoma,sans-serif;width:100%;box-sizing:border-box}.cnf-imp-paper{display:grid;grid-template-columns:1fr 150px;gap:12px;margin-top:10px}.cnf-imp-radios label{display:flex;align-items:center;gap:6px;margin-bottom:8px}.cnf-imp-icon{width:40px;height:58px;border:1px solid #555;display:flex;align-items:center;justify-content:center;font:700 28px Tahoma,sans-serif;background:#fff}.cnf-imp-icon.landscape{width:58px;height:40px}.cnf-imp-bottom{display:flex;justify-content:flex-end;align-items:center;padding-top:10px}.cnf-imp-actions{display:flex;gap:8px}.cnf-imp-muted{color:#777}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-impressora-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-imp-modal"><div class="cnf-imp-grid"><div class="cnf-imp-box"><div style="margin-bottom:8px">ConfiguraÃƒÂ§ÃƒÂ£o de impressÃƒÂ£o</div><div class="cnf-imp-row"><div class="cnf-imp-label">Destino:</div><select id="cnf-imp-nome" class="cnf-imp-select"><option>Escolher no navegador</option><option>Salvar em PDF</option><option>PrÃƒÂ©via no navegador</option></select><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Status:</div><div id="cnf-imp-status" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Tipo:</div><div id="cnf-imp-tipo" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Onde:</div><div id="cnf-imp-onde" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">ComentÃƒÂ¡rio:</div><div id="cnf-imp-coment" class="cnf-imp-value cnf-imp-muted"></div><div></div></div></div><div></div></div><div class="cnf-imp-paper"><div class="cnf-imp-box"><div style="margin-bottom:8px">Papel</div><div class="cnf-imp-row"><div class="cnf-imp-label">Tamanho:</div><select id="cnf-imp-papel" class="cnf-imp-select"><option value="A4">A4</option><option value="Letter">Letter</option><option value="A5">A5</option><option value="A3">A3</option></select><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">Origem:</div><select id="cnf-imp-origem" class="cnf-imp-select" disabled><option>Origem padrÃƒÂ£o</option></select><div></div></div></div><div class="cnf-imp-box"><div style="margin-bottom:8px">OrientaÃƒÂ§ÃƒÂ£o</div><div style="display:flex;gap:10px;align-items:flex-start"><div id="cnf-imp-icon" class="cnf-imp-icon">A</div><div class="cnf-imp-radios"><label><input id="cnf-imp-retrato" type="radio" name="cnf-imp-orient" checked> Retrato</label><label><input id="cnf-imp-paisagem" type="radio" name="cnf-imp-orient"> Paisagem</label></div></div></div></div><div class="cnf-imp-bottom"><div class="cnf-imp-actions"><button id="cnf-imp-ok" class="materiais-btn" type="button">OK</button><button id="cnf-imp-cancel" class="materiais-btn" type="button">Cancelar</button></div></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgImp={backdrop,modal:backdrop.querySelector(".cnf-imp-modal"),nome:backdrop.querySelector("#cnf-imp-nome"),status:backdrop.querySelector("#cnf-imp-status"),tipo:backdrop.querySelector("#cnf-imp-tipo"),onde:backdrop.querySelector("#cnf-imp-onde"),coment:backdrop.querySelector("#cnf-imp-coment"),prop:null,papel:backdrop.querySelector("#cnf-imp-papel"),origem:backdrop.querySelector("#cnf-imp-origem"),retrato:backdrop.querySelector("#cnf-imp-retrato"),paisagem:backdrop.querySelector("#cnf-imp-paisagem"),icon:backdrop.querySelector("#cnf-imp-icon"),rede:null,ok:backdrop.querySelector("#cnf-imp-ok"),cancel:backdrop.querySelector("#cnf-imp-cancel")};ensureModalChrome(cnfRelatorioDlgImp.modal);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});const sync=()=>{const paisagem=cnfRelatorioDlgImp.paisagem.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",paisagem)};cnfRelatorioDlgImp.retrato.addEventListener("change",sync);cnfRelatorioDlgImp.paisagem.addEventListener("change",sync);cnfRelatorioDlgImp.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgImp.ok.addEventListener("click",()=>{if(!cnfRelatorio)return;const st=cnfRelatorio.state;st.printerName=String(cnfRelatorioDlgImp.nome.value||"").trim()||st.printerName;st.printerStatus=String(cnfRelatorioDlgImp.status.textContent||st.printerStatus||"").trim();st.printerType=String(cnfRelatorioDlgImp.tipo.textContent||st.printerType||st.printerName||"").trim();st.printerWhere=String(cnfRelatorioDlgImp.onde.textContent||st.printerWhere||"").trim();st.printerComment=String(cnfRelatorioDlgImp.coment.textContent||st.printerComment||"").trim();st.paperSize=String(cnfRelatorioDlgImp.papel.value||"A4");st.paperSource=String(cnfRelatorioDlgImp.origem.value||"Origem padrÃƒÂ£o");st.printerOrientation=cnfRelatorioDlgImp.paisagem.checked?"paisagem":"retrato";cnfRelatorioImpressoraAplicarPapel(st);cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();backdrop.classList.add("hidden")})}
+function cnfRelatorioAbrirDlgImpressora(){if(!cnfRelatorio)return;cnfRelatorioImpressoraEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();const destinoAtual=cnfRelatorioDestinoAtual(st);cnfRelatorioDlgImp.nome.innerHTML=CNF_RELATORIO_DESTINOS.map(dest=>`<option value="${dest.nome}" ${dest.nome===destinoAtual.nome?"selected":""}>${dest.nome}</option>`).join("");cnfRelatorioDlgImp.nome.value=destinoAtual.nome;cnfRelatorioDlgImp.status.textContent=st.printerStatus||destinoAtual.status;cnfRelatorioDlgImp.tipo.textContent=st.printerType||destinoAtual.tipo;cnfRelatorioDlgImp.onde.textContent=st.printerWhere||destinoAtual.onde;cnfRelatorioDlgImp.coment.textContent=st.printerComment||destinoAtual.comentario;cnfRelatorioDlgImp.papel.value=st.paperSize||"A4";cnfRelatorioDlgImp.origem.value=st.paperSource||"Origem padrÃƒÂ£o";cnfRelatorioDlgImp.retrato.checked=String(st.printerOrientation||"retrato")!=="paisagem";cnfRelatorioDlgImp.paisagem.checked=!cnfRelatorioDlgImp.retrato.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",cnfRelatorioDlgImp.paisagem.checked);cnfRelatorioDlgImp.nome.onchange=()=>{const destino=CNF_RELATORIO_DESTINOS.find(item=>item.nome===cnfRelatorioDlgImp.nome.value)||CNF_RELATORIO_DESTINOS[0];cnfRelatorioDlgImp.status.textContent=destino.status;cnfRelatorioDlgImp.tipo.textContent=destino.tipo;cnfRelatorioDlgImp.onde.textContent=destino.onde;cnfRelatorioDlgImp.coment.textContent=destino.comentario};cnfRelatorioDlgImp.backdrop.classList.remove("hidden")}
+function cnfRelatorioRedeEnsureUI(){if(cnfRelatorioDlgRede)return;const style=document.createElement("style");style.textContent=".cnf-rede-modal{width:min(620px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:14px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-rede-top{margin-bottom:12px;font-size:13px;line-height:1.4}.cnf-rede-list{display:grid;gap:10px}.cnf-rede-item{border:1px solid #c7ced8;background:#fff;padding:12px;cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start}.cnf-rede-item.active{border-color:#2f79d8;background:#eef5ff}.cnf-rede-item strong{display:block;margin-bottom:4px}.cnf-rede-item small{color:#566579;line-height:1.35}.cnf-rede-bottom{display:flex;justify-content:flex-end;gap:8px;padding-top:14px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-rede-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-rede-modal"><div class="cnf-rede-top">No SaaS, a escolha da impressora fÃƒÂ­sica ÃƒÂ© feita no diÃƒÂ¡logo final do navegador. Aqui vocÃƒÂª define apenas o destino preferencial de saÃƒÂ­da.</div><div id="cnf-rede-list" class="cnf-rede-list"><div class="cnf-rede-item active" data-destino="browser"><input type="radio" checked><div><strong>Escolher ao imprimir</strong><small>Usa o diÃƒÂ¡logo nativo do navegador para escolher a impressora instalada na hora da impressÃƒÂ£o.</small></div></div><div class="cnf-rede-item" data-destino="pdf"><input type="radio"><div><strong>Salvar em PDF</strong><small>Prioriza a geraÃƒÂ§ÃƒÂ£o em PDF para download ou arquivamento antes da impressÃƒÂ£o.</small></div></div><div class="cnf-rede-item" data-destino="preview"><input type="radio"><div><strong>PrÃƒÂ©via no navegador</strong><small>Abre a prÃƒÂ©via e deixa a decisÃƒÂ£o final de impressÃƒÂ£o para o usuÃƒÂ¡rio no navegador.</small></div></div></div><div class="cnf-rede-bottom"><button id="cnf-rede-select" class="materiais-btn" type="button">Selecionar</button><button id="cnf-rede-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgRede={backdrop,modal:backdrop.querySelector(".cnf-rede-modal"),list:backdrop.querySelector("#cnf-rede-list"),select:backdrop.querySelector("#cnf-rede-select"),cancel:backdrop.querySelector("#cnf-rede-cancel"),destino:"browser"};ensureModalChrome(cnfRelatorioDlgRede.modal);const marcar=dest=>{cnfRelatorioDlgRede.destino=dest;cnfRelatorioDlgRede.list.querySelectorAll(".cnf-rede-item").forEach(item=>{const active=item.dataset.destino===dest;item.classList.toggle("active",active);const radio=item.querySelector("input[type='radio']");if(radio)radio.checked=active})};cnfRelatorioDlgRede.list.addEventListener("click",ev=>{const item=ev.target.closest(".cnf-rede-item");if(!item)return;marcar(item.dataset.destino||"browser")});backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgRede.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgRede.select.addEventListener("click",()=>{if(!cnfRelatorio)return;const dest=cnfRelatorioDlgRede.destino||"browser";if(dest==="pdf"){cnfRelatorio.state.printerName="Salvar em PDF";cnfRelatorio.state.printerType="PDF do navegador";cnfRelatorio.state.printerWhere="Download local";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel ao imprimir";cnfRelatorio.state.printerComment="O navegador permitirÃƒÂ¡ salvar em PDF na etapa final."}else if(dest==="preview"){cnfRelatorio.state.printerName="PrÃƒÂ©via no navegador";cnfRelatorio.state.printerType="PrÃƒÂ©via do navegador";cnfRelatorio.state.printerWhere="Tela";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel";cnfRelatorio.state.printerComment="A impressÃƒÂ£o fÃƒÂ­sica serÃƒÂ¡ escolhida depois, no navegador."}else{cnfRelatorio.state.printerName="Escolher no navegador";cnfRelatorio.state.printerType="Destino do navegador";cnfRelatorio.state.printerWhere="Definido pelo sistema";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel ao imprimir";cnfRelatorio.state.printerComment="A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador."}cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();if(cnfRelatorioDlgImp){cnfRelatorioDlgImp.nome.value=cnfRelatorio.state.printerName;cnfRelatorioDlgImp.status.textContent=cnfRelatorio.state.printerStatus;cnfRelatorioDlgImp.tipo.textContent=cnfRelatorio.state.printerType;cnfRelatorioDlgImp.onde.textContent=cnfRelatorio.state.printerWhere;cnfRelatorioDlgImp.coment.textContent=cnfRelatorio.state.printerComment}backdrop.classList.add("hidden")})}
 function cnfRelatorioAbrirDlgRede(){if(!cnfRelatorio)return;cnfRelatorioRedeEnsureUI();const dest=cnfRelatorioDestinoAtual(cnfRelatorio.state).id;cnfRelatorioDlgRede.destino=dest;cnfRelatorioDlgRede.list.querySelectorAll(".cnf-rede-item").forEach(item=>{const active=item.dataset.destino===dest;item.classList.toggle("active",active);const radio=item.querySelector("input[type='radio']");if(radio)radio.checked=active});cnfRelatorioDlgRede.backdrop.classList.remove("hidden")}
-function cnfRelatorioTesteEnsureUI(){if(cnfRelatorioDlgTeste)return;const style=document.createElement("style");style.textContent=".cnf-test-modal{width:min(380px,94vw);background:#f6f6f4;border:1px solid #c6ced8;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-test-box{border:1px solid #c7ced8;background:#fff;padding:8px;margin-bottom:8px}.cnf-test-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}.cnf-test-row:last-child{margin-bottom:0}.cnf-test-num{width:48px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-small{width:42px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-actions{display:flex;justify-content:flex-end;gap:8px}.cnf-test-col{display:flex;flex-direction:column;gap:4px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-teste-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-test-modal"><div class="cnf-test-box"><div style="margin-bottom:6px">Impressora selecionada:</div><div id="cnf-test-printer" style="min-height:18px"></div></div><div class="cnf-test-box"><div class="cnf-test-row"><span>NÃºmero de cÃ³pias:</span><input id="cnf-test-copias" class="cnf-test-num" type="number" min="1" step="1" value="1"></div><div style="border-top:1px solid #d4d4d4;margin:8px 0"></div><div class="cnf-test-col"><div>Intervalo de pÃ¡ginas</div><label><input id="cnf-test-todas" type="radio" name="cnf-test-intervalo" checked> Todas</label><div class="cnf-test-row"><label><input id="cnf-test-paginas" type="radio" name="cnf-test-intervalo"> PÃ¡ginas:</label><input id="cnf-test-de" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled><span>a</span><input id="cnf-test-ate" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled></div></div></div><div class="cnf-test-actions"><button id="cnf-test-config" class="materiais-btn" type="button">Configura</button><button id="cnf-test-ok" class="materiais-btn" type="button">Ok</button><button id="cnf-test-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgTeste={backdrop,modal:backdrop.querySelector(".cnf-test-modal"),printer:backdrop.querySelector("#cnf-test-printer"),copias:backdrop.querySelector("#cnf-test-copias"),todas:backdrop.querySelector("#cnf-test-todas"),paginas:backdrop.querySelector("#cnf-test-paginas"),de:backdrop.querySelector("#cnf-test-de"),ate:backdrop.querySelector("#cnf-test-ate"),config:backdrop.querySelector("#cnf-test-config"),ok:backdrop.querySelector("#cnf-test-ok"),cancel:backdrop.querySelector("#cnf-test-cancel")};ensureModalChrome(cnfRelatorioDlgTeste.modal);const sync=()=>{const on=cnfRelatorioDlgTeste.paginas.checked;cnfRelatorioDlgTeste.de.disabled=!on;cnfRelatorioDlgTeste.ate.disabled=!on};cnfRelatorioDlgTeste.todas.addEventListener("change",sync);cnfRelatorioDlgTeste.paginas.addEventListener("change",sync);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgTeste.config.addEventListener("click",()=>{backdrop.classList.add("hidden");cnfRelatorioAbrirDlgImpressora()});cnfRelatorioDlgTeste.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgTeste.ok.addEventListener("click",()=>{backdrop.classList.add("hidden");window.print()});sync()}
+function cnfRelatorioTesteEnsureUI(){if(cnfRelatorioDlgTeste)return;const style=document.createElement("style");style.textContent=".cnf-test-modal{width:min(380px,94vw);background:#f6f6f4;border:1px solid #c6ced8;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-test-box{border:1px solid #c7ced8;background:#fff;padding:8px;margin-bottom:8px}.cnf-test-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}.cnf-test-row:last-child{margin-bottom:0}.cnf-test-num{width:48px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-small{width:42px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-actions{display:flex;justify-content:flex-end;gap:8px}.cnf-test-col{display:flex;flex-direction:column;gap:4px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-teste-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-test-modal"><div class="cnf-test-box"><div style="margin-bottom:6px">Impressora selecionada:</div><div id="cnf-test-printer" style="min-height:18px"></div></div><div class="cnf-test-box"><div class="cnf-test-row"><span>NÃƒÂºmero de cÃƒÂ³pias:</span><input id="cnf-test-copias" class="cnf-test-num" type="number" min="1" step="1" value="1"></div><div style="border-top:1px solid #d4d4d4;margin:8px 0"></div><div class="cnf-test-col"><div>Intervalo de pÃƒÂ¡ginas</div><label><input id="cnf-test-todas" type="radio" name="cnf-test-intervalo" checked> Todas</label><div class="cnf-test-row"><label><input id="cnf-test-paginas" type="radio" name="cnf-test-intervalo"> PÃƒÂ¡ginas:</label><input id="cnf-test-de" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled><span>a</span><input id="cnf-test-ate" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled></div></div></div><div class="cnf-test-actions"><button id="cnf-test-config" class="materiais-btn" type="button">Configura</button><button id="cnf-test-ok" class="materiais-btn" type="button">Ok</button><button id="cnf-test-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgTeste={backdrop,modal:backdrop.querySelector(".cnf-test-modal"),printer:backdrop.querySelector("#cnf-test-printer"),copias:backdrop.querySelector("#cnf-test-copias"),todas:backdrop.querySelector("#cnf-test-todas"),paginas:backdrop.querySelector("#cnf-test-paginas"),de:backdrop.querySelector("#cnf-test-de"),ate:backdrop.querySelector("#cnf-test-ate"),config:backdrop.querySelector("#cnf-test-config"),ok:backdrop.querySelector("#cnf-test-ok"),cancel:backdrop.querySelector("#cnf-test-cancel")};ensureModalChrome(cnfRelatorioDlgTeste.modal);const sync=()=>{const on=cnfRelatorioDlgTeste.paginas.checked;cnfRelatorioDlgTeste.de.disabled=!on;cnfRelatorioDlgTeste.ate.disabled=!on};cnfRelatorioDlgTeste.todas.addEventListener("change",sync);cnfRelatorioDlgTeste.paginas.addEventListener("change",sync);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgTeste.config.addEventListener("click",()=>{backdrop.classList.add("hidden");cnfRelatorioAbrirDlgImpressora()});cnfRelatorioDlgTeste.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgTeste.ok.addEventListener("click",()=>{backdrop.classList.add("hidden");window.print()});sync()}
 function cnfRelatorioAbrirDlgTeste(){if(!cnfRelatorio)return;cnfRelatorioTesteEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();cnfRelatorioDlgTeste.printer.textContent=st.printerName||"Microsoft Print to PDF";cnfRelatorioDlgTeste.copias.value="1";cnfRelatorioDlgTeste.todas.checked=true;cnfRelatorioDlgTeste.paginas.checked=false;cnfRelatorioDlgTeste.de.value="1";cnfRelatorioDlgTeste.ate.value="1";cnfRelatorioDlgTeste.de.disabled=true;cnfRelatorioDlgTeste.ate.disabled=true;cnfRelatorioDlgTeste.backdrop.classList.remove("hidden")}
 function cnfRelatorioAbrir(opts={}){
   cnfRelatorioEnsureUI();
@@ -1307,7 +1387,7 @@ function cnfRelatorioAbrir(opts={}){
     const novoBotaoOk=cnfRelatorio.btnOk.cloneNode(true);
     cnfRelatorio.btnOk.replaceWith(novoBotaoOk);
     cnfRelatorio.btnOk=novoBotaoOk;
-    cnfRelatorio.btnOk.addEventListener("click",async()=>{cnfRelatorioSalvarPapel();const resultado=await cnfRelatorioSalvarServidor();if(!resultado.ok){window.alert(resultado.message||"Falha ao salvar a configuraÃ§Ã£o de impressos.");return}cnfRelatorio.state=resultado.config||cnfRelatorio.state;cnfRelatorioSalvarEstado();cnfRelatorio.backdrop.classList.add("hidden");const ctx=cnfRelatorioContextoAtual();footerMsg.textContent=`ConfiguraÃ§Ã£o de relatÃ³rios atualizada para ${ctx.userApelido||ctx.userNome||"o usuÃ¡rio"}.`});
+    cnfRelatorio.btnOk.addEventListener("click",async()=>{cnfRelatorioSalvarPapel();const resultado=await cnfRelatorioSalvarServidor();if(!resultado.ok){window.alert(resultado.message||"Falha ao salvar a configuraÃƒÂ§ÃƒÂ£o de impressos.");return}cnfRelatorio.state=resultado.config||cnfRelatorio.state;cnfRelatorioSalvarEstado();cnfRelatorio.backdrop.classList.add("hidden");const ctx=cnfRelatorioContextoAtual();footerMsg.textContent=`ConfiguraÃƒÂ§ÃƒÂ£o de relatÃƒÂ³rios atualizada para ${ctx.userApelido||ctx.userNome||"o usuÃƒÂ¡rio"}.`});
   }
   cnfRelatorio.state=cnfRelatorioCarregarLocal();
   cnfRelatorioSelecionarAba("relatorios");
@@ -1360,7 +1440,7 @@ function etqRender(){
     const id=Number(item.id||0)||0;
     const nome=esc(item.nome||"");
     const arquivo=esc(item.nome_arquivo||"");
-    const padrao=esc(item.padrao_nome||"Definido pelo usuÃ¡rio");
+    const padrao=esc(item.padrao_nome||"Definido pelo usuÃƒÂ¡rio");
     const active=id===sel;
     return `<tr data-id="${id}" class="${active?"selected":""}"><td>${nome}</td><td>${arquivo}</td><td>${padrao}</td></tr>`;
   }).join("");
@@ -1476,9 +1556,9 @@ function etqTesteImprimir(){
   const item=etqSelecionado();
   if(!item){window.alert("Selecione um modelo.");return}
   const layout=etqLayoutFromItem(item);
-  if(!layout){window.alert("Layout de etiqueta invÃ¡lido.");return}
+  if(!layout){window.alert("Layout de etiqueta invÃƒÂ¡lido.");return}
   const win=window.open("","_blank","width=900,height=700");
-  if(!win){window.alert("NÃ£o foi possÃ­vel abrir a janela de impressÃ£o.");return}
+  if(!win){window.alert("NÃƒÂ£o foi possÃƒÂ­vel abrir a janela de impressÃƒÂ£o.");return}
   const labelsHtml=layout.labels.map(l=>`<div class="label" style="left:${l.x}mm;top:${l.y}mm;width:${l.w}mm;height:${l.h}mm;"></div>`).join("");
   win.document.write(`<!doctype html><html><head><title>Teste de etiquetas</title><style>
   @page { size: A4; margin: 0; }
@@ -1503,7 +1583,7 @@ function etqRenderCombos(){
   const padroes=Array.isArray(etqCfg.padroes)?etqCfg.padroes:[];
   etqCfg.editPadrao.innerHTML=[
     ...padroes.map(p=>`<option value="${p.id}">${esc(p.nome||"")}</option>`),
-    `<option value="user">Definido pelo usuÃ¡rio</option>`,
+    `<option value="user">Definido pelo usuÃƒÂ¡rio</option>`,
   ].join("");
   const arquivos=etqArquivosOrdenados();
   etqCfg.editArquivo.innerHTML=arquivos.map(a=>`<option value="${a.id}" data-arquivo="${esc(a.nome_arquivo||"")}">${esc(a.nome_arquivo||a.nome||"")}</option>`).join("");
@@ -1603,7 +1683,7 @@ async function etqExcluirSelecionado(){
 }
 async function etqCarregarDados(){
   const {res:resP,data:dataP}=await requestJson("GET","/config/etiquetas/padroes",undefined,true);
-  if(!resP.ok)throw new Error(dataP.detail||"Falha ao carregar padrÃµes.");
+  if(!resP.ok)throw new Error(dataP.detail||"Falha ao carregar padrÃƒÂµes.");
   const {res:resA,data:dataA}=await requestJson("GET","/config/etiquetas/arquivos",undefined,true);
   if(!resA.ok)throw new Error(dataA.detail||"Falha ao carregar arquivos.");
   const {res:resM,data:dataM}=await requestJson("GET","/config/etiquetas/modelos",undefined,true);
@@ -1620,12 +1700,12 @@ function etqEnsureUI(){
   const backdrop=document.createElement("div");
   backdrop.id="config-etiquetas-backdrop";
   backdrop.className="modal-backdrop hidden";
-  backdrop.innerHTML=`<div class="etq-modal"><div class="etq-toolbar"><button id="etq-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo modelo...</button><button id="etq-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="etq-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="etq-btn-teste" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Teste</button><button id="etq-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="etq-grid"><table><colgroup><col><col style="width:180px"><col style="width:180px"></colgroup><thead><tr><th>Nome do modelo</th><th>Arquivo de modelo</th><th>PadrÃ£o</th></tr></thead><tbody id="etq-tbody"></tbody></table></div><div class="etq-footer"><div id="etq-total">0 etiquetas</div><div>Cria / altera modelos de etiquetas</div></div></div>`;
+  backdrop.innerHTML=`<div class="etq-modal"><div class="etq-toolbar"><button id="etq-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo modelo...</button><button id="etq-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="etq-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="etq-btn-teste" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Teste</button><button id="etq-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="etq-grid"><table><colgroup><col><col style="width:180px"><col style="width:180px"></colgroup><thead><tr><th>Nome do modelo</th><th>Arquivo de modelo</th><th>PadrÃƒÂ£o</th></tr></thead><tbody id="etq-tbody"></tbody></table></div><div class="etq-footer"><div id="etq-total">0 etiquetas</div><div>Cria / altera modelos de etiquetas</div></div></div>`;
   document.body.appendChild(backdrop);
   const editBackdrop=document.createElement("div");
   editBackdrop.id="config-etiquetas-edit-backdrop";
   editBackdrop.className="modal-backdrop hidden";
-  editBackdrop.innerHTML=`<div class="etq-edit-modal"><div class="etq-edit-grid"><div class="etq-edit-fields"><div class="etq-edit-row dual"><div><label>Nome:</label><input id="etq-edit-nome" type="text"></div><div><label>Arquivo de modelo:</label><select id="etq-edit-arquivo"></select></div></div><div class="etq-edit-row full"><label>PadrÃ£o de etiqueta:</label><select id="etq-edit-padrao"></select></div><div class="etq-edit-row line"><label><span>Margem esquerda</span><span class="dot"></span></label><input id="etq-edit-m-esq" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>Margem superior</span><span class="dot"></span></label><input id="etq-edit-m-sup" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>EspaÃ§o horizontal</span><span class="dot"></span></label><input id="etq-edit-esp-h" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>EspaÃ§o vertical</span><span class="dot"></span></label><input id="etq-edit-esp-v" type="text"><span class="unit">mm</span></div><div class="etq-edit-row dual"><div><label>Etiquetas por linha:</label><input id="etq-edit-col" type="number" min="1" step="1"></div><div><label>Linhas por pÃ¡gina:</label><input id="etq-edit-lin" type="number" min="1" step="1"></div></div></div><div class="etq-edit-preview"><div class="etq-preview-frame"><div id="etq-preview-grid" class="etq-preview-grid"></div></div></div></div><div class="etq-edit-actions"><button id="etq-edit-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="etq-edit-cancel" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div>`;
+  editBackdrop.innerHTML=`<div class="etq-edit-modal"><div class="etq-edit-grid"><div class="etq-edit-fields"><div class="etq-edit-row dual"><div><label>Nome:</label><input id="etq-edit-nome" type="text"></div><div><label>Arquivo de modelo:</label><select id="etq-edit-arquivo"></select></div></div><div class="etq-edit-row full"><label>PadrÃƒÂ£o de etiqueta:</label><select id="etq-edit-padrao"></select></div><div class="etq-edit-row line"><label><span>Margem esquerda</span><span class="dot"></span></label><input id="etq-edit-m-esq" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>Margem superior</span><span class="dot"></span></label><input id="etq-edit-m-sup" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>EspaÃƒÂ§o horizontal</span><span class="dot"></span></label><input id="etq-edit-esp-h" type="text"><span class="unit">mm</span></div><div class="etq-edit-row line"><label><span>EspaÃƒÂ§o vertical</span><span class="dot"></span></label><input id="etq-edit-esp-v" type="text"><span class="unit">mm</span></div><div class="etq-edit-row dual"><div><label>Etiquetas por linha:</label><input id="etq-edit-col" type="number" min="1" step="1"></div><div><label>Linhas por pÃƒÂ¡gina:</label><input id="etq-edit-lin" type="number" min="1" step="1"></div></div></div><div class="etq-edit-preview"><div class="etq-preview-frame"><div id="etq-preview-grid" class="etq-preview-grid"></div></div></div></div><div class="etq-edit-actions"><button id="etq-edit-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="etq-edit-cancel" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div>`;
   document.body.appendChild(editBackdrop);
   etqCfg={backdrop,modal:backdrop.querySelector(".etq-modal"),tbody:backdrop.querySelector("#etq-tbody"),total:backdrop.querySelector("#etq-total"),btnNovo:backdrop.querySelector("#etq-btn-novo"),btnEditar:backdrop.querySelector("#etq-btn-editar"),btnExcluir:backdrop.querySelector("#etq-btn-excluir"),btnTeste:backdrop.querySelector("#etq-btn-teste"),btnFechar:backdrop.querySelector("#etq-btn-fechar"),editBackdrop,editModal:editBackdrop.querySelector(".etq-edit-modal"),editTitle:null,editNome:editBackdrop.querySelector("#etq-edit-nome"),editArquivo:editBackdrop.querySelector("#etq-edit-arquivo"),editPadrao:editBackdrop.querySelector("#etq-edit-padrao"),editMargemEsq:editBackdrop.querySelector("#etq-edit-m-esq"),editMargemSup:editBackdrop.querySelector("#etq-edit-m-sup"),editEspH:editBackdrop.querySelector("#etq-edit-esp-h"),editEspV:editBackdrop.querySelector("#etq-edit-esp-v"),editColunas:editBackdrop.querySelector("#etq-edit-col"),editLinhas:editBackdrop.querySelector("#etq-edit-lin"),editPreview:editBackdrop.querySelector("#etq-preview-grid"),editOk:editBackdrop.querySelector("#etq-edit-ok"),editCancel:editBackdrop.querySelector("#etq-edit-cancel"),padroes:[],arquivos:[],modelos:[],selectedId:null,editMode:"novo",editId:null};
   ensureModalChrome(etqCfg.modal);
@@ -1801,9 +1881,9 @@ function prefRebuildAmbientePreview(){
           <div id="pref-amb-campo-label" class="pref-amb-campo-label">Campo</div>
           <input id="pref-amb-campo-input" class="pref-amb-field-input" type="text" value="Campo" readonly>
         </div>
-        <button id="pref-amb-botao-funcao" class="pref-amb-btn" type="button">BotÃ£o de funÃ§Ã£o</button>
+        <button id="pref-amb-botao-funcao" class="pref-amb-btn" type="button">BotÃƒÂ£o de funÃƒÂ§ÃƒÂ£o</button>
         <div class="pref-amb-choice">
-          <label><input type="radio" name="pref-amb-radio"><span>BotÃ£o "Radio"</span></label>
+          <label><input type="radio" name="pref-amb-radio"><span>BotÃƒÂ£o "Radio"</span></label>
           <label><input type="checkbox"><span>Caixa de checagem</span></label>
         </div>
       </div>
@@ -1926,7 +2006,7 @@ function prefOdontoEnsureDropdown(select){
   if(!(dropdown instanceof HTMLElement)){
     dropdown=document.createElement("div");
     dropdown.className="pref-odonto-color-dropdown";
-    dropdown.innerHTML='<button type="button" class="pref-odonto-color-btn"><span class="pref-odonto-color-swatch"></span><span class="pref-odonto-color-label"></span><span>â–¼</span></button><div class="pref-odonto-color-list pref-odonto-color-hidden"></div>';
+    dropdown.innerHTML='<button type="button" class="pref-odonto-color-btn"><span class="pref-odonto-color-swatch"></span><span class="pref-odonto-color-label"></span><span>Ã¢â€“Â¼</span></button><div class="pref-odonto-color-list pref-odonto-color-hidden"></div>';
     wrap.appendChild(dropdown);
     const btn=dropdown.querySelector(".pref-odonto-color-btn");
     const list=dropdown.querySelector(".pref-odonto-color-list");
@@ -2075,40 +2155,40 @@ function prefEnsureUI(){
         <button type="button" class="pref-tab active" data-tab="geral">Geral</button>
         <button type="button" class="pref-tab" data-tab="modelos">Modelos</button>
         <button type="button" class="pref-tab" data-tab="ambiente">Ambiente</button>
-        <button type="button" class="pref-tab" data-tab="dados">Dados do usuÃ¡rio</button>
+        <button type="button" class="pref-tab" data-tab="dados">Dados do usuÃƒÂ¡rio</button>
         <button type="button" class="pref-tab" data-tab="odontograma">Odontograma</button>
       </div>
 
       <div class="pref-pane" data-pane="geral">
         <div class="pref-grid-top">
           <div class="pref-field">
-            <label for="pref-geral-pesquisa">Pesquisa padrÃ£o no odontograma:</label>
+            <label for="pref-geral-pesquisa">Pesquisa padrÃƒÂ£o no odontograma:</label>
             <select id="pref-geral-pesquisa" class="pref-select"></select>
           </div>
           <div class="pref-field">
-            <label for="pref-geral-tabela">Tabela de intervenÃ§Ãµes padrÃ£o para novos cadastros:</label>
+            <label for="pref-geral-tabela">Tabela de intervenÃƒÂ§ÃƒÂµes padrÃƒÂ£o para novos cadastros:</label>
             <select id="pref-geral-tabela" class="pref-select"></select>
           </div>
           <div class="pref-field">
-            <label for="pref-geral-convenio">ConvÃªnio padrÃ£o para novos cadastros:</label>
+            <label for="pref-geral-convenio">ConvÃƒÂªnio padrÃƒÂ£o para novos cadastros:</label>
             <select id="pref-geral-convenio" class="pref-select"></select>
           </div>
         </div>
         <div class="pref-row">
-          <label for="pref-geral-msg">Mensagem padrÃ£o para orÃ§amentos:</label>
+          <label for="pref-geral-msg">Mensagem padrÃƒÂ£o para orÃƒÂ§amentos:</label>
           <input id="pref-geral-msg" class="pref-input-wide" type="text">
         </div>
         <div class="pref-row">
-          <label for="pref-geral-historico">HistÃ³rico padrÃ£o para conta corrente:</label>
+          <label for="pref-geral-historico">HistÃƒÂ³rico padrÃƒÂ£o para conta corrente:</label>
           <input id="pref-geral-historico" class="pref-input-wide" type="text">
         </div>
         <div class="pref-line"></div>
         <div class="pref-checks">
           <label><input id="pref-geral-quadro" type="checkbox"> Exibir quadro de avisos na abertura</label>
-          <label><input id="pref-geral-busca" type="checkbox"> Busca automÃ¡tica de pacientes agendados</label>
+          <label><input id="pref-geral-busca" type="checkbox"> Busca automÃƒÂ¡tica de pacientes agendados</label>
           <label class="pref-alarm">
             <input id="pref-geral-alarme" type="checkbox">
-            Alarme com <input id="pref-geral-alarme-min" type="number" min="1" value="1"> min de antecedÃªncia
+            Alarme com <input id="pref-geral-alarme-min" type="number" min="1" value="1"> min de antecedÃƒÂªncia
           </label>
         </div>
       </div>
@@ -2121,11 +2201,11 @@ function prefEnsureUI(){
           <select id="pref-modelo-receita" class="pref-select"></select>
           <label for="pref-modelo-recibo">Modelo de impresso para recibos</label>
           <select id="pref-modelo-recibo" class="pref-select"></select>
-          <label for="pref-modelo-etiqueta">Modelo padrÃ£o para etiquetas</label>
+          <label for="pref-modelo-etiqueta">Modelo padrÃƒÂ£o para etiquetas</label>
           <select id="pref-modelo-etiqueta" class="pref-select"></select>
           <label for="pref-modelo-email">Modelo de texto para e-mail agenda</label>
           <select id="pref-modelo-email" class="pref-select"></select>
-          <label for="pref-modelo-orcamento">Modelo padrÃ£o para orÃ§amentos</label>
+          <label for="pref-modelo-orcamento">Modelo padrÃƒÂ£o para orÃƒÂ§amentos</label>
           <select id="pref-modelo-orcamento" class="pref-select"></select>
           <label for="pref-modelo-whatsapp">Modelo de texto para WhatsApp agenda</label>
           <select id="pref-modelo-whatsapp" class="pref-select"></select>
@@ -2134,10 +2214,10 @@ function prefEnsureUI(){
 
       <div class="pref-pane hidden" data-pane="ambiente">
         <fieldset class="pref-amb-fieldset">
-          <legend class="pref-amb-legend">ApresentaÃ§Ã£o (letras e cores)</legend>
+          <legend class="pref-amb-legend">ApresentaÃƒÂ§ÃƒÂ£o (letras e cores)</legend>
           <div class="pref-amb-layout">
             <div class="pref-amb-left">
-              <label>SeÃ§Ã£o:</label>
+              <label>SeÃƒÂ§ÃƒÂ£o:</label>
               <div id="pref-amb-lista" class="pref-amb-list"></div>
             </div>
             <div class="pref-amb-right">
@@ -2147,7 +2227,7 @@ function prefEnsureUI(){
               </div>
               <div class="pref-amb-example"></div>
               <div class="pref-amb-footer">
-                <button id="pref-amb-restaurar" class="materiais-btn" type="button"><img src="/desktop-assets/restaurar.png" alt="">Restaura padrÃµes</button>
+                <button id="pref-amb-restaurar" class="materiais-btn" type="button"><img src="/desktop-assets/restaurar.png" alt="">Restaura padrÃƒÂµes</button>
               </div>
               <div class="pref-amb-controls">
                 <select id="pref-ambiente-fonte"></select>
@@ -2166,7 +2246,7 @@ function prefEnsureUI(){
             <input id="pref-dados-nome" class="pref-input" type="text">
           </div>
           <div class="pref-dados-row pref-dados-row-full">
-            <label for="pref-dados-endereco">EndereÃ§o:</label>
+            <label for="pref-dados-endereco">EndereÃƒÂ§o:</label>
             <input id="pref-dados-endereco" class="pref-input" type="text">
           </div>
           <div class="pref-dados-row pref-dados-row-2">
@@ -2180,7 +2260,7 @@ function prefEnsureUI(){
             <input id="pref-dados-cep" class="pref-input" type="text">
             <label for="pref-dados-uf">UF:</label>
             <select id="pref-dados-uf" class="pref-select"></select>
-            <label for="pref-dados-pais">PaÃ­s:</label>
+            <label for="pref-dados-pais">PaÃƒÂ­s:</label>
             <input id="pref-dados-pais" class="pref-input" type="text">
             <label for="pref-dados-telefones">Telefones:</label>
             <input id="pref-dados-telefones" class="pref-input" type="text">
@@ -2202,13 +2282,13 @@ function prefEnsureUI(){
             <fieldset class="pref-odonto-box">
               <div class="pref-odonto-checklist">
                 <label><input id="pref-odonto-anamnese" type="checkbox"> Exibir alerta de anamnese</label>
-                <label><input id="pref-odonto-icones" type="checkbox"> Exibir Ã­cones de alerta</label>
-                <label><input id="pref-odonto-cirurgiao" type="checkbox"> Exibir coluna â€œcirurgiÃ£oâ€ no histÃ³rico</label>
-                <label><input id="pref-odonto-historico-desc" type="checkbox"> Exibir histÃ³rico em ordem decrescente</label>
+                <label><input id="pref-odonto-icones" type="checkbox"> Exibir ÃƒÂ­cones de alerta</label>
+                <label><input id="pref-odonto-cirurgiao" type="checkbox"> Exibir coluna Ã¢â‚¬Å“cirurgiÃƒÂ£oÃ¢â‚¬Â no histÃƒÂ³rico</label>
+                <label><input id="pref-odonto-historico-desc" type="checkbox"> Exibir histÃƒÂ³rico em ordem decrescente</label>
                 <label><input id="pref-odonto-imagens" type="checkbox"> Exibir imagens do EasyCapture</label>
                 <label><input id="pref-odonto-dados-paciente" type="checkbox"> Exibir dados do paciente</label>
                 <label><input id="pref-odonto-dados-tratamento" type="checkbox"> Exibir dados do tratamento</label>
-                <label><input id="pref-odonto-observacoes" type="checkbox"> Exibir observaÃ§Ãµes</label>
+                <label><input id="pref-odonto-observacoes" type="checkbox"> Exibir observaÃƒÂ§ÃƒÂµes</label>
                 <label><input id="pref-odonto-documentos" type="checkbox"> Exibir documentos emitidos</label>
                 <label><input id="pref-odonto-agenda-dia" type="checkbox"> Exibir agenda do dia</label>
               </div>
@@ -2218,7 +2298,7 @@ function prefEnsureUI(){
             <label for="pref-odonto-filtro">Filtro mais utilizado</label>
             <select id="pref-odonto-filtro" class="pref-select"></select>
             <fieldset class="pref-odonto-box pref-odonto-colors-box">
-              <legend>Cores para sÃ­mbolos</legend>
+              <legend>Cores para sÃƒÂ­mbolos</legend>
               <div class="pref-odonto-color-row">
                 <label for="pref-odonto-cor-anomalia">Anomalias:</label>
                 <div class="pref-odonto-color-wrap">
@@ -2226,13 +2306,13 @@ function prefEnsureUI(){
                 </div>
               </div>
               <div class="pref-odonto-color-row">
-                <label for="pref-odonto-cor-observada">CondiÃ§Ã£o observada:</label>
+                <label for="pref-odonto-cor-observada">CondiÃƒÂ§ÃƒÂ£o observada:</label>
                 <div class="pref-odonto-color-wrap">
                   <select id="pref-odonto-cor-observada"></select>
                 </div>
               </div>
               <div class="pref-odonto-color-row">
-                <label for="pref-odonto-cor-realizado">JÃ¡ realizado:</label>
+                <label for="pref-odonto-cor-realizado">JÃƒÂ¡ realizado:</label>
                 <div class="pref-odonto-color-wrap">
                   <select id="pref-odonto-cor-realizado"></select>
                 </div>
@@ -2274,13 +2354,13 @@ function sysOptSelecionarAba(tabId){
   sysOptCfg.tabs.forEach(btn=>btn.classList.toggle("active",btn.dataset.tab===tabId));
   sysOptCfg.panes.forEach(pane=>pane.classList.toggle("hidden",pane.dataset.pane!==tabId));
   const mapa={
-    clinica:"ClÃ­nica carregada.",
+    clinica:"ClÃƒÂ­nica carregada.",
     financeiro:"Financeiro carregado.",
-    seguranca:"SeguranÃ§a carregada.",
+    seguranca:"SeguranÃƒÂ§a carregada.",
     data:"Data carregada.",
-    avancado:"AvanÃ§ado carregado."
+    avancado:"AvanÃƒÂ§ado carregado."
   };
-  footerMsg.textContent=mapa[tabId]||"OpÃ§Ãµes do sistema carregadas.";
+  footerMsg.textContent=mapa[tabId]||"OpÃƒÂ§ÃƒÂµes do sistema carregadas.";
 }
 
 function sysOptRenderSelects(){
@@ -2467,7 +2547,7 @@ async function sysOptCarregar(){
   if(!sysOptCfg)return false;
   const {res,data}=await requestJson("GET","/system-options",undefined,true);
   if(!res.ok){
-    window.alert(data.detail||"Falha ao carregar opÃ§Ãµes do sistema.");
+    window.alert(data.detail||"Falha ao carregar opÃƒÂ§ÃƒÂµes do sistema.");
     return false;
   }
   sysOptCfg.values=data?.values||{};
@@ -2482,23 +2562,23 @@ async function sysOptSalvar(){
   if(!payload)return;
   const {res,data}=await requestJson("PATCH","/system-options",{values:payload},true);
   if(!res.ok){
-    window.alert(data.detail||"Falha ao salvar opÃ§Ãµes do sistema.");
+    window.alert(data.detail||"Falha ao salvar opÃƒÂ§ÃƒÂµes do sistema.");
     return;
   }
   sysOptCfg.values=data?.values||payload;
   sysOptCfg.options=data?.options||sysOptCfg.options;
   sysOptSyncUI();
   if(usersPanelOverlay){
-    footerMsg.textContent=data.detail||"OpÃ§Ãµes do sistema atualizadas.";
+    footerMsg.textContent=data.detail||"OpÃƒÂ§ÃƒÂµes do sistema atualizadas.";
     return;
   }
   sysOptCfg.backdrop.classList.add("hidden");
-  footerMsg.textContent=data.detail||"OpÃ§Ãµes do sistema atualizadas.";
+  footerMsg.textContent=data.detail||"OpÃƒÂ§ÃƒÂµes do sistema atualizadas.";
 }
 
 function sysOptFechar(){
   if(usersPanelOverlay){
-    footerMsg.textContent="Feche a janela de usuÃ¡rios antes de fechar OpÃ§Ãµes do sistema.";
+    footerMsg.textContent="Feche a janela de usuÃƒÂ¡rios antes de fechar OpÃƒÂ§ÃƒÂµes do sistema.";
     return;
   }
   if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");
@@ -2561,13 +2641,13 @@ function sysOptEnsureUI(){
   backdrop.className="modal-backdrop hidden";
   backdrop.innerHTML=`
     <div class="sysopt-modal">
-      <div class="modal-header"><div class="modal-title">OpÃ§Ãµes do sistema</div></div>
+      <div class="modal-header"><div class="modal-title">OpÃƒÂ§ÃƒÂµes do sistema</div></div>
       <div class="sysopt-tabs">
-        <button class="sysopt-tab active" data-tab="clinica" type="button">ClÃ­nica</button>
+        <button class="sysopt-tab active" data-tab="clinica" type="button">ClÃƒÂ­nica</button>
         <button class="sysopt-tab" data-tab="financeiro" type="button">Financeiro</button>
-        <button class="sysopt-tab" data-tab="seguranca" type="button">SeguranÃ§a</button>
+        <button class="sysopt-tab" data-tab="seguranca" type="button">SeguranÃƒÂ§a</button>
         <button class="sysopt-tab" data-tab="data" type="button">Data</button>
-        <button class="sysopt-tab" data-tab="avancado" type="button">AvanÃ§ado</button>
+        <button class="sysopt-tab" data-tab="avancado" type="button">AvanÃƒÂ§ado</button>
       </div>
 
       <div class="sysopt-pane" data-pane="clinica">
@@ -2576,7 +2656,7 @@ function sysOptEnsureUI(){
             <div class="sysopt-field"><label for="sysopt-clinica-nome">Nome:</label><input id="sysopt-clinica-nome" type="text"></div>
           </div>
           <div class="sysopt-row r2">
-            <div class="sysopt-field"><label for="sysopt-clinica-endereco">EndereÃ§o:</label><input id="sysopt-clinica-endereco" type="text"></div>
+            <div class="sysopt-field"><label for="sysopt-clinica-endereco">EndereÃƒÂ§o:</label><input id="sysopt-clinica-endereco" type="text"></div>
             <div class="sysopt-field"><label for="sysopt-clinica-complemento">Complemento:</label><input id="sysopt-clinica-complemento" type="text"></div>
           </div>
           <div class="sysopt-row r2eq sysopt-hidden">
@@ -2590,50 +2670,50 @@ function sysOptEnsureUI(){
           </div>
           <div class="sysopt-row r2eq">
             <div class="sysopt-field"><label for="sysopt-clinica-cnpj">CNPJ:</label><input id="sysopt-clinica-cnpj" type="text"></div>
-            <div class="sysopt-field"><label for="sysopt-clinica-ie">InscriÃ§Ã£o Estadual:</label><input id="sysopt-clinica-ie" type="text"></div>
+            <div class="sysopt-field"><label for="sysopt-clinica-ie">InscriÃƒÂ§ÃƒÂ£o Estadual:</label><input id="sysopt-clinica-ie" type="text"></div>
           </div>
         </div>
       </div>
 
       <div class="sysopt-pane hidden" data-pane="financeiro">
         <div class="sysopt-grid">
-          <div class="sysopt-group-title">Ãndices financeiros e moedas</div>
+          <div class="sysopt-group-title">ÃƒÂndices financeiros e moedas</div>
           <div class="sysopt-row r3fin">
-            <div class="sysopt-field"><label for="sysopt-fin-indice">Ãndice padrÃ£o:</label><select id="sysopt-fin-indice"></select></div>
+            <div class="sysopt-field"><label for="sysopt-fin-indice">ÃƒÂndice padrÃƒÂ£o:</label><select id="sysopt-fin-indice"></select></div>
             <div class="sysopt-field"><label for="sysopt-fin-moeda">Moeda corrente:</label><input id="sysopt-fin-moeda" type="text"></div>
             <div class="sysopt-field"><label for="sysopt-fin-sigla">Sigla:</label><input id="sysopt-fin-sigla" type="text"></div>
           </div>
           <div class="sysopt-row line">
             <div class="sysopt-field">
-              <label class="sysopt-line-label" for="sysopt-fin-periodo"><span>PerÃ­odo padrÃ£o para parcelamento</span><span class="sysopt-dots"></span></label>
+              <label class="sysopt-line-label" for="sysopt-fin-periodo"><span>PerÃƒÂ­odo padrÃƒÂ£o para parcelamento</span><span class="sysopt-dots"></span></label>
             </div>
             <div class="sysopt-field">
               <input id="sysopt-fin-periodo" type="number" min="1" step="1">
             </div>
           </div>
           <div class="sysopt-row r2eq">
-            <div class="sysopt-field"><label for="sysopt-fin-cobranca">Tipo de cobranÃ§a padrÃ£o:</label><select id="sysopt-fin-cobranca"></select></div>
+            <div class="sysopt-field"><label for="sysopt-fin-cobranca">Tipo de cobranÃƒÂ§a padrÃƒÂ£o:</label><select id="sysopt-fin-cobranca"></select></div>
             <div class="sysopt-field"><label for="sysopt-fin-cat-orto">Categoria financeira para mensalidades de Ortodontia:</label><select id="sysopt-fin-cat-orto"></select></div>
           </div>
           <div class="sysopt-row r1">
-            <div class="sysopt-field"><label for="sysopt-fin-indice-rel">Ãndice utilizado pelos relatÃ³rios:</label><select id="sysopt-fin-indice-rel"></select></div>
+            <div class="sysopt-field"><label for="sysopt-fin-indice-rel">ÃƒÂndice utilizado pelos relatÃƒÂ³rios:</label><select id="sysopt-fin-indice-rel"></select></div>
           </div>
           <div class="sysopt-checklist">
-            <label><input id="sysopt-fin-indices-diarios" type="checkbox"> Pedir Ã­ndices financeiros diariamente na abertura do programa</label>
-            <label><input id="sysopt-fin-baixa-clinica" type="checkbox"> LanÃ§ar crÃ©ditos de baixa na conta da clÃ­nica</label>
-            <label><input id="sysopt-fin-debitos-convenio" type="checkbox"> LanÃ§ar automaticamente dÃ©bitos de convÃªnio na conta corrente do paciente</label>
-            <label><input id="sysopt-fin-creditos-futuros" type="checkbox"> Considerar crÃ©ditos futuros na lista de devedores</label>
+            <label><input id="sysopt-fin-indices-diarios" type="checkbox"> Pedir ÃƒÂ­ndices financeiros diariamente na abertura do programa</label>
+            <label><input id="sysopt-fin-baixa-clinica" type="checkbox"> LanÃƒÂ§ar crÃƒÂ©ditos de baixa na conta da clÃƒÂ­nica</label>
+            <label><input id="sysopt-fin-debitos-convenio" type="checkbox"> LanÃƒÂ§ar automaticamente dÃƒÂ©bitos de convÃƒÂªnio na conta corrente do paciente</label>
+            <label><input id="sysopt-fin-creditos-futuros" type="checkbox"> Considerar crÃƒÂ©ditos futuros na lista de devedores</label>
           </div>
         </div>
       </div>
 
       <div class="sysopt-pane hidden" data-pane="seguranca">
         <div class="sysopt-checklist">
-          <label><input id="sysopt-seg-usuarios" type="checkbox"> Ativar controle de usuÃ¡rios e senhas</label>
+          <label><input id="sysopt-seg-usuarios" type="checkbox"> Ativar controle de usuÃƒÂ¡rios e senhas</label>
           <label><input id="sysopt-seg-auditoria" type="checkbox"> Ativar sistema de auditoria</label>
         </div>
         <div style="margin-top:12px">
-          <button id="sysopt-seg-permissoes" class="materiais-btn sysopt-link-btn" type="button"><img src="/desktop-assets/chave.png" alt="">Definir permissÃµes de acesso para os usuÃ¡rios...</button>
+          <button id="sysopt-seg-permissoes" class="materiais-btn sysopt-link-btn" type="button"><img src="/desktop-assets/chave.png" alt="">Definir permissÃƒÂµes de acesso para os usuÃƒÂ¡rios...</button>
         </div>
       </div>
 
@@ -2659,7 +2739,7 @@ function sysOptEnsureUI(){
           </div>
           <div class="sysopt-row line">
             <div class="sysopt-field">
-              <label class="sysopt-line-label" for="sysopt-semanas"><span>NÃºmero de semanas pesquisadas na busca de horÃ¡rios livres</span><span class="sysopt-dots"></span></label>
+              <label class="sysopt-line-label" for="sysopt-semanas"><span>NÃƒÂºmero de semanas pesquisadas na busca de horÃƒÂ¡rios livres</span><span class="sysopt-dots"></span></label>
             </div>
             <div class="sysopt-field"><input id="sysopt-semanas" type="number" min="1" step="1"></div>
           </div>
@@ -2670,7 +2750,7 @@ function sysOptEnsureUI(){
         <div class="sysopt-grid">
           <div class="sysopt-row r2eq">
             <div class="sysopt-field"><label for="sysopt-av-captura">Sistema de captura de imagens:</label><select id="sysopt-av-captura"></select></div>
-            <div class="sysopt-field"><label for="sysopt-av-word">VersÃ£o do Microsoft Word:</label><select id="sysopt-av-word"></select></div>
+            <div class="sysopt-field"><label for="sysopt-av-word">VersÃƒÂ£o do Microsoft Word:</label><select id="sysopt-av-word"></select></div>
           </div>
           <div class="sysopt-row r1">
             <div class="sysopt-field"><label for="sysopt-av-email">Formato de envio de e-mail:</label><select id="sysopt-av-email"></select></div>
@@ -2682,16 +2762,16 @@ function sysOptEnsureUI(){
             <div class="sysopt-field"><input id="sysopt-av-imagens" type="number" min="1" step="1"></div>
           </div>
           <div class="sysopt-checklist">
-            <label><input id="sysopt-av-cpf" type="checkbox"> Habilitar formataÃ§Ã£o e validaÃ§Ã£o automÃ¡tica de CPF</label>
+            <label><input id="sysopt-av-cpf" type="checkbox"> Habilitar formataÃƒÂ§ÃƒÂ£o e validaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica de CPF</label>
             <label><input id="sysopt-av-dup-cpf" type="checkbox"> Bloquear duplicidade de CPF no cadastro</label>
-            <label class="sysopt-hidden"><input id="sysopt-av-debug" type="checkbox"> Habilitar mensagens de depuraÃ§Ã£o do sistema</label>
-            <label class="sysopt-hidden"><input id="sysopt-av-ignorar" type="checkbox"> Ignorar o controle de cÃ³pias do driver de impressÃ£o</label>
+            <label class="sysopt-hidden"><input id="sysopt-av-debug" type="checkbox"> Habilitar mensagens de depuraÃƒÂ§ÃƒÂ£o do sistema</label>
+            <label class="sysopt-hidden"><input id="sysopt-av-ignorar" type="checkbox"> Ignorar o controle de cÃƒÂ³pias do driver de impressÃƒÂ£o</label>
             <label class="sysopt-hidden"><input id="sysopt-av-salvar" type="checkbox"> Salvar arquivos MyEasy</label>
-            <label><input id="sysopt-av-agenda" type="checkbox"> Habilitar atualizaÃ§Ã£o automÃ¡tica da agenda</label>
-            <label><input id="sysopt-av-orcamento" type="checkbox"> Permitir finalizaÃ§Ã£o de intervenÃ§Ã£o somente se orÃ§amento aprovado</label>
+            <label><input id="sysopt-av-agenda" type="checkbox"> Habilitar atualizaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica da agenda</label>
+            <label><input id="sysopt-av-orcamento" type="checkbox"> Permitir finalizaÃƒÂ§ÃƒÂ£o de intervenÃƒÂ§ÃƒÂ£o somente se orÃƒÂ§amento aprovado</label>
             <label class="sysopt-hidden"><input id="sysopt-av-dente3d" type="checkbox"> Habilitar propriedades do dente em 3D</label>
             <label><input id="sysopt-av-cep" type="checkbox"> Habilitar CEP online</label>
-            <label><input id="sysopt-av-protese" type="checkbox"> Enviar somente nÃºmero do paciente no serviÃ§o de prÃ³tese</label>
+            <label><input id="sysopt-av-protese" type="checkbox"> Enviar somente nÃƒÂºmero do paciente no serviÃƒÂ§o de prÃƒÂ³tese</label>
           </div>
         </div>
       </div>
@@ -2764,7 +2844,7 @@ function sysOptEnsureUI(){
 
   sysOptCfg.tabs.forEach(btn=>btn.addEventListener("click",()=>sysOptSelecionarAba(btn.dataset.tab)));
   if(sysOptCfg.btnSegPermissoes){
-    sysOptCfg.btnSegPermissoes.addEventListener("click",()=>{abrirPainelUsuariosConfig(true,true);footerMsg.textContent="Abra um usuÃ¡rio para ajustar permissÃµes."});
+    sysOptCfg.btnSegPermissoes.addEventListener("click",()=>{abrirPainelUsuariosConfig(true,true);footerMsg.textContent="Abra um usuÃƒÂ¡rio para ajustar permissÃƒÂµes."});
   }
   if(sysOptCfg.btnOk)sysOptCfg.btnOk.addEventListener("click",sysOptSalvar);
   if(sysOptCfg.btnCancel)sysOptCfg.btnCancel.addEventListener("click",sysOptFechar);
@@ -2799,37 +2879,37 @@ function relatorioCssFromStyle(estilo,padrao={}){
 }
 async function procRelatorioExecutar(){
   const campos=procRelatorioCamposSelecionados();
-  if(!campos.length){window.alert("Selecione pelo menos um campo do relatÃ³rio.");return}
+  if(!campos.length){window.alert("Selecione pelo menos um campo do relatÃƒÂ³rio.");return}
   const params=procRelatorioMontarParams();
   if(!params)return;
   const{res,data}=await requestJson("GET",`/procedimentos/relatorio-tabela?${params.toString()}`,undefined,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao gerar relatÃ³rio.");return}
+  if(!res.ok){window.alert(data.detail||"Falha ao gerar relatÃƒÂ³rio.");return}
   const rows=Array.isArray(data?.itens)?data.itens:[];
-  const titulo=String(procRelatorio?.txtNome?.value||"").trim()||"RelatÃ³rio de tabela de procedimentos";
+  const titulo=String(procRelatorio?.txtNome?.value||"").trim()||"RelatÃƒÂ³rio de tabela de procedimentos";
   const observacao=String(data?.metadados?.observacao||"");
   const saida=String(procRelatorio?.cboSaida?.value||"Tela");
   if(saida==="Impressora"){
     const ok=procRelatorioAbrirDialogoImpressao(campos,rows,titulo);
-    if(ok){procRelatorioFechar();footerMsg.textContent="ImpressÃ£o iniciada."}
+    if(ok){procRelatorioFechar();footerMsg.textContent="ImpressÃƒÂ£o iniciada."}
     return;
   }
   if(saida==="Arquivo"){
     procRelatorioExportarArquivo(campos,rows,titulo);
     procRelatorioFechar();
-    footerMsg.textContent="RelatÃ³rio exportado em arquivo.";
+    footerMsg.textContent="RelatÃƒÂ³rio exportado em arquivo.";
     return;
   }
   procRelatorioAbrirPreview(campos,rows,titulo,observacao);
-  footerMsg.textContent="RelatÃ³rio de tabela de procedimentos carregado em tela.";
+  footerMsg.textContent="RelatÃƒÂ³rio de tabela de procedimentos carregado em tela.";
 }
 async function procVinculaCarregarListas(){const{res,data}=await requestJson("GET","/materiais/listas",undefined,true);if(!res)return;const listas=Array.isArray(data)?data:[];proc.vinculaListas.innerHTML=listas.map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join("");if(listas.length){await procVinculaCarregarMateriais()}}
 async function procVinculaCarregarMateriais(){const lid=Number(proc.vinculaListas.value||0);if(!lid){vinculaMateriaisCache=[];proc.vinculaMateriais.innerHTML="";proc.vinculaCustoUnit.value="0,00";proc.vinculaCustoTotal.value="0,00";return}const q=encodeURIComponent(String(proc.vinculaQ?.value||"").trim());const{res,data}=await requestJson("GET",`/materiais?lista_id=${lid}&q=${q}`,undefined,true);if(!res)return;vinculaMateriaisCache=Array.isArray(data)?data:[];proc.vinculaMateriais.innerHTML=vinculaMateriaisCache.map(x=>`<option value="${x.id}">${esc(x.codigo)} - ${esc(x.nome)}</option>`).join("");procVinculaMaterialSelecionado()}
 function procVinculaMaterialSelecionado(){const mid=Number(proc.vinculaMateriais.value||0);const mat=vinculaMateriaisCache.find(x=>x.id===mid);if(!mat){proc.vinculaCustoUnit.value="0,00";proc.vinculaCustoTotal.value="0,00";return}proc.vinculaCustoUnit.value=procFmtBr(Number(mat.custo||0));procVinculaAtualizarCustoTotal()}
 function procVinculaAtualizarCustoTotal(){const mid=Number(proc.vinculaMateriais.value||0);const mat=vinculaMateriaisCache.find(x=>x.id===mid);if(!mat){proc.vinculaCustoTotal.value="0,00";return}let qtd=0;try{qtd=procParse(proc.vinculaQuantidade.value)}catch{};proc.vinculaCustoTotal.value=procFmtBr(Number(mat.custo||0)*qtd)}
-async function procConfirmarVinculo(){const mid=Number(proc.vinculaMateriais.value||0);if(!mid){window.alert("Selecione um material.");return}let qtd=0;try{qtd=procParse(proc.vinculaQuantidade.value)}catch{qtd=0}if(qtd<=0){window.alert("Informe uma quantidade vÃ¡lida.");return}const{res,data}=await requestJson("POST",`/procedimentos/${procedimentoAtualId}/materiais-vinculados`,{material_id:mid,quantidade:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao vincular material.");return}procFecharVincular();await procRecarregarLinks()}
+async function procConfirmarVinculo(){const mid=Number(proc.vinculaMateriais.value||0);if(!mid){window.alert("Selecione um material.");return}let qtd=0;try{qtd=procParse(proc.vinculaQuantidade.value)}catch{qtd=0}if(qtd<=0){window.alert("Informe uma quantidade vÃƒÂ¡lida.");return}const{res,data}=await requestJson("POST",`/procedimentos/${procedimentoAtualId}/materiais-vinculados`,{material_id:mid,quantidade:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao vincular material.");return}procFecharVincular();await procRecarregarLinks()}
 async function procRecarregarLinks(){if(!procedimentoAtualId)return;const{res,data}=await requestJson("GET",`/procedimentos/${procedimentoAtualId}`,undefined,true);if(!res)return;procRenderLinks(data.materiais_vinculados||{itens:[],total_materiais:0,total_custo_und:0,total_custo:0})}
 async function procDesvincularSelecionado(){if(!procedimentoAtualId)return;const tr=proc.linksTbody.querySelector("tr.selected");if(!tr){window.alert("Selecione um material para excluir.");return}const nome=tr.children[1]?.textContent||"";if(!window.confirm(`Deseja realmente excluir o material:\n\n${nome}?`))return;const codigo=tr.dataset.codigo||"";const{res,data}=await requestJson("DELETE",`/procedimentos/${procedimentoAtualId}/materiais-vinculados/por-codigo/${encodeURIComponent(codigo)}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao desvincular.");return}await procRecarregarLinks()}
-async function procEditarVinculoSelecionado(){if(!procedimentoAtualId)return;const tr=proc.linksTbody.querySelector("tr.selected");if(!tr){window.alert("Selecione um material vinculado.");return}const codigo=tr.dataset.codigo||"";const atual=(tr.children[5]?.textContent||"").trim();const entrada=window.prompt("Informe a nova quantidade:",atual);if(entrada===null)return;let qtd=0;try{qtd=procParse(entrada)}catch{qtd=0}if(qtd<=0){window.alert("Informe uma quantidade vÃ¡lida.");return}const{res,data}=await requestJson("PUT",`/procedimentos/${procedimentoAtualId}/materiais-vinculados/por-codigo/${encodeURIComponent(codigo)}`,{quantidade:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar vÃ­nculo.");return}await procRecarregarLinks()}
+async function procEditarVinculoSelecionado(){if(!procedimentoAtualId)return;const tr=proc.linksTbody.querySelector("tr.selected");if(!tr){window.alert("Selecione um material vinculado.");return}const codigo=tr.dataset.codigo||"";const atual=(tr.children[5]?.textContent||"").trim();const entrada=window.prompt("Informe a nova quantidade:",atual);if(entrada===null)return;let qtd=0;try{qtd=procParse(entrada)}catch{qtd=0}if(qtd<=0){window.alert("Informe uma quantidade vÃƒÂ¡lida.");return}const{res,data}=await requestJson("PUT",`/procedimentos/${procedimentoAtualId}/materiais-vinculados/por-codigo/${encodeURIComponent(codigo)}`,{quantidade:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar vÃƒÂ­nculo.");return}await procRecarregarLinks()}
 function procFormatarCampoBr(el){try{el.value=procFmtBr(procParse(el.value))}catch{el.value="0,00"}}
 function pgenEnsureUI_LEGACY(){
   if(pgen)return;
@@ -2903,31 +2983,31 @@ function pgenEnsureUI_LEGACY(){
     </section>
     <div id="pgen-editor-backdrop" class="pgen-editor-backdrop hidden">
       <div class="pgen-editor-modal">
-        <div id="pgen-editor-title" class="pgen-editor-title">Procedimento genÃ©rico</div>
+        <div id="pgen-editor-title" class="pgen-editor-title">Procedimento genÃƒÂ©rico</div>
         <div class="pgen-editor-grid">
-          <label for="pgen-editor-codigo">CÃ³digo</label>
+          <label for="pgen-editor-codigo">CÃƒÂ³digo</label>
           <input id="pgen-editor-codigo" type="text">
           <label for="pgen-editor-tempo">Tempo</label>
           <input id="pgen-editor-tempo" type="number" min="0" step="1">
-          <label for="pgen-editor-simbolo">SÃ­mbolo</label>
+          <label for="pgen-editor-simbolo">SÃƒÂ­mbolo</label>
           <select id="pgen-editor-simbolo"></select>
-          <label for="pgen-editor-descricao">DescriÃ§Ã£o</label>
+          <label for="pgen-editor-descricao">DescriÃƒÂ§ÃƒÂ£o</label>
           <input id="pgen-editor-descricao" type="text" style="grid-column: span 5;">
-          <label for="pgen-editor-obs">ObservaÃ§Ãµes</label>
+          <label for="pgen-editor-obs">ObservaÃƒÂ§ÃƒÂµes</label>
           <textarea id="pgen-editor-obs" style="grid-column: span 5;"></textarea>
-          <label>Mostrar sÃ­mbolo</label>
-          <label class="pgen-editor-check" style="grid-column: span 5;"><input id="pgen-editor-mostrar" type="checkbox">Exibir sÃ­mbolo junto ao procedimento</label>
+          <label>Mostrar sÃƒÂ­mbolo</label>
+          <label class="pgen-editor-check" style="grid-column: span 5;"><input id="pgen-editor-mostrar" type="checkbox">Exibir sÃƒÂ­mbolo junto ao procedimento</label>
         </div>
         <div class="pgen-editor-section">
           <h3>Fases</h3>
           <div class="pgen-editor-row">
-            <div><label for="pgen-fase-codigo">CÃ³digo</label><input id="pgen-fase-codigo" type="text"></div>
-            <div style="flex:1 1 320px;"><label for="pgen-fase-descricao">DescriÃ§Ã£o</label><input id="pgen-fase-descricao" type="text"></div>
+            <div><label for="pgen-fase-codigo">CÃƒÂ³digo</label><input id="pgen-fase-codigo" type="text"></div>
+            <div style="flex:1 1 320px;"><label for="pgen-fase-descricao">DescriÃƒÂ§ÃƒÂ£o</label><input id="pgen-fase-descricao" type="text"></div>
             <div><label for="pgen-fase-tempo">Tempo</label><input id="pgen-fase-tempo" type="number" min="0" step="1"></div>
             <button id="pgen-fase-add" class="pgen-mini-btn" type="button">Adicionar fase</button>
           </div>
           <table class="pgen-small-table">
-            <thead><tr><th style="width:90px;">CÃ³digo</th><th>DescriÃ§Ã£o</th><th style="width:90px;">Tempo</th><th>AÃ§Ã£o</th></tr></thead>
+            <thead><tr><th style="width:90px;">CÃƒÂ³digo</th><th>DescriÃƒÂ§ÃƒÂ£o</th><th style="width:90px;">Tempo</th><th>AÃƒÂ§ÃƒÂ£o</th></tr></thead>
             <tbody id="pgen-fases-tbody"></tbody>
           </table>
         </div>
@@ -2941,7 +3021,7 @@ function pgenEnsureUI_LEGACY(){
             <button id="pgen-mat-add" class="pgen-mini-btn" type="button">Adicionar material</button>
           </div>
           <table class="pgen-small-table">
-            <thead><tr><th style="width:90px;">CÃ³digo</th><th>Material</th><th style="width:100px;">Quantidade</th><th style="width:100px;">Custo total</th><th>AÃ§Ã£o</th></tr></thead>
+            <thead><tr><th style="width:90px;">CÃƒÂ³digo</th><th>Material</th><th style="width:100px;">Quantidade</th><th style="width:100px;">Custo total</th><th>AÃƒÂ§ÃƒÂ£o</th></tr></thead>
             <tbody id="pgen-materiais-tbody"></tbody>
           </table>
         </div>
@@ -3034,13 +3114,13 @@ async function pgenAbrirEditor_LEGACY(id=null){
   procPreencherSelect(pgen.matLista,listas,{valueFrom:item=>item?.id??"",labelFrom:item=>item?.nome??""});
   if(id){
     const{res,data}=await requestJson("GET",`/cadastros/procedimentos-genericos/detalhe/${id}`,undefined,true);
-    if(!res.ok){window.alert(data.detail||"Falha ao carregar procedimento genÃ©rico.");return}
+    if(!res.ok){window.alert(data.detail||"Falha ao carregar procedimento genÃƒÂ©rico.");return}
     pgenEditorState={codigo:String(data.codigo||""),descricao:String(data.descricao||""),tempo:Number(data.tempo||0),simbolo_grafico:String(data.simbolo_grafico||""),mostrar_simbolo:!!data.mostrar_simbolo,observacoes:String(data.observacoes||""),fases:Array.isArray(data.fases)?data.fases.map((x,i)=>({codigo:String(x.codigo||""),descricao:String(x.descricao||""),sequencia:Number(x.sequencia||i+1),tempo:Number(x.tempo||0)})):[],materiais:Array.isArray(data.materiais)?data.materiais.map(x=>({material_id:Number(x.material_id||0),codigo:String(x.codigo||""),nome:String(x.nome||""),quantidade:Number(x.quantidade||0),custo_und:Number(x.custo_und||0)})):[]};
   }else{
     const{res,data}=await requestJson("GET","/cadastros/procedimentos-genericos/proximo-codigo",undefined,true);
     pgenEditorState=pgenEstadoVazio(res?String(data.codigo||""):"");
   }
-  pgen.editorTitle.textContent=id?"Altera procedimento genÃ©rico":"Novo procedimento genÃ©rico";
+  pgen.editorTitle.textContent=id?"Altera procedimento genÃƒÂ©rico":"Novo procedimento genÃƒÂ©rico";
   pgen.editorCodigo.value=String(pgenEditorState.codigo||"");
   pgen.editorDescricao.value=String(pgenEditorState.descricao||"");
   pgen.editorTempo.value=String(pgenEditorState.tempo||0);
@@ -3054,16 +3134,16 @@ async function pgenAbrirEditor_LEGACY(id=null){
   pgen.editorBackdrop.classList.remove("hidden");
 }
 function pgenFecharEditor(){pgenPararArrasteEditor();if(pgen?.editorBackdrop)pgen.editorBackdrop.classList.add("hidden");pgenEditorId=null;pgenEditorState=null}
-function pgenAdicionarFase_LEGACY(){if(!pgenEditorState)return;const descricao=(pgen.faseDescricao.value||"").trim();if(!descricao){window.alert("Informe a descriÃ§Ã£o da fase.");return}pgenEditorState.fases.push({codigo:(pgen.faseCodigo.value||"").trim(),descricao,sequencia:(pgenEditorState.fases.length+1),tempo:Number(pgen.faseTempo.value||0)});pgen.faseCodigo.value="";pgen.faseDescricao.value="";pgen.faseTempo.value="0";pgenRenderFases_LEGACY()}
-function pgenAdicionarMaterial_LEGACY(){if(!pgenEditorState)return;const item=pgenEditorBuscaMateriais.find(x=>Number(x.id||0)===Number(pgen.matSelect.value||0));if(!item){window.alert("Selecione um material.");return}const quantidade=Number(pgen.matQuantidade.value||0);if(!(quantidade>0)){window.alert("Informe uma quantidade vÃ¡lida.");return}const existente=pgenEditorState.materiais.find(x=>Number(x.material_id||0)===Number(item.id||0));if(existente){existente.quantidade=Number(existente.quantidade||0)+quantidade}else{pgenEditorState.materiais.push({material_id:Number(item.id||0),codigo:String(item.codigo||""),nome:String(item.nome||""),quantidade,custo_und:Number(item.custo||0)})}pgen.matQuantidade.value="1";pgenRenderMateriais_LEGACY()}
+function pgenAdicionarFase_LEGACY(){if(!pgenEditorState)return;const descricao=(pgen.faseDescricao.value||"").trim();if(!descricao){window.alert("Informe a descriÃƒÂ§ÃƒÂ£o da fase.");return}pgenEditorState.fases.push({codigo:(pgen.faseCodigo.value||"").trim(),descricao,sequencia:(pgenEditorState.fases.length+1),tempo:Number(pgen.faseTempo.value||0)});pgen.faseCodigo.value="";pgen.faseDescricao.value="";pgen.faseTempo.value="0";pgenRenderFases_LEGACY()}
+function pgenAdicionarMaterial_LEGACY(){if(!pgenEditorState)return;const item=pgenEditorBuscaMateriais.find(x=>Number(x.id||0)===Number(pgen.matSelect.value||0));if(!item){window.alert("Selecione um material.");return}const quantidade=Number(pgen.matQuantidade.value||0);if(!(quantidade>0)){window.alert("Informe uma quantidade vÃƒÂ¡lida.");return}const existente=pgenEditorState.materiais.find(x=>Number(x.material_id||0)===Number(item.id||0));if(existente){existente.quantidade=Number(existente.quantidade||0)+quantidade}else{pgenEditorState.materiais.push({material_id:Number(item.id||0),codigo:String(item.codigo||""),nome:String(item.nome||""),quantidade,custo_und:Number(item.custo||0)})}pgen.matQuantidade.value="1";pgenRenderMateriais_LEGACY()}
 async function pgenSalvarEditor_LEGACY(){
   if(!pgenEditorState)return;
   const payload={codigo:(pgen.editorCodigo.value||"").trim(),descricao:(pgen.editorDescricao.value||"").trim(),tempo:Number(pgen.editorTempo.value||0),simbolo_grafico:String(pgen.editorSimbolo.value||"").trim(),mostrar_simbolo:!!pgen.editorMostrar.checked,observacoes:String(pgen.editorObs.value||"").trim(),fases:(pgenEditorState.fases||[]).map((x,idx)=>({codigo:String(x.codigo||"").trim(),descricao:String(x.descricao||"").trim(),sequencia:idx+1,tempo:Number(x.tempo||0)})).filter(x=>x.descricao),materiais:(pgenEditorState.materiais||[]).map(x=>({material_id:Number(x.material_id||0),quantidade:Number(x.quantidade||0)})).filter(x=>x.material_id>0&&x.quantidade>0)};
-  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃ³digo e descriÃ§Ã£o.");return}
+  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃƒÂ³digo e descriÃƒÂ§ÃƒÂ£o.");return}
   const method=pgenEditorId?"PUT":"POST";
   const path=pgenEditorId?`/cadastros/procedimentos-genericos/${pgenEditorId}`:"/cadastros/procedimentos-genericos";
   const{res,data}=await requestJson(method,path,payload,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento genÃ©rico.");return}
+  if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento genÃƒÂ©rico.");return}
   pgenFecharEditor();
   await pgenCarregar();
   pgenSelecionar(Number(data.id||pgenEditorId||0));
@@ -3129,9 +3209,9 @@ function pgenSimboloDescricao(codigo){
 function pgenCorrigirRotulos(){
   if(!pgen)return;
   const titulo=pgen.panel?.querySelector(".pgen-title");
-  if(titulo)titulo.textContent="Cadastro de procedimentos genÃ©ricos";
+  if(titulo)titulo.textContent="Cadastro de procedimentos genÃƒÂ©ricos";
   const heads=[...pgen.panel.querySelectorAll(".pgen-head span")];
-  ["CÃ³digo","Procedimento","Especialidade","Status"].forEach((texto,idx)=>{if(heads[idx])heads[idx].textContent=texto});
+  ["CÃƒÂ³digo","Procedimento","Especialidade","Status"].forEach((texto,idx)=>{if(heads[idx])heads[idx].textContent=texto});
   const filtros=[["pgen-cbo-especialidade","Especialidade:"],["pgen-txt-pesquisar","Procedimento:"]];
   filtros.forEach(([id,texto])=>{
     const label=document.querySelector(`label[for='${id}']`);
@@ -3141,16 +3221,16 @@ function pgenCorrigirRotulos(){
   const abas=[
     ["pgen-tab-principal","Principal"],
     ["pgen-tab-custos","Custos diretos"],
-    ["pgen-tab-vinculos","VÃ­nculos"],
+    ["pgen-tab-vinculos","VÃƒÂ­nculos"],
   ];
   abas.forEach(([id,texto])=>{const el=document.getElementById(id);if(el)el.textContent=texto});
   const labels=[
-    ["pgen-editor-descricao","Nome do procedimento genÃ©rico:"],
-    ["pgen-editor-codigo","CÃ³digo genÃ©rico:"],
+    ["pgen-editor-descricao","Nome do procedimento genÃƒÂ©rico:"],
+    ["pgen-editor-codigo","CÃƒÂ³digo genÃƒÂ©rico:"],
     ["pgen-editor-especialidade","Especialidade:"],
-    ["pgen-editor-simbolo","SÃ­mbolo grÃ¡fico:"],
+    ["pgen-editor-simbolo","SÃƒÂ­mbolo grÃƒÂ¡fico:"],
     ["pgen-editor-peso","Peso:"],
-    ["pgen-editor-obs","ObservaÃ§Ãµes:"],
+    ["pgen-editor-obs","ObservaÃƒÂ§ÃƒÂµes:"],
   ];
   labels.forEach(([id,texto])=>{
     const label=document.querySelector(`label[for='${id}']`);
@@ -3159,10 +3239,10 @@ function pgenCorrigirRotulos(){
   const checkLabel=document.querySelector("label[for='pgen-editor-inativo']")||document.getElementById("pgen-editor-inativo")?.closest("label");
   if(checkLabel)checkLabel.lastChild.textContent="Inativar procedimento";
   const dateLabels=[...pgen.panel.querySelectorAll(".pgen-dates .pgen-field label")];
-  if(dateLabels[0])dateLabels[0].textContent="InclusÃ£o:";
-  if(dateLabels[1])dateLabels[1].textContent="AlteraÃ§Ã£o:";
+  if(dateLabels[0])dateLabels[0].textContent="InclusÃƒÂ£o:";
+  if(dateLabels[1])dateLabels[1].textContent="AlteraÃƒÂ§ÃƒÂ£o:";
   const vincHeads=[...pgen.panel.querySelectorAll(".pgen-vinc-head span")];
-  ["Tabela","CÃ³digo","Nome"].forEach((texto,idx)=>{if(vincHeads[idx])vincHeads[idx].textContent=texto});
+  ["Tabela","CÃƒÂ³digo","Nome"].forEach((texto,idx)=>{if(vincHeads[idx])vincHeads[idx].textContent=texto});
 }
 function pgenAtualizarPreviewSimbolo(){
   if(!pgen)return;
@@ -3218,14 +3298,14 @@ function pgenDetalheParaEstado(data){
   };
 }
 async function pgenPersistirFases(state){
-  if(!state?.id)throw new Error("Procedimento genÃ©rico nÃ£o selecionado.");
+  if(!state?.id)throw new Error("Procedimento genÃƒÂ©rico nÃƒÂ£o selecionado.");
   const payload=pgenPayloadFromState(state);
   const {res,data}=await requestJson("PUT",`/cadastros/procedimentos-genericos/${state.id}`,payload,true);
   if(!res.ok)throw new Error(data.detail||"Falha ao gravar fases do procedimento.");
   return data;
 }
 async function pgenPersistirMateriais(state){
-  if(!state?.id)throw new Error("Procedimento genÃ©rico nÃ£o selecionado.");
+  if(!state?.id)throw new Error("Procedimento genÃƒÂ©rico nÃƒÂ£o selecionado.");
   const payload=pgenPayloadFromState(state);
   const {res,data}=await requestJson("PUT",`/cadastros/procedimentos-genericos/${state.id}`,payload,true);
   if(!res.ok)throw new Error(data.detail||"Falha ao gravar materiais do procedimento.");
@@ -3461,7 +3541,7 @@ function pgenEnsureUI(){
   document.head.appendChild(style);
   workspaceEmpty.insertAdjacentHTML("afterend",`
     <section id="pgen-panel" class="pgen-panel hidden">
-      <h2 class="pgen-title">Cadastro de procedimentos genÃ©ricos</h2>
+      <h2 class="pgen-title">Cadastro de procedimentos genÃƒÂ©ricos</h2>
       <div class="pgen-toolbar">
         <button id="pgen-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo procedimento...</button>
         <button id="pgen-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button>
@@ -3474,7 +3554,7 @@ function pgenEnsureUI(){
         <div class="pgen-field"><label for="pgen-cbo-especialidade">Especialidade:</label><select id="pgen-cbo-especialidade"><option value="">&lt;&lt;Todas&gt;&gt;</option></select></div>
         <div class="pgen-field"><label for="pgen-txt-pesquisar">Procedimento:</label><input id="pgen-txt-pesquisar" type="text"></div>
       </div>
-      <div class="pgen-head"><span>CÃ³digo</span><span>Procedimento</span><span>Especialidade</span><span>Status</span></div>
+      <div class="pgen-head"><span>CÃƒÂ³digo</span><span>Procedimento</span><span>Especialidade</span><span>Status</span></div>
       <div class="pgen-table-wrap">
         <table class="pgen-table">
           <colgroup><col><col><col><col></colgroup>
@@ -3492,38 +3572,38 @@ function pgenEnsureUI(){
         <div class="pgen-editor-tabs">
           <button id="pgen-tab-principal" class="pgen-editor-tab active" type="button">Principal</button>
           <button id="pgen-tab-custos" class="pgen-editor-tab" type="button">Custos diretos</button>
-          <button id="pgen-tab-vinculos" class="pgen-editor-tab" type="button">VÃ­nculos</button>
+          <button id="pgen-tab-vinculos" class="pgen-editor-tab" type="button">VÃƒÂ­nculos</button>
         </div>
         <div id="pgen-pane-principal" class="pgen-editor-pane">
           <div class="pgen-principal-grid">
             <div id="pgen-preview" class="pgen-preview"></div>
             <div class="pgen-nome-wrap">
-              <label for="pgen-editor-descricao">Nome do procedimento genÃ©rico:</label>
+              <label for="pgen-editor-descricao">Nome do procedimento genÃƒÂ©rico:</label>
               <input id="pgen-editor-descricao" type="text">
             </div>
             <div class="pgen-principal-row">
-              <div class="pgen-field"><label for="pgen-editor-codigo">CÃ³digo genÃ©rico:</label><input id="pgen-editor-codigo" type="text"></div>
+              <div class="pgen-field"><label for="pgen-editor-codigo">CÃƒÂ³digo genÃƒÂ©rico:</label><input id="pgen-editor-codigo" type="text"></div>
               <div class="pgen-field"><label for="pgen-editor-especialidade">Especialidade:</label><select id="pgen-editor-especialidade"></select></div>
             </div>
             <div class="pgen-principal-row-2">
-              <div class="pgen-field"><label for="pgen-editor-simbolo">SÃ­mbolo grÃ¡fico:</label><select id="pgen-editor-simbolo"></select></div>
+              <div class="pgen-field"><label for="pgen-editor-simbolo">SÃƒÂ­mbolo grÃƒÂ¡fico:</label><select id="pgen-editor-simbolo"></select></div>
               <div class="pgen-field"><label for="pgen-editor-peso">Peso:</label><input id="pgen-editor-peso" type="number" min="0" step="1"></div>
             </div>
-            <div class="pgen-field pgen-wide"><label for="pgen-editor-obs">ObservaÃ§Ãµes:</label><textarea id="pgen-editor-obs"></textarea></div>
+            <div class="pgen-field pgen-wide"><label for="pgen-editor-obs">ObservaÃƒÂ§ÃƒÂµes:</label><textarea id="pgen-editor-obs"></textarea></div>
             <label class="pgen-check pgen-wide"><input id="pgen-editor-inativo" type="checkbox">Inativar procedimento</label>
             <div class="pgen-dates pgen-wide">
-              <div class="pgen-field"><label>InclusÃ£o:</label><div id="pgen-editor-inclusao" class="pgen-date-box"></div></div>
-              <div class="pgen-field"><label>AlteraÃ§Ã£o:</label><div id="pgen-editor-alteracao" class="pgen-date-box"></div></div>
+              <div class="pgen-field"><label>InclusÃƒÂ£o:</label><div id="pgen-editor-inclusao" class="pgen-date-box"></div></div>
+              <div class="pgen-field"><label>AlteraÃƒÂ§ÃƒÂ£o:</label><div id="pgen-editor-alteracao" class="pgen-date-box"></div></div>
             </div>
           </div>
         </div>
         <div id="pgen-pane-custos" class="pgen-editor-pane hidden">
           <div class="pgen-custos-grid">
-            <span>Custo da hora clÃ­nica:</span><span>R$</span><div id="pgen-cd-hora" class="money"></div><span></span>
-            <span>Tempo total de execuÃ§Ã£o:</span><span></span><div class="num-box"><input id="pgen-cd-tempo-input" type="number" min="0" step="1" value="0"></div><span>min</span>
-            <span>Custo fixo da intervenÃ§Ã£o:</span><span>R$</span><div id="pgen-cd-fixo" class="money"></div><span></span>
+            <span>Custo da hora clÃƒÂ­nica:</span><span>R$</span><div id="pgen-cd-hora" class="money"></div><span></span>
+            <span>Tempo total de execuÃƒÂ§ÃƒÂ£o:</span><span></span><div class="num-box"><input id="pgen-cd-tempo-input" type="number" min="0" step="1" value="0"></div><span>min</span>
+            <span>Custo fixo da intervenÃƒÂ§ÃƒÂ£o:</span><span>R$</span><div id="pgen-cd-fixo" class="money"></div><span></span>
             <div class="sep"></div>
-            <span>Custo de protÃ©tico:</span><span>R$</span><div class="money" style="background:#f5f5f5"><input id="pgen-cd-protetico-input" type="text" value="0,00"></div><span></span>
+            <span>Custo de protÃƒÂ©tico:</span><span>R$</span><div class="money" style="background:#f5f5f5"><input id="pgen-cd-protetico-input" type="text" value="0,00"></div><span></span>
             <span>Custo de materiais:</span><span>R$</span><div id="pgen-cd-materiais" class="money"></div><span></span>
             <div class="sep"></div>
             <span>Custo total:</span><span>R$</span><div id="pgen-cd-total" class="money"></div><span></span>
@@ -3531,7 +3611,7 @@ function pgenEnsureUI(){
         </div>
         <div id="pgen-pane-vinculos" class="pgen-editor-pane hidden">
           <div class="pgen-vinculos-wrap">
-            <div class="pgen-vinc-head"><span>Tabela</span><span>CÃ³digo</span><span>Nome</span></div>
+            <div class="pgen-vinc-head"><span>Tabela</span><span>CÃƒÂ³digo</span><span>Nome</span></div>
             <div class="pgen-vinc-table-wrap">
               <table class="pgen-vinc-table">
                 <colgroup><col><col><col></colgroup>
@@ -3560,7 +3640,7 @@ function pgenEnsureUI(){
           <button id="pgen-fases-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button>
         </div>
         <div class="pgen-fases-grid">
-          <div class="pgen-fases-head-row"><span>Seq</span><span>CÃ³digo</span><span>DescriÃ§Ã£o</span><span>DuraÃ§Ã£o</span></div>
+          <div class="pgen-fases-head-row"><span>Seq</span><span>CÃƒÂ³digo</span><span>DescriÃƒÂ§ÃƒÂ£o</span><span>DuraÃƒÂ§ÃƒÂ£o</span></div>
           <div class="pgen-fases-table-wrap">
             <table class="pgen-fases-table">
               <colgroup><col><col><col><col></colgroup>
@@ -3584,7 +3664,7 @@ function pgenEnsureUI(){
               <select id="pgen-fase-select"></select>
             </div>
             <div>
-              <label for="pgen-fase-tempo">DuraÃ§Ã£o (min)</label>
+              <label for="pgen-fase-tempo">DuraÃƒÂ§ÃƒÂ£o (min)</label>
               <input id="pgen-fase-tempo" type="number" min="0" step="1" value="0">
             </div>
           </div>
@@ -3628,7 +3708,7 @@ function pgenEnsureUI(){
         <div class="pgen-mat-edit-body">
           <div class="pgen-mat-edit-grid">
             <div>
-              <label for="pgen-mat-lista">ClassificaÃ§Ã£o:</label>
+              <label for="pgen-mat-lista">ClassificaÃƒÂ§ÃƒÂ£o:</label>
               <select id="pgen-mat-lista"></select>
             </div>
             <div class="pgen-mat-edit-search">
@@ -3640,11 +3720,11 @@ function pgenEnsureUI(){
               <select id="pgen-mat-select"></select>
             </div>
             <div class="pgen-mat-edit-metric">
-              <label for="pgen-mat-custo-unit">Valor de custo unitÃ¡rio........................</label>
+              <label for="pgen-mat-custo-unit">Valor de custo unitÃƒÂ¡rio........................</label>
               <input id="pgen-mat-custo-unit" type="text" value="0,00" readonly>
             </div>
             <div class="pgen-mat-edit-metric">
-              <label for="pgen-mat-quantidade">Quantidade mÃ©dia utilizada................</label>
+              <label for="pgen-mat-quantidade">Quantidade mÃƒÂ©dia utilizada................</label>
               <input id="pgen-mat-quantidade" class="metric-qtd" type="number" min="0" step="0.01" value="0">
             </div>
             <div class="pgen-mat-edit-metric">
@@ -3818,7 +3898,7 @@ function pgenFaseEditFechar(){
 }
 async function pgenAbrirFases(){
   const item=pgenSelecionado();
-  if(!item){window.alert("Selecione um procedimento genÃ©rico.");return}
+  if(!item){window.alert("Selecione um procedimento genÃƒÂ©rico.");return}
   const {res,data}=await requestJson("GET",`/cadastros/procedimentos-genericos/detalhe/${item.id}`,undefined,true);
   if(!res.ok){window.alert(data.detail||"Falha ao carregar as fases do procedimento.");return}
   pgenFasesState=pgenDetalheParaEstado(data);
@@ -3854,7 +3934,7 @@ async function pgenFaseEditSalvar(){
   const tempo=Math.max(0,Number(pgen.faseTempo.value||0));
   const fases=Array.isArray(pgenFasesState.fases)?[...pgenFasesState.fases]:[];
   const duplicada=fases.some((item,idx)=>String(item.codigo||"").trim()===codigo&&idx!==pgenFaseEditIdx);
-  if(duplicada){window.alert("Esta fase jÃ¡ estÃ¡ vinculada ao procedimento.");return}
+  if(duplicada){window.alert("Esta fase jÃƒÂ¡ estÃƒÂ¡ vinculada ao procedimento.");return}
   const novaFase={codigo,descricao,tempo,sequencia:1};
   if(pgenFaseEditIdx!=null&&pgenFaseEditIdx>=0&&pgenFaseEditIdx<fases.length){
     fases[pgenFaseEditIdx]={...fases[pgenFaseEditIdx],...novaFase};
@@ -3879,11 +3959,11 @@ async function pgenFaseEditSalvar(){
   }
 }
 async function pgenFaseExcluirSelecionada(){
-  if(!pgenFasesState){window.alert("Selecione um procedimento genÃ©rico.");return}
+  if(!pgenFasesState){window.alert("Selecione um procedimento genÃƒÂ©rico.");return}
   if(!(pgenFasesSelecionadaIdx>=0)){window.alert("Selecione uma fase.");return}
   const fase=(pgenFasesState.fases||[])[pgenFasesSelecionadaIdx];
   if(!fase)return;
-  if(!window.confirm(`Confirma a eliminaÃ§Ã£o da fase ${fase.descricao}?`))return;
+  if(!window.confirm(`Confirma a eliminaÃƒÂ§ÃƒÂ£o da fase ${fase.descricao}?`))return;
   pgenFasesState.fases=(pgenFasesState.fases||[]).filter((_,idx)=>idx!==pgenFasesSelecionadaIdx).map((item,idx)=>({...item,sequencia:idx+1}));
   try{
     const salvo=await pgenPersistirFases(pgenFasesState);
@@ -3949,7 +4029,7 @@ function pgenAtualizarCustoMaterialEditor(){
 }
 async function pgenAbrirMateriais(){
   const item=pgenSelecionado();
-  if(!item){window.alert("Selecione um procedimento genÃ©rico.");return}
+  if(!item){window.alert("Selecione um procedimento genÃƒÂ©rico.");return}
   const {res,data}=await requestJson("GET",`/cadastros/procedimentos-genericos/detalhe/${item.id}`,undefined,true);
   if(!res.ok){window.alert(data.detail||"Falha ao carregar os materiais do procedimento.");return}
   pgenEditorState=pgenDetalheParaEstado(data);
@@ -3988,11 +4068,11 @@ async function pgenMaterialEditSalvar(){
   const item=pgenEditorBuscaMateriais.find(x=>Number(x.id||0)===Number(pgen.matSelect?.value||0));
   if(!item){window.alert("Selecione um material.");return}
   const quantidade=Math.max(0,Number(pgen.matQuantidade?.value||0));
-  if(!(quantidade>0)){window.alert("Informe uma quantidade vÃ¡lida.");return}
+  if(!(quantidade>0)){window.alert("Informe uma quantidade vÃƒÂ¡lida.");return}
   const materiais=Array.isArray(pgenEditorState.materiais)?[...pgenEditorState.materiais]:[];
   const novo={material_id:Number(item.id||0),codigo:String(item.codigo||""),nome:String(item.nome||""),quantidade,custo_und:Number(item.custo||0)};
   const duplicada=materiais.some((x,idx)=>Number(x.material_id||0)===novo.material_id&&idx!==pgenMaterialEditIdx);
-  if(duplicada){window.alert("Este material jÃ¡ estÃ¡ vinculado ao procedimento.");return}
+  if(duplicada){window.alert("Este material jÃƒÂ¡ estÃƒÂ¡ vinculado ao procedimento.");return}
   if(pgenMaterialEditIdx!=null&&pgenMaterialEditIdx>=0&&pgenMaterialEditIdx<materiais.length)materiais[pgenMaterialEditIdx]={...materiais[pgenMaterialEditIdx],...novo};
   else materiais.push(novo);
   pgenEditorState.materiais=materiais;
@@ -4013,7 +4093,7 @@ function pgenMaterialExcluirSelecionado(){
   if(!(pgenMaterialSelecionadoIdx>=0)){window.alert("Selecione um material.");return}
   const item=(pgenEditorState?.materiais||[])[pgenMaterialSelecionadoIdx];
   if(!item)return;
-  if(!window.confirm(`Confirma a eliminaÃ§Ã£o do material ${item.nome}?`))return;
+  if(!window.confirm(`Confirma a eliminaÃƒÂ§ÃƒÂ£o do material ${item.nome}?`))return;
   pgenEditorState.materiais=(pgenEditorState.materiais||[]).filter((_,idx)=>idx!==pgenMaterialSelecionadoIdx);
   pgenPersistirMateriais(pgenEditorState).then(salvo=>{
     pgenEditorState=pgenDetalheParaEstado(salvo);
@@ -4031,7 +4111,7 @@ async function pgenCarregar(){
   const q=encodeURIComponent((pgen.txtPesquisar.value||"").trim());
   const especialidade=encodeURIComponent(String(pgen.cboEspecialidade?.value||"").trim());
   const {res,data}=await requestJson("GET",`/cadastros/procedimentos-genericos?q=${q}&especialidade=${especialidade}`,undefined,true);
-  if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar procedimentos genÃ©ricos.";return}
+  if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar procedimentos genÃƒÂ©ricos.";return}
   pgenCache=Array.isArray(data)?data:[];
   pgenSelId=pgenCache.some(item=>item.id===keep)?keep:(pgenCache[0]?.id||null);
   pgenRender();
@@ -4046,7 +4126,7 @@ procPreencherSelect(pgen.editorSimbolo,simbolos,{valueFrom:item=>item?.codigo??"
   pgenPreencherEspecialidades();
   if(id){
     const {res,data}=await requestJson("GET",`/cadastros/procedimentos-genericos/detalhe/${id}`,undefined,true);
-    if(!res.ok){window.alert(data.detail||"Falha ao carregar procedimento genÃ©rico.");return}
+    if(!res.ok){window.alert(data.detail||"Falha ao carregar procedimento genÃƒÂ©rico.");return}
     pgenEditorState=pgenDetalheParaEstado(data);
   }else{
     const {res,data}=await requestJson("GET","/cadastros/procedimentos-genericos/proximo-codigo",undefined,true);
@@ -4081,21 +4161,21 @@ async function pgenSalvarEditor(){
   pgenEditorState.tempo=Math.max(0,Number(pgen.cdTempoInput.value||0));
   pgenEditorState.custo_lab=Math.max(0,Number(procParse(pgen.cdProteticoInput.value||"0")||0));
   const payload={codigo:(pgen.editorCodigo.value||"").trim(),descricao:(pgen.editorDescricao.value||"").trim(),especialidade:String(pgen.editorEspecialidade.value||"").trim(),tempo:pgenEditorState.tempo,custo_lab:pgenEditorState.custo_lab,peso:Number(pgen.editorPeso.value||0),simbolo_grafico:String(pgen.editorSimbolo.value||"").trim(),mostrar_simbolo:!!String(pgen.editorSimbolo.value||"").trim(),inativo:!!pgen.editorInativo.checked,observacoes:String(pgen.editorObs.value||"").trim(),fases:(pgenEditorState.fases||[]).map((x,idx)=>({codigo:String(x.codigo||"").trim(),descricao:String(x.descricao||"").trim(),sequencia:idx+1,tempo:Number(x.tempo||0)})).filter(x=>x.descricao),materiais:(pgenEditorState.materiais||[]).map(x=>({material_id:Number(x.material_id||0),quantidade:Number(x.quantidade||0)})).filter(x=>x.material_id>0&&x.quantidade>0)};
-  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃ³digo e descriÃ§Ã£o.");return}
+  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃƒÂ³digo e descriÃƒÂ§ÃƒÂ£o.");return}
   const method=pgenEditorId?"PUT":"POST";
   const path=pgenEditorId?`/cadastros/procedimentos-genericos/${pgenEditorId}`:"/cadastros/procedimentos-genericos";
   const {res,data}=await requestJson(method,path,payload,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento genÃ©rico.");return}
+  if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento genÃƒÂ©rico.");return}
   pgenFecharEditor();
   await pgenCarregar();
   pgenSelecionar(Number(data.id||pgenEditorId||0));
 }
 async function pgenExcluirSelecionado(){
   const item=pgenSelecionado();
-  if(!item){window.alert("Selecione um procedimento genÃ©rico.");return}
-  if(!window.confirm(`Confirma a eliminaÃ§Ã£o do procedimento ${item.descricao}?`))return;
+  if(!item){window.alert("Selecione um procedimento genÃƒÂ©rico.");return}
+  if(!window.confirm(`Confirma a eliminaÃƒÂ§ÃƒÂ£o do procedimento ${item.descricao}?`))return;
   const {res,data}=await requestJson("DELETE",`/cadastros/procedimentos-genericos/${item.id}`,undefined,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao excluir procedimento genÃ©rico.");return}
+  if(!res.ok){window.alert(data.detail||"Falha ao excluir procedimento genÃƒÂ©rico.");return}
   await pgenCarregar();
 }
 async function pgenAbrir(){
@@ -4108,7 +4188,7 @@ async function pgenAbrir(){
   pgen.panel.classList.remove("hidden");
   workspaceEmpty.classList.add("hidden");
   await pgenCarregar();
-  footerMsg.textContent="MÃ³dulo Procedimentos genÃ©ricos aberto.";
+  footerMsg.textContent="MÃƒÂ³dulo Procedimentos genÃƒÂ©ricos aberto.";
 }
 pgenCorrigirRotulos=function(){
   if(!pgen)return;
@@ -4150,12 +4230,12 @@ pgenCorrigirRotulos=function(){
   const fasesTitulo=document.querySelector(".pgen-fases-title");
   if(fasesTitulo)fasesTitulo.textContent="Configura fases do procedimento";
   const fasesHeads=[...document.querySelectorAll(".pgen-fases-head-row span")];
-  ["Seq","CÃ³digo","DescriÃ§Ã£o","DuraÃ§Ã£o"].forEach((texto,idx)=>{if(fasesHeads[idx])fasesHeads[idx].textContent=texto});
+  ["Seq","CÃƒÂ³digo","DescriÃƒÂ§ÃƒÂ£o","DuraÃƒÂ§ÃƒÂ£o"].forEach((texto,idx)=>{if(fasesHeads[idx])fasesHeads[idx].textContent=texto});
   if(pgen?.faseEditTitle&&pgenFaseEditIdx==null)pgen.faseEditTitle.textContent="Nova fase";
   const faseSelectLabel=document.querySelector("label[for='pgen-fase-select']");
   if(faseSelectLabel)faseSelectLabel.textContent="Fase procedimento";
   const faseTempoLabel=document.querySelector("label[for='pgen-fase-tempo']");
-  if(faseTempoLabel)faseTempoLabel.textContent="DuraÃ§Ã£o (min)";
+  if(faseTempoLabel)faseTempoLabel.textContent="DuraÃƒÂ§ÃƒÂ£o (min)";
 };
 function fichaEnsureUI(){
   if(ficha)return;
@@ -4188,7 +4268,7 @@ function fichaEnsureUI(){
     .ficha-phone-grid{display:grid;grid-template-columns:122px 1fr 28px;gap:4px;align-items:end}
     .ficha-phone-grid .ficha-field{margin:0}
     .ficha-phone-grid .ficha-field select,.ficha-phone-grid .ficha-field input{height:20px;font-size:11px;padding:0 4px}
-    .ficha-phone-ico{height:22px;width:28px;display:flex;align-items:center;justify-content:center;border:1px solid #2fa84f;background:#e8ffef;color:#178038;border-radius:4px;font:700 11px/1 Tahoma,sans-serif;cursor:pointer}
+    .ficha-phone-ico{height:24px;width:28px;display:flex;align-items:center;justify-content:center;border:1px solid #2fa84f;background:#e8ffef url('/desktop-assets/whatsapp.png') center/14px 14px no-repeat;color:transparent;border-radius:4px;font:700 11px/1 Tahoma,sans-serif;cursor:pointer}
     .ficha-conv-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px 8px}
     .ficha-dados-footer{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
     .ficha-statusbar{margin-top:5px;padding-top:4px;border-top:1px solid #cfd8e3;color:#2f3f57}
@@ -4314,19 +4394,19 @@ function fichaEnsureUI(){
             <div class="ficha-phone-grid">
               <div class="ficha-field"><select id="ficha-tipo-fone1"><option value="">Selecione...</option></select></div>
               <div class="ficha-field"><input id="ficha-fone1" type="text"></div>
-              <button id="ficha-btn-wa1" class="ficha-phone-ico" type="button" title="WhatsApp">WA</button>
+              <button id="ficha-btn-wa1" class="ficha-phone-ico" type="button" title="WhatsApp" aria-label="WhatsApp"></button>
 
               <div class="ficha-field"><select id="ficha-tipo-fone2"><option value="">Selecione...</option></select></div>
               <div class="ficha-field"><input id="ficha-fone2" type="text"></div>
-              <button id="ficha-btn-wa2" class="ficha-phone-ico" type="button" title="WhatsApp">WA</button>
+              <button id="ficha-btn-wa2" class="ficha-phone-ico" type="button" title="WhatsApp" aria-label="WhatsApp"></button>
 
               <div class="ficha-field"><select id="ficha-tipo-fone3"><option value="">Selecione...</option></select></div>
               <div class="ficha-field"><input id="ficha-fone3" type="text"></div>
-              <button id="ficha-btn-wa3" class="ficha-phone-ico" type="button" title="WhatsApp">WA</button>
+              <button id="ficha-btn-wa3" class="ficha-phone-ico" type="button" title="WhatsApp" aria-label="WhatsApp"></button>
 
               <div class="ficha-field"><select id="ficha-tipo-fone4"><option value="">Selecione...</option></select></div>
               <div class="ficha-field"><input id="ficha-fone4" type="text"></div>
-              <button id="ficha-btn-wa4" class="ficha-phone-ico" type="button" title="WhatsApp">WA</button>
+              <button id="ficha-btn-wa4" class="ficha-phone-ico" type="button" title="WhatsApp" aria-label="WhatsApp"></button>
             </div>
           </div>
 
@@ -4712,7 +4792,7 @@ async function fichaFotoAtualizarDispositivos(){
   try{
     const devices=await navigator.mediaDevices.enumerateDevices();
     const cameras=devices.filter(d=>d.kind==="videoinput");
-    fichaFotoCapture.device.innerHTML=cameras.map((d,idx)=>`<option value="${esc(d.deviceId||"")}">${esc(d.label||`CÃ¢mera ${idx+1}`)}</option>`).join("");
+    fichaFotoCapture.device.innerHTML=cameras.map((d,idx)=>`<option value="${esc(d.deviceId||"")}">${esc(d.label||`CÃƒÂ¢mera ${idx+1}`)}</option>`).join("");
     return cameras;
   }catch{
     fichaFotoCapture.device.innerHTML="";
@@ -4720,7 +4800,7 @@ async function fichaFotoAtualizarDispositivos(){
   }
 }
 async function fichaFotoAbrirStream(deviceId=""){
-  if(!fichaFotoCapture?.video||!navigator.mediaDevices?.getUserMedia)throw new Error("Captura por cÃ¢mera nÃ£o suportada neste navegador.");
+  if(!fichaFotoCapture?.video||!navigator.mediaDevices?.getUserMedia)throw new Error("Captura por cÃƒÂ¢mera nÃƒÂ£o suportada neste navegador.");
   fichaFotoStopStream();
   const constraints=deviceId?{video:{deviceId:{exact:deviceId}}}:{video:{facingMode:"user"}};
   const stream=await navigator.mediaDevices.getUserMedia(constraints);
@@ -4774,7 +4854,7 @@ function fichaFotoEnsureUI(){
       <div class="modal ficha-photo-cam">
         <div class="modal-header"><div class="modal-title">Captura de fotografia</div></div>
         <div class="ficha-photo-cam-grid">
-          <div><label for="ficha-photo-device">CÃ¢mera:</label><select id="ficha-photo-device"></select></div>
+          <div><label for="ficha-photo-device">CÃƒÂ¢mera:</label><select id="ficha-photo-device"></select></div>
         </div>
         <div class="ficha-photo-preview"><video id="ficha-photo-video" autoplay playsinline muted></video></div>
         <div class="ficha-photo-actions">
@@ -4804,11 +4884,11 @@ function fichaFotoEnsureUI(){
   fichaFotoMenu.btnEliminar.addEventListener("click",()=>{fichaFotoMenu.panel.classList.add("hidden");fichaFotoAplicar("","");});
   fichaFotoMenu.btnCapturar.addEventListener("click",async()=>{
     fichaFotoMenu.panel.classList.add("hidden");
-    if(!navigator.mediaDevices?.getUserMedia){window.alert("Captura por cÃ¢mera nÃ£o disponÃ­vel neste navegador.");return}
+    if(!navigator.mediaDevices?.getUserMedia){window.alert("Captura por cÃƒÂ¢mera nÃƒÂ£o disponÃƒÂ­vel neste navegador.");return}
     fichaFotoCapture.backdrop.classList.remove("hidden");
-    try{await fichaFotoAbrirStream(String(fichaFotoCapture.device?.value||""));}catch(err){fichaFotoFecharCaptura();window.alert(err?.message||"NÃ£o foi possÃ­vel acessar a cÃ¢mera.");}
+    try{await fichaFotoAbrirStream(String(fichaFotoCapture.device?.value||""));}catch(err){fichaFotoFecharCaptura();window.alert(err?.message||"NÃƒÂ£o foi possÃƒÂ­vel acessar a cÃƒÂ¢mera.");}
   });
-  fichaFotoCapture.device.addEventListener("change",async()=>{try{await fichaFotoAbrirStream(String(fichaFotoCapture.device.value||""));}catch(err){window.alert(err?.message||"NÃ£o foi possÃ­vel trocar a cÃ¢mera.");}});
+  fichaFotoCapture.device.addEventListener("change",async()=>{try{await fichaFotoAbrirStream(String(fichaFotoCapture.device.value||""));}catch(err){window.alert(err?.message||"NÃƒÂ£o foi possÃƒÂ­vel trocar a cÃƒÂ¢mera.");}});
   fichaFotoCapture.btnCapturar.addEventListener("click",fichaFotoCapturarAtual);
   fichaFotoCapture.btnCancelar.addEventListener("click",fichaFotoFecharCaptura);
   fichaFotoCapture.backdrop.addEventListener("click",(ev)=>{if(ev.target===fichaFotoCapture.backdrop)fichaFotoFecharCaptura();});
@@ -4959,8 +5039,8 @@ async function fichaCarregarCombos(){
   const [prefixos,estadoCivil,statusPaciente,tiposIndicacao,bairros,cidades,palavrasChave,unidadesResp,prestadoresResp,comboResp]=await Promise.all([
     materiaisCarregarAuxTipo("Prefixo pessoais"),
     materiaisCarregarAuxTipo("Estado civil"),
-    materiaisCarregarAuxTipo("SituaÃ§Ã£o do paciente"),
-    materiaisCarregarAuxTipo("Tipos de indicaÃ§Ã£o"),
+    materiaisCarregarAuxTipo("Situação do paciente"),
+    materiaisCarregarAuxTipo("Tipos de indicaÃƒÂ§ÃƒÂ£o"),
     materiaisCarregarAuxTipo("Bairro"),
     materiaisCarregarAuxTipo("Cidade"),
     materiaisCarregarAuxTipo("Palavra chave"),
@@ -5003,7 +5083,7 @@ async function fichaCarregarCombos(){
     fichaPlanosCache=planosNovos;
     fichaTabelasCache=tabelasNovas;
   }else if(typeof footerMsg!=="undefined"&&footerMsg){
-    footerMsg.textContent=(comboData?.detail?String(comboData.detail):"Falha ao carregar convÃªnios, planos e tabelas da ficha.");
+    footerMsg.textContent=(comboData?.detail?String(comboData.detail):"Falha ao carregar convÃƒÂªnios, planos e tabelas da ficha.");
   }
   fichaSetObjectOptions(ficha.convenio,fichaConveniosCache,"Selecione...");
   fichaAtualizarPlanosFiltro();
@@ -5273,7 +5353,7 @@ async function fichaAbrirPorCodigo(codigo,quiet=false){
   await fichaCarregarCombos();
   const{res,data}=await requestJson("GET",`/cadastros/pacientes/por-codigo/${cod}`,undefined,true);
   if(!res.ok){
-    if(!quiet)window.alert(data.detail||"Paciente nÃ£o encontrado.");
+    if(!quiet)window.alert(data.detail||"Paciente nÃƒÂ£o encontrado.");
     return null;
   }
   fichaAplicarPaciente(data);
@@ -5327,116 +5407,205 @@ function fichaMenuPacEnsureUI(){
   if(fichaMenuPac)return;
   const style=document.createElement("style");
   style.textContent=`
-    .ficha-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.28);display:grid;place-items:center;z-index:1200}
+    .ficha-menu-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.25);display:grid;place-items:center;z-index:1200}
     .ficha-menu-backdrop.hidden{display:none}
-    .ficha-menu-modal{width:min(980px,96vw);height:min(620px,90vh);background:#fff;border:1px solid #9aa7b8;display:grid;grid-template-rows:auto auto 1fr auto;font:12px Tahoma,sans-serif;color:#000}
-    .ficha-menu-top{display:flex;align-items:center;justify-content:space-between;background:#008080;color:#fff;padding:6px 8px}
-    .ficha-menu-title{font:700 13px Tahoma,sans-serif}
-    .ficha-menu-close{width:22px;height:22px;border:1px solid #d8eef0;background:#e9f9fb;color:#024f54;cursor:pointer;font:700 14px/1 Tahoma,sans-serif}
-    .ficha-menu-filtros{display:grid;grid-template-columns:94px 1fr 100px 86px;gap:8px;align-items:end;padding:8px;border-bottom:1px solid #d3dbe7}
-    .ficha-menu-filtros label{display:block;margin-bottom:2px}
-    .ficha-menu-filtros input,.ficha-menu-filtros select{height:24px;border:1px solid #bfc9d6;box-sizing:border-box;padding:0 6px}
-    .ficha-menu-grid{margin:8px;border:1px solid #cfd8e3;overflow:auto}
+    .ficha-menu-modal{width:690px;max-width:96vw;height:640px;max-height:92vh;background:#ececec;border:1px solid #9ea7b4;display:grid;grid-template-rows:auto auto auto auto 1fr auto;font:12px Tahoma,sans-serif;color:#000;box-sizing:border-box}
+    .ficha-menu-top{display:flex;align-items:center;justify-content:space-between}
+    .ficha-menu-title{font:700 44px/1 Tahoma,sans-serif;margin-right:auto}
+    .ficha-menu-close{width:30px;height:30px}
+    .form-row,.ficha-menu-form-row{display:grid;gap:10px;padding:8px 10px 0}
+    .ficha-menu-form-row.is-top{grid-template-columns:1fr 1fr 1.4fr}
+    .ficha-menu-form-row.is-search{grid-template-columns:190px 1fr;padding-top:6px;padding-bottom:4px}
+    .form-group,.ficha-menu-form-group{display:grid;grid-template-rows:auto 24px;align-items:end;min-width:0}
+    .form-group label,.ficha-menu-form-group label{display:block;line-height:16px;margin:0 0 2px}
+    .form-group select,.form-group input,.ficha-menu-form-group select,.ficha-menu-form-group input{height:24px;border:1px solid #9ea7b4;background:#fff;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif;min-width:0}
+    .ficha-menu-alpha{display:flex;align-items:center;gap:0;padding:0 10px 4px}
+    .ficha-menu-alpha button{height:24px;min-width:24px;border:1px solid #9ea7b4;border-right:none;background:#ececec;cursor:pointer;padding:0 5px;font:12px Tahoma,sans-serif}
+    .ficha-menu-alpha button:last-child{border-right:1px solid #9ea7b4}
+    .ficha-menu-alpha button.active{background:#d9e8fb}
+    .ficha-menu-grid{margin:0 10px;border:1px solid #9ea7b4;background:#fff;overflow:auto;min-height:0}
     .ficha-menu-table{width:100%;border-collapse:collapse;table-layout:fixed}
-    .ficha-menu-table th,.ficha-menu-table td{padding:4px 6px;border-bottom:1px solid #e7edf5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .ficha-menu-table th{background:#f3f7fc;text-align:left;position:sticky;top:0;z-index:1}
-    .ficha-menu-table tr:nth-child(even){background:#fafcff}
-    .ficha-menu-table tr.selected{background:#d9e8fb}
-    .ficha-menu-table td:nth-child(1),.ficha-menu-table th:nth-child(1){width:74px;text-align:right}
-    .ficha-menu-table td:nth-child(3),.ficha-menu-table th:nth-child(3){width:112px}
-    .ficha-menu-table td:nth-child(4),.ficha-menu-table th:nth-child(4){width:170px}
-    .ficha-menu-table td:nth-child(5),.ficha-menu-table th:nth-child(5){width:130px}
-    .ficha-menu-foot{display:flex;align-items:center;justify-content:space-between;padding:8px;border-top:1px solid #d3dbe7}
-    .ficha-menu-actions{display:flex;gap:8px}
-    .ficha-menu-actions .materiais-btn{height:30px;min-width:88px;justify-content:center;padding:0 10px}
+    .ficha-menu-table th,.ficha-menu-table td{height:22px;padding:0 6px;border-bottom:1px solid #e5e9ef;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:12px Tahoma,sans-serif}
+    .ficha-menu-table th{background:#f5f7fb;text-align:left;position:sticky;top:0;z-index:1}
+    .ficha-menu-table th:nth-child(1),.ficha-menu-table td:nth-child(1){width:auto}
+    .ficha-menu-table th:nth-child(2),.ficha-menu-table td:nth-child(2){width:120px;text-align:left}
+    .ficha-menu-table tr.selected{background:#2a84d2;color:#fff}
+    .ficha-menu-foot{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-top:1px solid #b7bfca}
+    .form-actions,.ficha-menu-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+    .ficha-menu-actions .materiais-btn{height:30px;min-width:90px;justify-content:center;padding:0 10px;border:1px solid #9ea7b4;background:#ececec}
+    .ficha-menu-actions .materiais-btn img{display:none}
   `;
   document.head.appendChild(style);
+  const letras=['*','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','X','Y','W','Z'];
   const html=`
     <div id="ficha-menu-backdrop" class="ficha-menu-backdrop hidden">
       <div class="ficha-menu-modal">
-        <div class="ficha-menu-top">
-          <div class="ficha-menu-title">Menu de pacientes</div>
-          <button id="ficha-menu-close" class="ficha-menu-close" type="button" aria-label="Fechar">X</button>
+        <div class="ficha-menu-top modal-header">
+          <div class="ficha-menu-title modal-title">Menu de pacientes</div>
+          <button id="ficha-menu-close" class="ficha-menu-close modal-close-x" type="button" aria-label="Fechar">X</button>
         </div>
-        <div class="ficha-menu-filtros">
-          <div>
-            <label for="ficha-menu-campo">Campo</label>
-            <select id="ficha-menu-campo">
-              <option value="geral">Geral</option>
-              <option value="codigo">CÃ³digo</option>
-              <option value="nome">Nome</option>
-            </select>
-          </div>
-          <div>
-            <label for="ficha-menu-q">Pesquisar</label>
-            <input id="ficha-menu-q" type="text" autocomplete="off">
-          </div>
-          <button id="ficha-menu-btn-pesquisar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Pesquisar</button>
-          <button id="ficha-menu-btn-limpar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Limpar</button>
+        <div class="form-row ficha-menu-form-row is-top">
+          <div class="form-group ficha-menu-form-group"><label for="ficha-menu-cir">CirurgiÃ£o:</label><select id="ficha-menu-cir"></select></div>
+          <div class="form-group ficha-menu-form-group"><label for="ficha-menu-filtro">Filtro:</label><select id="ficha-menu-filtro"></select></div>
+          <div class="form-group ficha-menu-form-group"><label for="ficha-menu-vis">VisualizaÃ§Ã£o:</label><select id="ficha-menu-vis"></select></div>
         </div>
+        <div class="form-row ficha-menu-form-row is-search">
+          <div class="form-group ficha-menu-form-group"><label for="ficha-menu-pesquisa">Pesquisar:</label><select id="ficha-menu-pesquisa"></select></div>
+          <div class="form-group ficha-menu-form-group"><label for="ficha-menu-q">Pesquisar nome do paciente:</label><input id="ficha-menu-q" type="text" autocomplete="off"></div>
+        </div>
+        <div id="ficha-menu-alpha" class="ficha-menu-alpha">${letras.map((l,i)=>`<button type="button" data-ord="${i}">${l}</button>`).join('')}</div>
         <div class="ficha-menu-grid">
           <table class="ficha-menu-table">
-            <thead><tr><th>N</th><th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade</th><th>SituaÃ§Ã£o</th></tr></thead>
+            <thead><tr><th id="ficha-menu-th-nome">Nome</th><th id="ficha-menu-th-numero">NÃºmero</th></tr></thead>
             <tbody id="ficha-menu-tbody"></tbody>
           </table>
         </div>
         <div class="ficha-menu-foot">
-          <div id="ficha-menu-total">Total: 0</div>
-          <div class="ficha-menu-actions">
-            <button id="ficha-menu-btn-abrir" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Abrir</button>
-            <button id="ficha-menu-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
+          <div id="ficha-menu-total">0 pacientes listados</div>
+          <div class="form-actions ficha-menu-actions">
+            <button id="ficha-menu-btn-novo" class="materiais-btn" type="button">Novo...</button>
+            <button id="ficha-menu-btn-ok" class="materiais-btn" type="button">Ok</button>
+            <button id="ficha-menu-btn-cancelar" class="materiais-btn" type="button">Cancela</button>
           </div>
         </div>
       </div>
     </div>
   `;
   document.body.insertAdjacentHTML("beforeend",html);
+  ensureModalChrome(document.querySelector("#ficha-menu-backdrop .ficha-menu-modal"));
   fichaMenuPac={
     backdrop:document.getElementById("ficha-menu-backdrop"),
     title:document.querySelector("#ficha-menu-backdrop .ficha-menu-title"),
     closeX:document.getElementById("ficha-menu-close"),
-    cboCampo:document.getElementById("ficha-menu-campo"),
+    cboCirurgiao:document.getElementById("ficha-menu-cir"),
+    cboFiltro:document.getElementById("ficha-menu-filtro"),
+    cboVisualizacao:document.getElementById("ficha-menu-vis"),
+    cboPesquisa:document.getElementById("ficha-menu-pesquisa"),
     txtQ:document.getElementById("ficha-menu-q"),
-    btnPesquisar:document.getElementById("ficha-menu-btn-pesquisar"),
-    btnLimpar:document.getElementById("ficha-menu-btn-limpar"),
+    alphaWrap:document.getElementById("ficha-menu-alpha"),
     tbody:document.getElementById("ficha-menu-tbody"),
     total:document.getElementById("ficha-menu-total"),
-    btnAbrir:document.getElementById("ficha-menu-btn-abrir"),
-    btnFechar:document.getElementById("ficha-menu-btn-fechar"),
-    thCodigo:document.querySelector("#ficha-menu-backdrop .ficha-menu-table th:nth-child(1)"),
-    thCpf:document.querySelector("#ficha-menu-backdrop .ficha-menu-table th:nth-child(3)"),
-    thTelefone:document.querySelector("#ficha-menu-backdrop .ficha-menu-table th:nth-child(4)"),
-    thCidade:document.querySelector("#ficha-menu-backdrop .ficha-menu-table th:nth-child(5)"),
-    thStatus:document.querySelector("#ficha-menu-backdrop .ficha-menu-table th:nth-child(6)"),
+    btnNovo:document.getElementById("ficha-menu-btn-novo"),
+    btnOk:document.getElementById("ficha-menu-btn-ok"),
+    btnCancelar:document.getElementById("ficha-menu-btn-cancelar"),
+    thNome:document.getElementById("ficha-menu-th-nome"),
+    thNumero:document.getElementById("ficha-menu-th-numero"),
     selectedId:null,
     mode:"paciente",
     source:"paciente",
+    prefLoaded:false,
+    saveTimer:null,
+    searchTimer:null,
+    searchSeq:0,
+    lastTotal:0,
+    onSelect:null,
   };
   const fechar=()=>fichaMenuPacFechar();
   fichaMenuPac.closeX.addEventListener("click",fechar);
-  fichaMenuPac.btnFechar.addEventListener("click",fechar);
-  fichaMenuPac.btnPesquisar.addEventListener("click",()=>fichaMenuPacPesquisar());
-  fichaMenuPac.btnLimpar.addEventListener("click",()=>fichaMenuPacLimpar());
-  fichaMenuPac.btnAbrir.addEventListener("click",()=>fichaMenuPacConfirmar());
-  fichaMenuPac.txtQ.addEventListener("keydown",(ev)=>{
-    if(ev.key==="Enter"){ev.preventDefault();fichaMenuPacPesquisar();}
-    if(ev.key==="Escape"){ev.preventDefault();fichaMenuPacFechar();}
+  fichaMenuPac.btnCancelar.addEventListener("click",fechar);
+  fichaMenuPac.btnOk.addEventListener("click",()=>fichaMenuPacConfirmar());
+  fichaMenuPac.btnNovo.addEventListener("click",async()=>{fichaMenuPacFechar();await fichaAbrirNovo();});
+  fichaMenuPac.txtQ.addEventListener("keydown",(ev)=>{if(ev.key==="Enter"){ev.preventDefault();fichaMenuPacPesquisar()} if(ev.key==="Escape"){ev.preventDefault();fichaMenuPacFechar();}});
+  fichaMenuPac.txtQ.addEventListener("input",()=>{
+    if(!fichaMenuPac)return;
+    if(fichaMenuPac.searchTimer)clearTimeout(fichaMenuPac.searchTimer);
+    fichaMenuPac.searchTimer=setTimeout(()=>{fichaMenuPacPesquisar();},120);
   });
-  fichaMenuPac.backdrop.addEventListener("keydown",(ev)=>{
-    if(ev.key==="Escape"){ev.preventDefault();fichaMenuPacFechar();}
-    if(ev.key==="Enter"&&ev.target===fichaMenuPac.tbody){ev.preventDefault();fichaMenuPacConfirmar();}
+  fichaMenuPac.backdrop.addEventListener("keydown",(ev)=>{if(ev.key==="Escape"){ev.preventDefault();fichaMenuPacFechar();}});
+  if(fichaMenuPac.alphaWrap){
+    fichaMenuPac.alphaWrap.querySelectorAll("button[data-ord]").forEach(btn=>btn.addEventListener("click",()=>{
+      if(!fichaMenuPac)return;
+      fichaMenuPac.alphaWrap.querySelectorAll("button[data-ord]").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      if(fichaMenuPac.mode==="paciente"){fichaMenuPacSalvarPreferencias({active_ord_menu_pac:Number(btn.dataset.ord||0)}).then(()=>fichaMenuPacPesquisar());}
+      else{fichaMenuPacPesquisar();}
+    }));
+  }
+  const onFiltroChange=()=>{if(!fichaMenuPac)return; if(fichaMenuPac.mode==="paciente"){fichaMenuPacSalvarPreferencias({cir_menu_pac:Number(fichaMenuPac.cboCirurgiao.value||0),status_menu_pac:Number(fichaMenuPac.cboFiltro.value||0),visualizacao_menu_pac:Number(fichaMenuPac.cboVisualizacao.value||1),pesquisa_menu_pac:Number(fichaMenuPac.cboPesquisa.value||1)}).then(()=>fichaMenuPacPesquisar());} else {fichaMenuPacPesquisar();}};
+  fichaMenuPac.cboCirurgiao.addEventListener("change",onFiltroChange);
+  fichaMenuPac.cboFiltro.addEventListener("change",onFiltroChange);
+  fichaMenuPac.cboVisualizacao.addEventListener("change",onFiltroChange);
+  fichaMenuPac.cboPesquisa.addEventListener("change",onFiltroChange);
+}
+async function fichaMenuPacCarregarPreferencias(){
+  fichaMenuPacEnsureUI();
+  try{
+    const{res,data}=await requestJson("GET","/cadastros/pacientes/menu-preferences",undefined,true);
+    if(!res.ok||!data)return;
+    const v=data.values||{};
+    fichaMenuPac.cboVisualizacao.value=String(v.visualizacao_menu_pac??1);
+    fichaMenuPac.cboPesquisa.value=String(v.pesquisa_menu_pac??1);
+    fichaMenuPac.prefLoaded=true;
+    const alvoOrd=Number(v.active_ord_menu_pac||0);
+    if(fichaMenuPac.alphaWrap){
+      fichaMenuPac.alphaWrap.querySelectorAll("button[data-ord]").forEach(b=>b.classList.toggle("active",Number(b.dataset.ord||0)===alvoOrd));
+    }
+    fichaMenuPac._prefs=v;
+  }catch{}
+}
+async function fichaMenuPacSalvarPreferencias(parcial={}){
+  if(!fichaMenuPac||fichaMenuPac.mode!=="paciente")return;
+  const base=Object.assign({
+    cir_menu_pac:Number(fichaMenuPac.cboCirurgiao?.value||0),
+    status_menu_pac:Number(fichaMenuPac.cboFiltro?.value||0),
+    visualizacao_menu_pac:Number(fichaMenuPac.cboVisualizacao?.value||1),
+    pesquisa_menu_pac:Number(fichaMenuPac.cboPesquisa?.value||1),
+    active_ord_menu_pac:0,
+  },fichaMenuPac._prefs||{},parcial||{});
+  if(fichaMenuPac.alphaWrap){
+    const ativo=fichaMenuPac.alphaWrap.querySelector("button.active[data-ord]");
+    if(!Object.prototype.hasOwnProperty.call(parcial||{},"active_ord_menu_pac"))base.active_ord_menu_pac=Number(ativo?.dataset?.ord||0);
+  }
+  fichaMenuPac._prefs=base;
+  if(fichaMenuPac.saveTimer)clearTimeout(fichaMenuPac.saveTimer);
+  return new Promise(resolve=>{
+    fichaMenuPac.saveTimer=setTimeout(async()=>{
+      try{await requestJson("PATCH","/cadastros/pacientes/menu-preferences",base,true);}catch{}
+      resolve();
+    },120);
   });
+}
+async function fichaMenuPacCarregarOptions(){
+  if(!fichaMenuPac)return;
+  if(fichaMenuPac.mode!=="paciente"){
+    fichaMenuPac.cboCirurgiao.innerHTML='<option value="0"><<Todos>></option>';
+    fichaMenuPac.cboFiltro.innerHTML='<option value="0"><<Todos>></option>';
+    fichaMenuPac.cboVisualizacao.innerHTML='<option value="1">Nome, número</option>';
+    fichaMenuPac.cboPesquisa.innerHTML='<option value="1">Nome</option><option value="2">NÃºmero</option>';
+    return;
+  }
+  const{res,data}=await requestJson("GET","/cadastros/pacientes/menu-options",undefined,true);
+  if(!res.ok||!data)return;
+  const cirs=Array.isArray(data.cirurgioes)?data.cirurgioes:[];
+  const sts=Array.isArray(data.filtro_status)?data.filtro_status:[];
+  const vis=Array.isArray(data.visualizacao)?data.visualizacao:[];
+  const pesq=Array.isArray(data.pesquisa)?data.pesquisa:[];
+  fichaMenuPac.cboCirurgiao.innerHTML=cirs.map(x=>`<option value="${esc(String(x.id??0))}">${esc(String(x.label||""))}</option>`).join("");
+  fichaMenuPac.cboFiltro.innerHTML=sts.map(x=>`<option value="${esc(String(x.id??0))}">${esc(String(x.label||""))}</option>`).join("");
+  fichaMenuPac.cboVisualizacao.innerHTML=vis.map(x=>`<option value="${esc(String(x.id??1))}">${esc(String(x.label||""))}</option>`).join("")||'<option value="1">Nome, número</option>';
+  fichaMenuPac.cboPesquisa.innerHTML=pesq.map(x=>`<option value="${esc(String(x.id??1))}">${esc(String(x.label||""))}</option>`).join("")||'<option value="1">Nome</option><option value="2">NÃºmero</option>';
+  const prefs=fichaMenuPac._prefs||{};
+  fichaMenuPac.cboCirurgiao.value=String(prefs.cir_menu_pac??0);
+  fichaMenuPac.cboFiltro.value=String(prefs.status_menu_pac??0);
+  fichaMenuPac.cboVisualizacao.value=String(prefs.visualizacao_menu_pac??1);
+  fichaMenuPac.cboPesquisa.value=String(prefs.pesquisa_menu_pac??1);
+  if(!fichaMenuPac.cboCirurgiao.value)fichaMenuPac.cboCirurgiao.value="0";
+  if(!fichaMenuPac.cboFiltro.value)fichaMenuPac.cboFiltro.value="0";
+  if(!fichaMenuPac.cboVisualizacao.value)fichaMenuPac.cboVisualizacao.value="1";
+  if(!fichaMenuPac.cboPesquisa.value)fichaMenuPac.cboPesquisa.value="1";
 }
 function fichaMenuPacAplicarLayout(){
   if(!fichaMenuPac)return;
   const modo=String(fichaMenuPac.mode||"paciente");
   const isContato=modo==="indicado-contato";
   if(fichaMenuPac.title)fichaMenuPac.title.textContent=isContato?"Menu de contatos":"Menu de pacientes";
-  if(fichaMenuPac.thCodigo)fichaMenuPac.thCodigo.textContent="N";
-  if(fichaMenuPac.thCpf)fichaMenuPac.thCpf.textContent=isContato?"Tipo":"CPF";
-  if(fichaMenuPac.thTelefone)fichaMenuPac.thTelefone.textContent="Telefone";
-  if(fichaMenuPac.thCidade)fichaMenuPac.thCidade.textContent="Cidade";
-  if(fichaMenuPac.thStatus)fichaMenuPac.thStatus.textContent=isContato?"Contato":"Situacao";
+  if(fichaMenuPac.thNome)fichaMenuPac.thNome.textContent="Nome";
+  if(fichaMenuPac.thNumero)fichaMenuPac.thNumero.textContent="NÃºmero";
+  const mostrarLegado=(modo==="paciente"||modo==="indicado-paciente");
+  if(fichaMenuPac.cboCirurgiao?.closest('div'))fichaMenuPac.cboCirurgiao.closest('div').style.visibility=mostrarLegado?'visible':'hidden';
+  if(fichaMenuPac.cboFiltro?.closest('div'))fichaMenuPac.cboFiltro.closest('div').style.visibility=mostrarLegado?'visible':'hidden';
+  if(fichaMenuPac.cboVisualizacao?.closest('div'))fichaMenuPac.cboVisualizacao.closest('div').style.visibility=mostrarLegado?'visible':'hidden';
+  if(fichaMenuPac.alphaWrap)fichaMenuPac.alphaWrap.style.display=mostrarLegado?'flex':'none';
 }
 function fichaMenuPacSelecionarLinha(tr){
   if(!fichaMenuPac||!tr)return;
@@ -5448,79 +5617,80 @@ function fichaMenuPacRender(){
   if(!fichaMenuPac)return;
   fichaMenuPacAplicarLayout();
   const modo=String(fichaMenuPac.mode||"paciente");
-  const isContato=modo==="indicado-contato";
   const lista=Array.isArray(fichaPacientesBuscaCache)?fichaPacientesBuscaCache:[];
-  fichaMenuPac.tbody.innerHTML=lista.map((x)=>{
-    if(isContato){
-      const nome=String(x.nome||"").trim();
-      const tipo=String(x.tipo||"").trim();
-      const fone=String(x.tel1||x.tel2||x.tel3||x.tel4||"").trim();
-      const cidade=String(x.cidade||"").trim();
-      const contato=String(x.contato||"").trim();
-      return`<tr data-id="${x.id}"><td>${esc(x.id)}</td><td>${esc(nome)}</td><td>${esc(tipo)}</td><td>${esc(fone)}</td><td>${esc(cidade)}</td><td>${esc(contato)}</td></tr>`;
-    }
-    const nome=String(x.nome_completo||`${x.nome||""} ${x.sobrenome||""}`).trim();
-    const situ=(x.inativo||String(x.status||"").toLowerCase().includes("inat"))?"Inativo":"Ativo";
-    return`<tr data-id="${x.id}"><td>${esc(x.codigo)}</td><td>${esc(nome)}</td><td>${esc(x.cpf||"")}</td><td>${esc(x.fone1||"")}</td><td>${esc(x.cidade||"")}</td><td>${esc(situ)}</td></tr>`;
-  }).join("");
-  fichaMenuPac.total.textContent=`Total: ${lista.length}`;
+  fichaMenuPac.tbody.innerHTML=lista.map((x)=>`<tr data-id="${x.id}"><td>${esc(x.nome||"")}</td><td>${esc(String(x.valor_coluna2??x.codigo??""))}</td></tr>`).join("");
+  const total=fichaMenuPac.lastTotal||lista.length;
+  fichaMenuPac.total.textContent=modo==="indicado-contato"?`${total} contatos listados`:`${total} pacientes listados`;
+  if(fichaMenuPac.thNumero)fichaMenuPac.thNumero.textContent=String(fichaMenuPac.coluna2Label||"NÃºmero");
   fichaMenuPac.selectedId=null;
   const rows=Array.from(fichaMenuPac.tbody.querySelectorAll("tr"));
-  rows.forEach((tr)=>{
-    tr.addEventListener("click",()=>fichaMenuPacSelecionarLinha(tr));
-    tr.addEventListener("dblclick",()=>{fichaMenuPacSelecionarLinha(tr);fichaMenuPacConfirmar();});
-  });
+  rows.forEach((tr)=>{tr.addEventListener("click",()=>fichaMenuPacSelecionarLinha(tr)); tr.addEventListener("dblclick",()=>{fichaMenuPacSelecionarLinha(tr);fichaMenuPacConfirmar();});});
   if(rows.length)fichaMenuPacSelecionarLinha(rows[0]);
+}
+function fichaMenuPacNorm(texto){
+  let t=String(texto||"").toLowerCase().trim();
+  if(!t)return"";
+  try{t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");}catch{}
+  return t.replace(/\s+/g," ");
 }
 async function fichaMenuPacPesquisar(){
   fichaMenuPacEnsureUI();
+  if(!fichaMenuPac)return;
+  const currentSeq=++fichaMenuPac.searchSeq;
   const modo=String(fichaMenuPac?.mode||"paciente");
   const isContato=modo==="indicado-contato";
   const qRaw=String(fichaMenuPac.txtQ?.value||"").trim();
-  const campo=String(fichaMenuPac.cboCampo?.value||"geral").trim();
-  let q=qRaw;
-  if(!isContato&&campo==="codigo"&&qRaw&&!/^\d+$/.test(qRaw)){
-    window.alert("Informe apenas numeros para pesquisa por codigo.");
-    return;
-  }
-  if(campo==="nome"&&qRaw)q=qRaw;
-  const path=isContato?"/agenda-contatos?limit=5000":`/cadastros/pacientes?q=${encodeURIComponent(q)}&limit=200`;
-  const{res,data}=await requestJson("GET",path,undefined,true);
-  if(!res.ok){
-    window.alert(data.detail||(isContato?"Falha ao pesquisar contatos.":"Falha ao pesquisar pacientes."));
-    return;
-  }
-  let lista=Array.isArray(data)?data:[];
   if(isContato){
-    const qLower=qRaw.toLowerCase();
-    if(qLower){
-      lista=lista.filter(x=>{
-        const nome=String(x.nome||"").toLowerCase();
-        const contato=String(x.contato||"").toLowerCase();
-        const fones=[x.tel1,x.tel2,x.tel3,x.tel4].map(v=>String(v||"").toLowerCase()).join(" ");
-        const cidade=String(x.cidade||"").toLowerCase();
-        return nome.includes(qLower)||contato.includes(qLower)||fones.includes(qLower)||cidade.includes(qLower);
-      });
+    const{res,data}=await requestJson("GET","/agenda-contatos?limit=5000",undefined,true);
+    if(currentSeq!==fichaMenuPac.searchSeq)return;
+    if(!res.ok){window.alert(data.detail||"Falha ao pesquisar contatos.");return}
+    let lista=Array.isArray(data)?data:[];
+    const ql=fichaMenuPacNorm(qRaw);
+    if(ql){
+      lista=lista.filter(x=>fichaMenuPacNorm(`${x.nome||''} ${x.contato||''} ${x.tel1||''} ${x.tel2||''} ${x.tel3||''} ${x.tel4||''}`).includes(ql));
     }
-  }else{
-    if(campo==="codigo"&&qRaw)lista=lista.filter(x=>String(x.codigo)===qRaw);
-    if(campo==="nome"&&qRaw){
-      const qLower=qRaw.toLowerCase();
-      lista=lista.filter(x=>String(x.nome_completo||`${x.nome||""} ${x.sobrenome||""}`).toLowerCase().includes(qLower));
-    }
+    fichaPacientesBuscaCache=lista.map(x=>({id:x.id,nome:String(x.nome||""),codigo:Number(x.id||0)}));
+    fichaMenuPac.lastTotal=fichaPacientesBuscaCache.length;
+    fichaMenuPac.coluna2Label="NÃºmero";
+    fichaMenuPacRender();
+    return;
   }
-  fichaPacientesBuscaCache=lista;
+  const ativo=fichaMenuPac.alphaWrap?.querySelector('button.active[data-ord]');
+  const activeOrd=Number(ativo?.dataset?.ord||0);
+  const params=new URLSearchParams();
+  params.set('q',qRaw);
+  params.set('cir_menu_pac',String(Number(fichaMenuPac.cboCirurgiao?.value||0)));
+  params.set('status_menu_pac',String(Number(fichaMenuPac.cboFiltro?.value||0)));
+  params.set('visualizacao_menu_pac',String(Number(fichaMenuPac.cboVisualizacao?.value||1)));
+  params.set('pesquisa_menu_pac',String(Number(fichaMenuPac.cboPesquisa?.value||1)));
+  params.set('active_ord_menu_pac',String(activeOrd));
+  params.set('offset','0');
+  params.set('limit','5000');
+  const{res,data}=await requestJson('GET',`/cadastros/pacientes/menu?${params.toString()}`,undefined,true);
+  if(currentSeq!==fichaMenuPac.searchSeq)return;
+  if(!res.ok){window.alert(data.detail||'Falha ao pesquisar pacientes.');return}
+  const itens=Array.isArray(data?.items)?data.items:[];
+  fichaPacientesBuscaCache=itens.map(x=>({
+    id:Number(x.id||0),
+    nome:String(x.nome||''),
+    codigo:Number(x.codigo||0),
+    valor_coluna2:String(x.valor_coluna2??x.codigo??''),
+    nome_paciente:String(x.nome_paciente||x.nome||''),
+  }));
+  fichaMenuPac.lastTotal=Number(data?.total||fichaPacientesBuscaCache.length);
+  fichaMenuPac.coluna2Label=String(data?.coluna2_label||"NÃºmero");
   fichaMenuPacRender();
 }
 function fichaMenuPacLimpar(){
   if(!fichaMenuPac)return;
   fichaMenuPac.txtQ.value="";
-  fichaPacientesBuscaCache=[];
-  fichaMenuPacRender();
+  if(fichaMenuPac.alphaWrap){fichaMenuPac.alphaWrap.querySelectorAll('button[data-ord]').forEach(b=>b.classList.remove('active')); const star=fichaMenuPac.alphaWrap.querySelector('button[data-ord="0"]'); if(star)star.classList.add('active');}
   fichaMenuPacPesquisar();
 }
 function fichaMenuPacFechar(){
   if(!fichaMenuPac)return;
+  if(fichaMenuPac.searchTimer){clearTimeout(fichaMenuPac.searchTimer);fichaMenuPac.searchTimer=null;}
+  fichaMenuPac.onSelect=null;
   fichaMenuPac.backdrop.classList.add("hidden");
 }
 async function fichaMenuPacConfirmar(){
@@ -5530,7 +5700,7 @@ async function fichaMenuPacConfirmar(){
   const modo=String(fichaMenuPac.mode||"paciente");
   if(modo==="indicado-paciente"){
     const item=(Array.isArray(fichaPacientesBuscaCache)?fichaPacientesBuscaCache:[]).find(x=>Number(x.id)===id);
-    const nome=String(item?.nome_completo||`${item?.nome||""} ${item?.sobrenome||""}`).trim();
+    const nome=String(item?.nome_paciente||item?.nome||"").trim();
     if(ficha?.indicadoPor)ficha.indicadoPor.value=nome;
     fichaMenuPacFechar();
     footerMsg.textContent="Indicado por preenchido com paciente.";
@@ -5544,33 +5714,53 @@ async function fichaMenuPacConfirmar(){
     footerMsg.textContent="Indicado por preenchido com contato.";
     return;
   }
+  if(typeof fichaMenuPac.onSelect==="function"){
+    const item=(Array.isArray(fichaPacientesBuscaCache)?fichaPacientesBuscaCache:[]).find(x=>Number(x.id)===id)||null;
+    try{
+      await fichaMenuPac.onSelect(item);
+    }catch(err){
+      console.error(err);
+    }
+    fichaMenuPacFechar();
+    footerMsg.textContent="Paciente selecionado para o agendamento.";
+    return;
+  }
   const ok=await fichaCarregarPacientePorId(id,false);
   if(!ok)return;
+  fichaEnsureUI();
+  hideAllPanels();
+  ficha.panel.classList.remove("hidden");
+  workspaceEmpty.classList.add("hidden");
+  fichaSetTab("dados");
   fichaMenuPacFechar();
   footerMsg.textContent="Paciente carregado.";
 }
 async function fichaMenuPacAbrir(prefill="",opts={}){
   fichaMenuPacEnsureUI();
   fichaMenuPac.mode=String(opts?.mode||"paciente");
+  fichaMenuPac.onSelect=typeof opts?.onSelect==="function"?opts.onSelect:null;
   fichaMenuPacAplicarLayout();
   fichaMenuPac.backdrop.classList.remove("hidden");
   fichaMenuPac.txtQ.value=String(prefill||"").trim();
-  fichaMenuPac.cboCampo.value=(fichaMenuPac.mode==="indicado-contato")?"geral":(/^\d+$/.test(fichaMenuPac.txtQ.value)?"codigo":"geral");
+  await fichaMenuPacCarregarPreferencias();
+  await fichaMenuPacCarregarOptions();
+  if(fichaMenuPac.mode==="paciente"&&fichaMenuPac.txtQ.value&&/^\d+$/.test(fichaMenuPac.txtQ.value)){
+    fichaMenuPac.cboPesquisa.value="2";
+  }
   await fichaMenuPacPesquisar();
   setTimeout(()=>{try{fichaMenuPac.txtQ.focus();fichaMenuPac.txtQ.select()}catch{}},10);
-}
-async function fichaNavegarPaciente(sentido,quiet=false){
+}async function fichaNavegarPaciente(sentido,quiet=false){
   const params=new URLSearchParams();
   params.set("sentido",String(sentido||"first"));
   if(fichaPacienteAtualId)params.set("atual_id",String(fichaPacienteAtualId));
   await fichaCarregarCombos();
   const{res,data}=await requestJson("GET",`/cadastros/pacientes/navegar?${params.toString()}`,undefined,true);
   if(!res.ok){
-    if(!quiet)window.alert(data.detail||"Falha na navegaÃ§Ã£o de pacientes.");
+    if(!quiet)window.alert(data.detail||"Falha na navegaÃƒÂ§ÃƒÂ£o de pacientes.");
     return null;
   }
   if(!data){
-    if(!quiet)footerMsg.textContent="Nenhum paciente cadastrado para esta clÃ­nica.";
+    if(!quiet)footerMsg.textContent="Nenhum paciente cadastrado para esta clÃƒÂ­nica.";
     return null;
   }
   fichaAplicarPaciente(data);
@@ -5592,10 +5782,10 @@ async function fichaExcluirPaciente(){
   const proximo=await fichaNavegarPaciente("first",true);
   if(!proximo){
     await fichaLimparNovo();
-    footerMsg.textContent="Paciente excluÃ­do. NÃ£o hÃ¡ mais pacientes cadastrados.";
+    footerMsg.textContent="Paciente excluÃƒÂ­do. NÃƒÂ£o hÃƒÂ¡ mais pacientes cadastrados.";
     return;
   }
-  footerMsg.textContent="Paciente excluÃ­do com sucesso.";
+  footerMsg.textContent="Paciente excluÃƒÂ­do com sucesso.";
 }
 function fichaSetTab(tab){
   if(!ficha)return;
@@ -5623,8 +5813,8 @@ async function fichaLimparNovo(){
   ficha.cadastro.value=hoje;
   if(ficha.idade)ficha.idade.value="?";
   fichaEnsureSelectOption(ficha.status,"Ativo","Ativo");
-  fichaEnsureSelectOption(ficha.cidade,"SÃ£o JosÃ© do Rio Preto","SÃ£o JosÃ© do Rio Preto");
-  fichaEnsureSelectOption(ficha.cidTra,"SÃ£o JosÃ© do Rio Preto","SÃ£o JosÃ© do Rio Preto");
+  fichaEnsureSelectOption(ficha.cidade,"SÃƒÂ£o JosÃƒÂ© do Rio Preto","SÃƒÂ£o JosÃƒÂ© do Rio Preto");
+  fichaEnsureSelectOption(ficha.cidTra,"SÃƒÂ£o JosÃƒÂ© do Rio Preto","SÃƒÂ£o JosÃƒÂ© do Rio Preto");
   fichaEnsureSelectOption(ficha.tipoFone1,"Residencial","Residencial");
   fichaEnsureSelectOption(ficha.tipoFone2,"Comercial","Comercial");
   fichaEnsureSelectOption(ficha.tipoFone3,"Celular","Celular");
@@ -5649,8 +5839,8 @@ async function fichaLimparNovo(){
   fichaSelecionarOpcaoPorTexto(ficha.tipoFone4,["Recado"])||(ficha.tipoFone4&&(ficha.tipoFone4.selectedIndex=0));
   const correspondencia=document.getElementById("ficha-correspondencia");
   if(correspondencia&&correspondencia.options.length)correspondencia.selectedIndex=0;
-  fichaSelecionarOpcaoPorTexto(ficha.cidade,["SÃ£o JosÃ© do Rio Preto","Sao Jose do Rio Preto"]);
-  fichaSelecionarOpcaoPorTexto(ficha.cidTra,["SÃ£o JosÃ© do Rio Preto","Sao Jose do Rio Preto"]);
+  fichaSelecionarOpcaoPorTexto(ficha.cidade,["SÃƒÂ£o JosÃƒÂ© do Rio Preto","Sao Jose do Rio Preto"]);
+  fichaSelecionarOpcaoPorTexto(ficha.cidTra,["SÃƒÂ£o JosÃƒÂ© do Rio Preto","Sao Jose do Rio Preto"]);
   if(ficha.uf)fichaSetUfOptions(ficha.uf,"SP");
   if(ficha.estTra)fichaSetUfOptions(ficha.estTra,"SP");
   if(ficha.convenio){
@@ -5694,12 +5884,8 @@ async function fichaAbrirNovo(){
 async function fichaAbrirExistente(){
   fichaEnsureUI();
   hideAllPanels();
-  ficha.panel.classList.remove("hidden");
   workspaceEmpty.classList.add("hidden");
-  ficha.titulo.textContent="Ficha pessoal -";
-  await fichaCarregarCombos();
-  await fichaLimparNovo();
-  fichaSetTab("dados");
+  if(ficha.titulo)ficha.titulo.textContent="Ficha pessoal -";
   await fichaMenuPacAbrir("");
   footerMsg.textContent="Cadastro > Abre paciente: menu de pacientes aberto.";
 }
@@ -5780,7 +5966,7 @@ function ccEnsureUI(){
       <div class="cc-filtros">
         <div><label>Mes</label><select id="cc-mes"></select></div>
         <div><label>Ano</label><input id="cc-ano" type="number" min="1900" max="2100"></div>
-        <div><label>Conta Corrente</label><select id="cc-conta"><option value="CLINICA">ClÃ­nica</option><option value="CIRURGIAO">CirurgiÃ£o</option></select></div>
+        <div><label>Conta Corrente</label><select id="cc-conta"><option value="CLINICA">ClÃƒÂ­nica</option><option value="CIRURGIAO">CirurgiÃƒÂ£o</option></select></div>
         <div><label>Filtro de visualizacao</label><select id="cc-filtro"><option>Todos os lancamentos</option><option>Apenas lancamentos tributaveis</option><option>Apenas debitos (Saidas)</option><option>Apenas creditos (Entradas)</option><option>Apenas despesas pessoais</option></select></div>
       </div>
       <div class="cc-head"><span>Data</span><span>Lancamentos</span><span>Historico</span><span>Debito</span><span>Credito</span></div>
@@ -5925,8 +6111,8 @@ async function ccTrocarTipoModal(tipo){
 }
 function ccSelecionado(){return ccLancCache.find(x=>x.id===ccSelecionadoId)||null}
 function ccRenderTabela(data){ccLancCache=data?.itens||[];cc.tbody.innerHTML=ccLancCache.map(x=>`<tr data-id="${x.id}" class="${x.tipo==="debito"?"debito":""}"><td>${ccDateISOToBR(x.data_lancamento)}</td><td>${esc(x.categoria_nome||"")}</td><td>${esc(x.historico||"")}</td><td>${x.tipo==="debito"?ccFmt(x.valor):""}</td><td>${x.tipo==="credito"?ccFmt(x.valor):""}</td></tr>`).join("");cc.totEnt.textContent=ccFmt(data?.total_entrada||0);cc.totSai.textContent=ccFmt(data?.total_saida||0);cc.totSaldo.textContent=ccFmt(data?.saldo||0);cc.totSaldo.style.color=Number(data?.saldo||0)<0?"red":"black"}
-async function ccCarregar(){const mes=Number(cc.mes.value||0),ano=Number(cc.ano.value||0),conta=encodeURIComponent(cc.conta.value),filtro=encodeURIComponent(cc.filtro.value);const{res,data}=await requestJson("GET",`/financeiro/lancamentos?mes=${mes}&ano=${ano}&conta=${conta}&filtro=${filtro}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar lanÃ§amentos.";return}ccSelecionadoId=null;ccRenderTabela(data)}
-async function ccAbrir(){ccEnsureUI();hideAllPanels();ensurePanelChrome(cc.panel);cc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await ccCarregar();footerMsg.textContent="MÃ³dulo Conta Corrente aberto."}
+async function ccCarregar(){const mes=Number(cc.mes.value||0),ano=Number(cc.ano.value||0),conta=encodeURIComponent(cc.conta.value),filtro=encodeURIComponent(cc.filtro.value);const{res,data}=await requestJson("GET",`/financeiro/lancamentos?mes=${mes}&ano=${ano}&conta=${conta}&filtro=${filtro}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar lanÃƒÂ§amentos.";return}ccSelecionadoId=null;ccRenderTabela(data)}
+async function ccAbrir(){ccEnsureUI();hideAllPanels();ensurePanelChrome(cc.panel);cc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await ccCarregar();footerMsg.textContent="MÃƒÂ³dulo Conta Corrente aberto."}
 async function ccCarregarCombosModal(){
   const tipo=ccTipoAtual==="debito"?"Saida":"Entrada";
   const categoriaAtual=cc.mCategoria.value;
@@ -5969,15 +6155,15 @@ function ccAbrirModal(tipo,l=null){
   cc.mb.classList.remove("hidden");
 }
 function ccFecharModal(){if(!cc)return;cc.mb.classList.add("hidden")}
-async function ccSalvarModal(){let valor=0;try{valor=toFloat(cc.mValor.value)}catch{valor=0}if(valor<=0){window.alert("Informe um valor vÃ¡lido.");return}const historico=cc.mHistorico.value.trim();if(!historico){window.alert("Informe o histÃ³rico.");return}const payload={categoria_id:Number(cc.mCategoria.value||0),historico,valor,tipo:ccTipoAtual,conta:cc.conta.value,situacao:cc.mSituacao.value,forma_pagamento:cc.mForma.value||null,documento:cc.mDoc.value.trim()||null,referencia:cc.mRef.value.trim()||null,complemento:cc.mComp.value.trim()||null,tributavel:cc.mTrib.checked?1:0,data_lancamento:cc.mDataLanc.value,data_vencimento:cc.mDataVenc.value,data_pagamento:cc.mDataLanc.value,parcelas:1+(cc.mParcCheck.checked?Number(cc.mParc.value||0):0)};const method=ccEditId?"PUT":"POST";const path=ccEditId?`/financeiro/lancamentos/${ccEditId}`:"/financeiro/lancamentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar lanÃ§amento.");return}ccFecharModal();await ccCarregar();window.alert("LanÃ§amento salvo.")}
-async function ccExcluirSelecionado(){const l=ccSelecionado();if(!l){window.alert("Selecione um lanÃ§amento.");return}if(!window.confirm("Deseja realmente excluir este lanÃ§amento?"))return;const{res,data}=await requestJson("DELETE",`/financeiro/lancamentos/${l.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir.");return}await ccCarregar()}
-function ccImprimir(){const linhas=ccLancCache.map(x=>`<tr><td>${ccDateISOToBR(x.data_lancamento)}</td><td>${esc(x.categoria_nome||"")}</td><td>${esc(x.historico||"")}</td><td style="text-align:right">${x.tipo==="debito"?ccFmt(x.valor):""}</td><td style="text-align:right">${x.tipo==="credito"?ccFmt(x.valor):""}</td></tr>`).join("");const mes=cc.mes.options[cc.mes.selectedIndex]?.textContent||cc.mes.value;const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>RelatÃ³rio Conta Corrente</title><style>body{font-family:Tahoma,Arial,sans-serif;font-size:12px;color:#000;padding:16px}h1{font-size:16px;margin:0 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:4px}th{text-align:left;background:#f6f8fa}.tot{margin-top:10px;display:flex;gap:16px;justify-content:flex-end}.box{border:1px solid #bfc9d6;background:#eaf7ff;padding:4px 8px;min-width:110px;text-align:right}</style></head><body onload="window.print()"><h1>RelatÃ³rio de Conta Corrente</h1><div><strong>MÃªs/Ano:</strong> ${esc(String(mes))}/${esc(String(cc.ano.value||""))}</div><div><strong>Conta:</strong> ${esc(cc.conta.value||"")}</div><div><strong>Filtro:</strong> ${esc(cc.filtro.value||"")}</div><table><thead><tr><th>Data</th><th>LanÃ§amento</th><th>HistÃ³rico</th><th>DÃ©bito</th><th>CrÃ©dito</th></tr></thead><tbody>${linhas||'<tr><td colspan="5" style="text-align:center">Sem lanÃ§amentos.</td></tr>'}</tbody></table><div class="tot"><div>Entradas: <span class="box">${cc.totEnt.textContent||"0,00"}</span></div><div>Despesas: <span class="box">${cc.totSai.textContent||"0,00"}</span></div><div>Saldo: <span class="box">${cc.totSaldo.textContent||"0,00"}</span></div></div></body></html>`;const w=window.open("","_blank","noopener,noreferrer,width=980,height=720");if(!w){window.alert("NÃ£o foi possÃ­vel abrir a janela de impressÃ£o.");return}w.document.open();w.document.write(html);w.document.close()}
+async function ccSalvarModal(){let valor=0;try{valor=toFloat(cc.mValor.value)}catch{valor=0}if(valor<=0){window.alert("Informe um valor vÃƒÂ¡lido.");return}const historico=cc.mHistorico.value.trim();if(!historico){window.alert("Informe o histÃƒÂ³rico.");return}const payload={categoria_id:Number(cc.mCategoria.value||0),historico,valor,tipo:ccTipoAtual,conta:cc.conta.value,situacao:cc.mSituacao.value,forma_pagamento:cc.mForma.value||null,documento:cc.mDoc.value.trim()||null,referencia:cc.mRef.value.trim()||null,complemento:cc.mComp.value.trim()||null,tributavel:cc.mTrib.checked?1:0,data_lancamento:cc.mDataLanc.value,data_vencimento:cc.mDataVenc.value,data_pagamento:cc.mDataLanc.value,parcelas:1+(cc.mParcCheck.checked?Number(cc.mParc.value||0):0)};const method=ccEditId?"PUT":"POST";const path=ccEditId?`/financeiro/lancamentos/${ccEditId}`:"/financeiro/lancamentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar lanÃƒÂ§amento.");return}ccFecharModal();await ccCarregar();window.alert("LanÃƒÂ§amento salvo.")}
+async function ccExcluirSelecionado(){const l=ccSelecionado();if(!l){window.alert("Selecione um lanÃƒÂ§amento.");return}if(!window.confirm("Deseja realmente excluir este lanÃƒÂ§amento?"))return;const{res,data}=await requestJson("DELETE",`/financeiro/lancamentos/${l.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir.");return}await ccCarregar()}
+function ccImprimir(){const linhas=ccLancCache.map(x=>`<tr><td>${ccDateISOToBR(x.data_lancamento)}</td><td>${esc(x.categoria_nome||"")}</td><td>${esc(x.historico||"")}</td><td style="text-align:right">${x.tipo==="debito"?ccFmt(x.valor):""}</td><td style="text-align:right">${x.tipo==="credito"?ccFmt(x.valor):""}</td></tr>`).join("");const mes=cc.mes.options[cc.mes.selectedIndex]?.textContent||cc.mes.value;const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>RelatÃƒÂ³rio Conta Corrente</title><style>body{font-family:Tahoma,Arial,sans-serif;font-size:12px;color:#000;padding:16px}h1{font-size:16px;margin:0 0 8px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #d0d7de;padding:4px}th{text-align:left;background:#f6f8fa}.tot{margin-top:10px;display:flex;gap:16px;justify-content:flex-end}.box{border:1px solid #bfc9d6;background:#eaf7ff;padding:4px 8px;min-width:110px;text-align:right}</style></head><body onload="window.print()"><h1>RelatÃƒÂ³rio de Conta Corrente</h1><div><strong>MÃƒÂªs/Ano:</strong> ${esc(String(mes))}/${esc(String(cc.ano.value||""))}</div><div><strong>Conta:</strong> ${esc(cc.conta.value||"")}</div><div><strong>Filtro:</strong> ${esc(cc.filtro.value||"")}</div><table><thead><tr><th>Data</th><th>LanÃƒÂ§amento</th><th>HistÃƒÂ³rico</th><th>DÃƒÂ©bito</th><th>CrÃƒÂ©dito</th></tr></thead><tbody>${linhas||'<tr><td colspan="5" style="text-align:center">Sem lanÃƒÂ§amentos.</td></tr>'}</tbody></table><div class="tot"><div>Entradas: <span class="box">${cc.totEnt.textContent||"0,00"}</span></div><div>Despesas: <span class="box">${cc.totSai.textContent||"0,00"}</span></div><div>Saldo: <span class="box">${cc.totSaldo.textContent||"0,00"}</span></div></div></body></html>`;const w=window.open("","_blank","noopener,noreferrer,width=980,height=720");if(!w){window.alert("NÃƒÂ£o foi possÃƒÂ­vel abrir a janela de impressÃƒÂ£o.");return}w.document.open();w.document.write(html);w.document.close()}
 function protEnsureUI(){
   if(prot)return;
   const style=document.createElement("style");
   style.textContent=".prot-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.prot-top{border:1px solid #c7d2df;border-radius:4px;padding:5px 6px;display:flex;align-items:center;gap:8px}.prot-top label{white-space:nowrap}.prot-top select{width:290px;height:24px;border:1px solid #bfc9d6;border-radius:4px;padding:0 4px;background:#fff}.prot-toolbar{display:flex;gap:8px;align-items:center;margin:8px 0 6px;flex-wrap:wrap}.prot-divider{border-top:1px solid #d3dbe5;margin:8px 0 6px}.prot-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.prot-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.prot-grid th,.prot-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prot-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.prot-grid th:nth-child(2),.prot-grid td:nth-child(2),.prot-grid th:nth-child(3),.prot-grid td:nth-child(3),.prot-grid th:nth-child(4),.prot-grid td:nth-child(4){text-align:center}.prot-grid tr.selected{background:#d9e8fb}.prot-total{margin-top:6px;color:#5b6b7e}.prot-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1300}.prot-modal{width:min(346px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.prot-modal .modal-body{display:grid;gap:8px}.prot-modal .row{margin:0}.prot-modal label{display:block;margin-bottom:2px;color:#000;font:12px Tahoma,sans-serif}.prot-modal input,.prot-modal select,.prot-modal span,.prot-modal button{font:12px Tahoma,sans-serif}.prot-modal input,.prot-modal select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.prot-modal .full{width:100%}.prot-modal .price-grid{display:grid;grid-template-columns:60px 58px 1fr;gap:10px;align-items:end}.prot-modal .preco-valor label{visibility:hidden}.prot-modal .prazo-wrap{display:flex;align-items:center;gap:6px}.prot-modal #prot-modal-preco{width:100%}.prot-modal #prot-modal-prazo{width:54px}.prot-modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.prot-relatorio-modal{width:min(390px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.prot-relatorio-modal .f{margin-bottom:10px}.prot-relatorio-modal label{display:block;margin-bottom:2px}.prot-relatorio-modal input,.prot-relatorio-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif}.prot-relatorio-grid{display:grid;grid-template-columns:1fr 120px;gap:8px}.prot-relatorio-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.prot-relatorio-arquivo-modal{width:min(520px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.prot-relatorio-arquivo-modal label{display:block;margin-bottom:2px}.prot-relatorio-arquivo-modal input[type=\"text\"],.prot-relatorio-arquivo-modal input[type=\"number\"],.prot-relatorio-arquivo-modal select,.prot-relatorio-arquivo-modal textarea{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif}.prot-relatorio-arquivo-modal input[type=\"checkbox\"]{width:auto;height:auto;margin:0 6px 0 0}.prot-relatorio-arquivo-modal textarea{height:80px;resize:none;padding:4px 6px}.prot-relatorio-arquivo-row{margin-bottom:8px}.prot-relatorio-save-row{display:grid;grid-template-columns:1fr 32px;gap:6px;align-items:center}.prot-relatorio-arquivo-inline{display:grid;grid-template-columns:1fr;gap:10px}.prot-relatorio-arquivo-email-row label{display:flex;align-items:center;gap:6px}.prot-relatorio-arquivo-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.prot-relatorio-email-disabled{opacity:.65}.prot-relatorio-email-disabled input,.prot-relatorio-email-disabled textarea{background:#f3f3f3}";
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="proteticos-panel" class="prot-panel hidden"><div class="panel-title">Configura tabelas de protÃ©ticos</div><div class="prot-top"><label for="prot-cbo">ProtÃ©tico:</label><select id="prot-cbo"></select></div><div class="prot-divider"></div><div class="prot-toolbar"><button id="prot-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo serviÃ§o...</button><button id="prot-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="prot-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="prot-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="prot-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="prot-grid"><table><colgroup><col><col style="width:80px"><col style="width:90px"><col style="width:70px"></colgroup><thead><tr><th>ServiÃ§o</th><th>Ãndice</th><th>PreÃ§o</th><th>Prazo</th></tr></thead><tbody id="prot-tbody"></tbody></table></div><div id="prot-total" class="prot-total">0 serviÃ§os</div></section><div id="prot-modal-backdrop" class="prot-modal-backdrop hidden"><div class="prot-modal"><div class="modal-header"><div class="modal-title" id="prot-modal-title">Insere serviÃ§o</div></div><div class="modal-body"><div class="row"><label for="prot-modal-nome">DescriÃ§Ã£o:</label><input id="prot-modal-nome" class="full" type="text"></div><div class="price-grid"><div><label for="prot-modal-indice">PreÃ§o:</label><select id="prot-modal-indice" class="full"><option value="R$">R$</option></select></div><div class="preco-valor"><label for="prot-modal-preco">Valor</label><input id="prot-modal-preco" type="text" value="0,00"></div><div><label for="prot-modal-prazo">Prazo mÃ©dio para entrega:</label><div class="prazo-wrap"><input id="prot-modal-prazo" type="number" min="0" value="0"><span>dias</span></div></div></div><div class="actions"><button id="prot-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div></div><div id="prot-relatorio-backdrop" class="prot-modal-backdrop hidden"><div class="prot-relatorio-modal"><div class="modal-header"><div class="modal-title">Tabela de serviÃ§os de protÃ©tico</div></div><div class="f"><label for="prot-relatorio-tabela">Tabela:</label><select id="prot-relatorio-tabela"></select></div><div class="prot-relatorio-grid"><div class="f"><label for="prot-relatorio-titulo">TÃ­tulo do relatÃ³rio:</label><input id="prot-relatorio-titulo" type="text" value="Tabela de serviÃ§os de protÃ©tico"></div><div class="f"><label for="prot-relatorio-saida">SaÃ­da do relatÃ³rio:</label><select id="prot-relatorio-saida"><option value="Tela">Tela</option><option value="Impressora">Impressora</option><option value="Arquivo">Arquivo</option></select></div></div><div class="prot-relatorio-actions"><button id="prot-relatorio-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-relatorio-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="proteticos-panel" class="prot-panel hidden"><div class="panel-title">Configura tabelas de protÃƒÂ©ticos</div><div class="prot-top"><label for="prot-cbo">ProtÃƒÂ©tico:</label><select id="prot-cbo"></select></div><div class="prot-divider"></div><div class="prot-toolbar"><button id="prot-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo serviÃƒÂ§o...</button><button id="prot-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="prot-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="prot-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="prot-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="prot-grid"><table><colgroup><col><col style="width:80px"><col style="width:90px"><col style="width:70px"></colgroup><thead><tr><th>ServiÃƒÂ§o</th><th>ÃƒÂndice</th><th>PreÃƒÂ§o</th><th>Prazo</th></tr></thead><tbody id="prot-tbody"></tbody></table></div><div id="prot-total" class="prot-total">0 serviÃƒÂ§os</div></section><div id="prot-modal-backdrop" class="prot-modal-backdrop hidden"><div class="prot-modal"><div class="modal-header"><div class="modal-title" id="prot-modal-title">Insere serviÃƒÂ§o</div></div><div class="modal-body"><div class="row"><label for="prot-modal-nome">DescriÃƒÂ§ÃƒÂ£o:</label><input id="prot-modal-nome" class="full" type="text"></div><div class="price-grid"><div><label for="prot-modal-indice">PreÃƒÂ§o:</label><select id="prot-modal-indice" class="full"><option value="R$">R$</option></select></div><div class="preco-valor"><label for="prot-modal-preco">Valor</label><input id="prot-modal-preco" type="text" value="0,00"></div><div><label for="prot-modal-prazo">Prazo mÃƒÂ©dio para entrega:</label><div class="prazo-wrap"><input id="prot-modal-prazo" type="number" min="0" value="0"><span>dias</span></div></div></div><div class="actions"><button id="prot-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div></div><div id="prot-relatorio-backdrop" class="prot-modal-backdrop hidden"><div class="prot-relatorio-modal"><div class="modal-header"><div class="modal-title">Tabela de serviÃƒÂ§os de protÃƒÂ©tico</div></div><div class="f"><label for="prot-relatorio-tabela">Tabela:</label><select id="prot-relatorio-tabela"></select></div><div class="prot-relatorio-grid"><div class="f"><label for="prot-relatorio-titulo">TÃƒÂ­tulo do relatÃƒÂ³rio:</label><input id="prot-relatorio-titulo" type="text" value="Tabela de serviÃƒÂ§os de protÃƒÂ©tico"></div><div class="f"><label for="prot-relatorio-saida">SaÃƒÂ­da do relatÃƒÂ³rio:</label><select id="prot-relatorio-saida"><option value="Tela">Tela</option><option value="Impressora">Impressora</option><option value="Arquivo">Arquivo</option></select></div></div><div class="prot-relatorio-actions"><button id="prot-relatorio-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-relatorio-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
   prot={
     panel:document.getElementById("proteticos-panel"),
     cbo:document.getElementById("prot-cbo"),
@@ -6008,7 +6194,7 @@ function protEnsureUI(){
     relArquivoBackdrop=document.createElement("div");
     relArquivoBackdrop.id="prot-relatorio-arquivo-backdrop";
     relArquivoBackdrop.className="prot-modal-backdrop hidden";
-    relArquivoBackdrop.innerHTML=`<div class="prot-relatorio-arquivo-modal"><div class="modal-header"><div class="modal-title">Salvar relatÃ³rio em arquivo</div></div><div class="prot-relatorio-arquivo-body"><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-path">Salvar arquivo de saÃ­da em:</label><div class="prot-relatorio-save-row"><input id="prot-relatorio-arquivo-path" type="text"><button id="prot-relatorio-arquivo-picker" class="materiais-btn" type="button"><img src="/desktop-assets/pasta.png" alt=""></button></div></div><div class="prot-relatorio-arquivo-row prot-relatorio-arquivo-inline"><div><label for="prot-relatorio-arquivo-formato">Formato do arquivo:</label><select id="prot-relatorio-arquivo-formato"><option value="PDF">PDF</option><option value="HTML">HTML</option><option value="RTF">RTF</option><option value="XLS">Excel</option><option value="TXT">Texto</option><option value="CSV">CSV</option></select></div></div><div id="prot-relatorio-arquivo-email-row" class="prot-relatorio-arquivo-row"><label><input id="prot-relatorio-arquivo-email-check" type="checkbox">Enviar e-mail para:</label><input id="prot-relatorio-arquivo-email" type="text"></div><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-assunto">Assunto do e-mail:</label><input id="prot-relatorio-arquivo-assunto" type="text"></div><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-corpo">Corpo do e-mail:</label><textarea id="prot-relatorio-arquivo-corpo"></textarea></div><div class="prot-relatorio-arquivo-actions"><button id="prot-relatorio-arquivo-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-relatorio-arquivo-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`;
+    relArquivoBackdrop.innerHTML=`<div class="prot-relatorio-arquivo-modal"><div class="modal-header"><div class="modal-title">Salvar relatÃƒÂ³rio em arquivo</div></div><div class="prot-relatorio-arquivo-body"><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-path">Salvar arquivo de saÃƒÂ­da em:</label><div class="prot-relatorio-save-row"><input id="prot-relatorio-arquivo-path" type="text"><button id="prot-relatorio-arquivo-picker" class="materiais-btn" type="button"><img src="/desktop-assets/pasta.png" alt=""></button></div></div><div class="prot-relatorio-arquivo-row prot-relatorio-arquivo-inline"><div><label for="prot-relatorio-arquivo-formato">Formato do arquivo:</label><select id="prot-relatorio-arquivo-formato"><option value="PDF">PDF</option><option value="HTML">HTML</option><option value="RTF">RTF</option><option value="XLS">Excel</option><option value="TXT">Texto</option><option value="CSV">CSV</option></select></div></div><div id="prot-relatorio-arquivo-email-row" class="prot-relatorio-arquivo-row"><label><input id="prot-relatorio-arquivo-email-check" type="checkbox">Enviar e-mail para:</label><input id="prot-relatorio-arquivo-email" type="text"></div><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-assunto">Assunto do e-mail:</label><input id="prot-relatorio-arquivo-assunto" type="text"></div><div class="prot-relatorio-arquivo-row"><label for="prot-relatorio-arquivo-corpo">Corpo do e-mail:</label><textarea id="prot-relatorio-arquivo-corpo"></textarea></div><div class="prot-relatorio-arquivo-actions"><button id="prot-relatorio-arquivo-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="prot-relatorio-arquivo-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`;
     document.body.appendChild(relArquivoBackdrop);
   }
   prot.relArquivoBackdrop=relArquivoBackdrop;
@@ -6031,27 +6217,27 @@ function protEnsureUI(){
 }
 function protServicoSelecionado(){return protServicosCache.find(item=>item.id===protServicoSelecionadoId)||null}
 function protSelecionarLinha(tr){if(!prot||!(tr instanceof HTMLElement))return;protServicoSelecionadoId=Number(tr.dataset.id||0)||null;prot.tbody.querySelectorAll("tr.selected").forEach(row=>row.classList.remove("selected"));if(protServicoSelecionadoId)tr.classList.add("selected")}
-function protEditarSelecionado(){const item=protServicoSelecionado();if(!item){window.alert("Selecione um serviÃ§o.");return}protAbrirModal(item)}
+function protEditarSelecionado(){const item=protServicoSelecionado();if(!item){window.alert("Selecione um serviÃƒÂ§o.");return}protAbrirModal(item)}
 function protFecharRelatorio(){if(prot?.relBackdrop)prot.relBackdrop.classList.add("hidden")}
 function protFecharRelatorioArquivo(){if(prot?.relArquivoBackdrop)prot.relArquivoBackdrop.classList.add("hidden");if(prot){prot.relArquivoHandle=null;prot.relArquivoContext=null}}
 function protAtualizarEmailRelatorioUI(){if(!prot)return;const ativo=!!prot.relArquivoEmailCheck?.checked;if(prot.relArquivoEmail)prot.relArquivoEmail.disabled=!ativo;if(prot.relArquivoAssunto)prot.relArquivoAssunto.disabled=!ativo;if(prot.relArquivoCorpo)prot.relArquivoCorpo.disabled=!ativo;if(prot.relArquivoEmailRow){prot.relArquivoEmailRow.classList.toggle("prot-relatorio-email-disabled",!ativo)}}
 function protNomeArquivoBase(titulo){const base=String(titulo||"relatorio_protetico").trim()||"relatorio_protetico";const limpo=base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z0-9_-]+/g,"_").replace(/_+/g,"_").replace(/^_+|_+$/g,"").toLowerCase();return limpo||"relatorio_protetico"}
 function protRelatorioRows(){return protServicosCache.map(item=>[String(item.nome||""),String(item.indice||"R$"),formatMoney(item.preco||0),String(item.prazo||0)])}
 function protCsvEsc(v){const s=String(v??"");return /[;"\n\r]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
-function protRelatorioCsv(rows){const header=["ServiÃ§o","Ãndice","PreÃ§o","Prazo"];const linhas=[header.map(protCsvEsc).join(";")];rows.forEach(row=>{linhas.push(row.map(protCsvEsc).join(";"))});return "\ufeff"+linhas.join("\r\n")}
-function protRelatorioTxt(titulo,nomeTabela,rows){const header=["ServiÃ§o","Ãndice","PreÃ§o","Prazo"];const toLine=(arr)=>arr.join(" | ");const linhas=[`RelatÃ³rio: ${titulo||"Tabela de serviÃ§os de protÃ©tico"}`,`Tabela: ${nomeTabela||""}`,"",toLine(header),...rows.map(toLine)];return linhas.join("\r\n")}
+function protRelatorioCsv(rows){const header=["ServiÃƒÂ§o","ÃƒÂndice","PreÃƒÂ§o","Prazo"];const linhas=[header.map(protCsvEsc).join(";")];rows.forEach(row=>{linhas.push(row.map(protCsvEsc).join(";"))});return "\ufeff"+linhas.join("\r\n")}
+function protRelatorioTxt(titulo,nomeTabela,rows){const header=["ServiÃƒÂ§o","ÃƒÂndice","PreÃƒÂ§o","Prazo"];const toLine=(arr)=>arr.join(" | ");const linhas=[`RelatÃƒÂ³rio: ${titulo||"Tabela de serviÃƒÂ§os de protÃƒÂ©tico"}`,`Tabela: ${nomeTabela||""}`,"",toLine(header),...rows.map(toLine)];return linhas.join("\r\n")}
 function protRtfEscape(texto){return String(texto||"").replace(/\\/g,"\\\\").replace(/{/g,"\\{").replace(/}/g,"\\}").replace(/\r?\n/g,"\\par\r\n")}
 function protRelatorioRtf(titulo,nomeTabela,rows){const texto=protRelatorioTxt(titulo,nomeTabela,rows);return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\fs20 ${protRtfEscape(texto)}}`}
-function protRelatorioXlsHtml(titulo,nomeTabela,rows){const header=["ServiÃ§o","Ãndice","PreÃ§o","Prazo"];const rowsHtml=rows.map(row=>`<tr>${row.map((c,idx)=>`<td style="${idx>=1?"text-align:center":""}">${esc(String(c||""))}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="4">Sem serviÃ§os.</td></tr>`;return `<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃ³rio")}</h3><div><strong>Tabela:</strong> ${esc(nomeTabela||"")}</div><table border="1"><thead><tr>${header.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rowsHtml}</tbody></table></body></html>`}
+function protRelatorioXlsHtml(titulo,nomeTabela,rows){const header=["ServiÃƒÂ§o","ÃƒÂndice","PreÃƒÂ§o","Prazo"];const rowsHtml=rows.map(row=>`<tr>${row.map((c,idx)=>`<td style="${idx>=1?"text-align:center":""}">${esc(String(c||""))}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="4">Sem serviÃƒÂ§os.</td></tr>`;return `<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃƒÂ³rio")}</h3><div><strong>Tabela:</strong> ${esc(nomeTabela||"")}</div><table border="1"><thead><tr>${header.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${rowsHtml}</tbody></table></body></html>`}
 function protPdfEscape(texto){return String(texto??"").replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)")}
-function protRelatorioPdfBlob(titulo,nomeTabela,rows){const header=["ServiÃ§o","Ãndice","PreÃ§o","Prazo"];const widths=header.map((h,i)=>Math.min(26,Math.max(h.length,...rows.map(r=>(r[i]||"").length),6)));const toLine=(arr)=>arr.map((v,i)=>String(v||"").padEnd(widths[i]," ").slice(0,widths[i])).join(" | ");const sep=widths.map(x=>"-".repeat(x)).join("-+-");const lines=[String(titulo||"RelatÃ³rio"),`Tabela: ${nomeTabela||""}`,"",toLine(header),sep,...rows.map(toLine)];const pageHeight=842;const startY=800;const lh=13;const bottom=40;const perPage=Math.max(20,Math.floor((startY-bottom)/lh));const pages=[];for(let i=0;i<lines.length;i+=perPage)pages.push(lines.slice(i,i+perPage));const objs=[];const addObj=(id,body)=>objs.push({id,body});addObj(1,"<< /Type /Catalog /Pages 2 0 R >>");addObj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");let nextId=4;const kids=[];for(const pg of pages){const contentId=nextId++;const pageId=nextId++;const stream=["BT","/F1 10 Tf","13 TL",`40 ${startY} Td`,...pg.map((ln,idx)=>`${idx===0?"":"T* "}(${protPdfEscape(ln)}) Tj`),"ET"].join("\n");addObj(contentId,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);addObj(pageId,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);kids.push(`${pageId} 0 R`)}addObj(2,`<< /Type /Pages /Count ${kids.length||1} /Kids [${kids.join(" ")}] >>`);objs.sort((a,b)=>a.id-b.id);let pdf="%PDF-1.4\n";const enc=new TextEncoder();const offsets={};for(const o of objs){offsets[o.id]=enc.encode(pdf).length;pdf+=`${o.id} 0 obj\n${o.body}\nendobj\n`}const xref=enc.encode(pdf).length;const maxId=Math.max(...objs.map(o=>o.id));pdf+=`xref\n0 ${maxId+1}\n0000000000 65535 f \n`;for(let i=1;i<=maxId;i++){const off=offsets[i]||0;pdf+=`${String(off).padStart(10,"0")} 00000 n \n`}pdf+=`trailer\n<< /Size ${maxId+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Blob([pdf],{type:"application/pdf"})}
+function protRelatorioPdfBlob(titulo,nomeTabela,rows){const header=["ServiÃƒÂ§o","ÃƒÂndice","PreÃƒÂ§o","Prazo"];const widths=header.map((h,i)=>Math.min(26,Math.max(h.length,...rows.map(r=>(r[i]||"").length),6)));const toLine=(arr)=>arr.map((v,i)=>String(v||"").padEnd(widths[i]," ").slice(0,widths[i])).join(" | ");const sep=widths.map(x=>"-".repeat(x)).join("-+-");const lines=[String(titulo||"RelatÃƒÂ³rio"),`Tabela: ${nomeTabela||""}`,"",toLine(header),sep,...rows.map(toLine)];const pageHeight=842;const startY=800;const lh=13;const bottom=40;const perPage=Math.max(20,Math.floor((startY-bottom)/lh));const pages=[];for(let i=0;i<lines.length;i+=perPage)pages.push(lines.slice(i,i+perPage));const objs=[];const addObj=(id,body)=>objs.push({id,body});addObj(1,"<< /Type /Catalog /Pages 2 0 R >>");addObj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");let nextId=4;const kids=[];for(const pg of pages){const contentId=nextId++;const pageId=nextId++;const stream=["BT","/F1 10 Tf","13 TL",`40 ${startY} Td`,...pg.map((ln,idx)=>`${idx===0?"":"T* "}(${protPdfEscape(ln)}) Tj`),"ET"].join("\n");addObj(contentId,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);addObj(pageId,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);kids.push(`${pageId} 0 R`)}addObj(2,`<< /Type /Pages /Count ${kids.length||1} /Kids [${kids.join(" ")}] >>`);objs.sort((a,b)=>a.id-b.id);let pdf="%PDF-1.4\n";const enc=new TextEncoder();const offsets={};for(const o of objs){offsets[o.id]=enc.encode(pdf).length;pdf+=`${o.id} 0 obj\n${o.body}\nendobj\n`}const xref=enc.encode(pdf).length;const maxId=Math.max(...objs.map(o=>o.id));pdf+=`xref\n0 ${maxId+1}\n0000000000 65535 f \n`;for(let i=1;i<=maxId;i++){const off=offsets[i]||0;pdf+=`${String(off).padStart(10,"0")} 00000 n \n`}pdf+=`trailer\n<< /Size ${maxId+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Blob([pdf],{type:"application/pdf"})}
 function protFormatoInfo(formato){const f=String(formato||"").toUpperCase();if(f==="HTML")return{ext:"html",mime:"text/html"};if(f==="RTF")return{ext:"rtf",mime:"application/rtf"};if(f==="XLS")return{ext:"xls",mime:"application/vnd.ms-excel"};if(f==="TXT")return{ext:"txt",mime:"text/plain"};if(f==="CSV")return{ext:"csv",mime:"text/csv"};return{ext:"pdf",mime:"application/pdf"}}
 function protRelatorioBlob(formato,titulo,nomeTabela,rows){const fmt=String(formato||"PDF").toUpperCase();if(fmt==="HTML")return new Blob([protRelatorioHtml(titulo,nomeTabela,false)],{type:"text/html;charset=utf-8"});if(fmt==="RTF")return new Blob([protRelatorioRtf(titulo,nomeTabela,rows)],{type:"application/rtf"});if(fmt==="XLS")return new Blob(["\ufeff"+protRelatorioXlsHtml(titulo,nomeTabela,rows)],{type:"application/vnd.ms-excel;charset=utf-8"});if(fmt==="TXT")return new Blob([protRelatorioTxt(titulo,nomeTabela,rows)],{type:"text/plain;charset=utf-8"});if(fmt==="CSV")return new Blob([protRelatorioCsv(rows)],{type:"text/csv;charset=utf-8"});return protRelatorioPdfBlob(titulo,nomeTabela,rows)}
-async function protEnviarEmailRelatorio(formData){const token=getToken();if(!token)return{ok:false,message:"SessÃ£o invÃ¡lida. FaÃ§a login novamente."};const enviar=async(grant)=>{const headers={Authorization:"Bearer "+token};if(grant)headers["X-Protected-Grant"]=grant;const res=await fetch(baseUrl+"/relatorios/enviar-email",{method:"POST",headers,body:formData});let data={};try{data=await res.json()}catch{}return{res,data}};let{res,data}=await enviar("");const protErr=parseProtectedError(res,data);if(protErr){try{const grant=await ensureProtectedGrant(protErr.moduleCode,protErr.message);({res,data}=await enviar(grant))}catch(err){return{ok:false,message:err?.message||"Acesso protegido cancelado."}}}if(!res.ok)return{ok:false,message:data.detail||"Falha ao enviar e-mail."};return{ok:true,message:data.detail||"E-mail enviado."}}
-async function protSelecionarDestinoRelatorio(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=ctx.titulo||"RelatÃ³rio";const formato=prot.relArquivoFormato?.value||"PDF";const info=protFormatoInfo(formato);const sugerido=prot.relArquivoPath?.value.trim()||`${protNomeArquivoBase(titulo)}.${info.ext}`;if(typeof window.showSaveFilePicker!=="function"){if(prot.relArquivoPath&&!prot.relArquivoPath.value.trim())prot.relArquivoPath.value=sugerido;if(!prot.relArquivoPickerWarned){window.alert("Seu navegador nÃ£o permite escolher a pasta. O arquivo serÃ¡ baixado na pasta padrÃ£o de downloads.");prot.relArquivoPickerWarned=true}if(prot.relArquivoPath)prot.relArquivoPath.focus();return}try{const handle=await window.showSaveFilePicker({suggestedName:sugerido,types:[{description:"Arquivos PDF",accept:{"application/pdf":[".pdf"]}},{description:"Arquivos HTML",accept:{"text/html":[".html",".htm"]}},{description:"Arquivos RTF",accept:{"application/rtf":[".rtf"]}},{description:"Planilhas Excel",accept:{"application/vnd.ms-excel":[".xls",".xlsx"]}},{description:"Arquivos texto",accept:{"text/plain":[".txt"]}},{description:"Arquivos CSV",accept:{"text/csv":[".csv"]}}]});prot.relArquivoHandle=handle;if(prot.relArquivoPath)prot.relArquivoPath.value=handle?.name||sugerido;const nome=(handle?.name||"").toLowerCase();if(nome.endsWith(".pdf"))prot.relArquivoFormato.value="PDF";else if(nome.endsWith(".html")||nome.endsWith(".htm"))prot.relArquivoFormato.value="HTML";else if(nome.endsWith(".rtf"))prot.relArquivoFormato.value="RTF";else if(nome.endsWith(".xls")||nome.endsWith(".xlsx"))prot.relArquivoFormato.value="XLS";else if(nome.endsWith(".txt"))prot.relArquivoFormato.value="TXT";else if(nome.endsWith(".csv"))prot.relArquivoFormato.value="CSV"}catch(err){if(err&&err.name==="AbortError")return;window.alert("NÃ£o foi possÃ­vel abrir o seletor de arquivos.")}}
-async function protSalvarRelatorioArquivo(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=String(ctx.titulo||"Tabela de serviÃ§os de protÃ©tico");const nomeTabela=String(ctx.nomeTabela||"");const formato=String(prot.relArquivoFormato?.value||"PDF").toUpperCase();const info=protFormatoInfo(formato);let nomeArquivo=String(prot.relArquivoPath?.value||"").trim();if(!nomeArquivo)nomeArquivo=`${protNomeArquivoBase(titulo)}.${info.ext}`;if(!nomeArquivo.toLowerCase().endsWith(`.${info.ext}`))nomeArquivo=`${nomeArquivo}.${info.ext}`;const rows=protRelatorioRows();const blob=protRelatorioBlob(formato,titulo,nomeTabela,rows);if(!blob){window.alert("NÃ£o foi possÃ­vel gerar o arquivo.");return}let salvo=false;let salvoPorDownload=false;if(prot.relArquivoHandle&&typeof prot.relArquivoHandle.createWritable==="function"){const handleName=(prot.relArquivoHandle.name||"").toLowerCase();if(handleName.endsWith(`.${info.ext}`)){try{const writable=await prot.relArquivoHandle.createWritable();await writable.write(blob);await writable.close();salvo=true}catch{salvo=false}}else{prot.relArquivoHandle=null}}if(!salvo){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=nomeArquivo;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);salvo=true;salvoPorDownload=true}if(prot.relArquivoEmailCheck?.checked){const email=String(prot.relArquivoEmail?.value||"").trim();if(!email){window.alert("Informe o e-mail para envio.");return}const subject=String(prot.relArquivoAssunto?.value||"").trim()||`RelatÃ³rio: ${titulo}`;const body=String(prot.relArquivoCorpo?.value||"").trim();const formData=new FormData();formData.append("to_email",email);formData.append("subject",subject);formData.append("body",body);formData.append("filename",nomeArquivo);formData.append("file",blob,nomeArquivo);const res=await protEnviarEmailRelatorio(formData);if(!res.ok){window.alert(res.message||"Falha ao enviar e-mail.");return}footerMsg.textContent=res.message||"E-mail enviado com sucesso."}else if(salvo){footerMsg.textContent=salvoPorDownload?"RelatÃ³rio exportado em arquivo (download do navegador).":"RelatÃ³rio exportado em arquivo."}protFecharRelatorioArquivo()}
-function protAbrirRelatorioArquivo(titulo,nomeTabela){if(!prot)return;prot.relArquivoContext={titulo,nomeTabela};const base=protNomeArquivoBase(titulo);if(prot.relArquivoFormato)prot.relArquivoFormato.value="PDF";if(prot.relArquivoPath)prot.relArquivoPath.value=`${base}.pdf`;if(prot.relArquivoAssunto)prot.relArquivoAssunto.value=`RelatÃ³rio: ${titulo}`;if(prot.relArquivoCorpo)prot.relArquivoCorpo.value="";if(prot.relArquivoEmailCheck)prot.relArquivoEmailCheck.checked=false;protAtualizarEmailRelatorioUI();if(prot.relArquivoBackdrop)prot.relArquivoBackdrop.classList.remove("hidden");if(prot.relArquivoPath)prot.relArquivoPath.focus()}
-function protAbrirRelatorio(){if(!prot)return;prot.relTabela.innerHTML=proteticosCache.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("");if(proteticoSelecionadoId&&prot.relTabela.querySelector(`option[value="${proteticoSelecionadoId}"]`))prot.relTabela.value=String(proteticoSelecionadoId);else if(proteticosCache[0])prot.relTabela.value=String(proteticosCache[0].id);prot.relTitulo.value="Tabela de serviÃ§os de protÃ©tico";prot.relSaida.value="Tela";prot.relBackdrop.classList.remove("hidden")}
+async function protEnviarEmailRelatorio(formData){const token=getToken();if(!token)return{ok:false,message:"SessÃƒÂ£o invÃƒÂ¡lida. FaÃƒÂ§a login novamente."};const enviar=async(grant)=>{const headers={Authorization:"Bearer "+token};if(grant)headers["X-Protected-Grant"]=grant;const res=await fetch(baseUrl+"/relatorios/enviar-email",{method:"POST",headers,body:formData});let data={};try{data=await res.json()}catch{}return{res,data}};let{res,data}=await enviar("");const protErr=parseProtectedError(res,data);if(protErr){try{const grant=await ensureProtectedGrant(protErr.moduleCode,protErr.message);({res,data}=await enviar(grant))}catch(err){return{ok:false,message:err?.message||"Acesso protegido cancelado."}}}if(!res.ok)return{ok:false,message:data.detail||"Falha ao enviar e-mail."};return{ok:true,message:data.detail||"E-mail enviado."}}
+async function protSelecionarDestinoRelatorio(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=ctx.titulo||"RelatÃƒÂ³rio";const formato=prot.relArquivoFormato?.value||"PDF";const info=protFormatoInfo(formato);const sugerido=prot.relArquivoPath?.value.trim()||`${protNomeArquivoBase(titulo)}.${info.ext}`;if(typeof window.showSaveFilePicker!=="function"){if(prot.relArquivoPath&&!prot.relArquivoPath.value.trim())prot.relArquivoPath.value=sugerido;if(!prot.relArquivoPickerWarned){window.alert("Seu navegador nÃƒÂ£o permite escolher a pasta. O arquivo serÃƒÂ¡ baixado na pasta padrÃƒÂ£o de downloads.");prot.relArquivoPickerWarned=true}if(prot.relArquivoPath)prot.relArquivoPath.focus();return}try{const handle=await window.showSaveFilePicker({suggestedName:sugerido,types:[{description:"Arquivos PDF",accept:{"application/pdf":[".pdf"]}},{description:"Arquivos HTML",accept:{"text/html":[".html",".htm"]}},{description:"Arquivos RTF",accept:{"application/rtf":[".rtf"]}},{description:"Planilhas Excel",accept:{"application/vnd.ms-excel":[".xls",".xlsx"]}},{description:"Arquivos texto",accept:{"text/plain":[".txt"]}},{description:"Arquivos CSV",accept:{"text/csv":[".csv"]}}]});prot.relArquivoHandle=handle;if(prot.relArquivoPath)prot.relArquivoPath.value=handle?.name||sugerido;const nome=(handle?.name||"").toLowerCase();if(nome.endsWith(".pdf"))prot.relArquivoFormato.value="PDF";else if(nome.endsWith(".html")||nome.endsWith(".htm"))prot.relArquivoFormato.value="HTML";else if(nome.endsWith(".rtf"))prot.relArquivoFormato.value="RTF";else if(nome.endsWith(".xls")||nome.endsWith(".xlsx"))prot.relArquivoFormato.value="XLS";else if(nome.endsWith(".txt"))prot.relArquivoFormato.value="TXT";else if(nome.endsWith(".csv"))prot.relArquivoFormato.value="CSV"}catch(err){if(err&&err.name==="AbortError")return;window.alert("NÃƒÂ£o foi possÃƒÂ­vel abrir o seletor de arquivos.")}}
+async function protSalvarRelatorioArquivo(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=String(ctx.titulo||"Tabela de serviÃƒÂ§os de protÃƒÂ©tico");const nomeTabela=String(ctx.nomeTabela||"");const formato=String(prot.relArquivoFormato?.value||"PDF").toUpperCase();const info=protFormatoInfo(formato);let nomeArquivo=String(prot.relArquivoPath?.value||"").trim();if(!nomeArquivo)nomeArquivo=`${protNomeArquivoBase(titulo)}.${info.ext}`;if(!nomeArquivo.toLowerCase().endsWith(`.${info.ext}`))nomeArquivo=`${nomeArquivo}.${info.ext}`;const rows=protRelatorioRows();const blob=protRelatorioBlob(formato,titulo,nomeTabela,rows);if(!blob){window.alert("NÃƒÂ£o foi possÃƒÂ­vel gerar o arquivo.");return}let salvo=false;let salvoPorDownload=false;if(prot.relArquivoHandle&&typeof prot.relArquivoHandle.createWritable==="function"){const handleName=(prot.relArquivoHandle.name||"").toLowerCase();if(handleName.endsWith(`.${info.ext}`)){try{const writable=await prot.relArquivoHandle.createWritable();await writable.write(blob);await writable.close();salvo=true}catch{salvo=false}}else{prot.relArquivoHandle=null}}if(!salvo){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=nomeArquivo;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);salvo=true;salvoPorDownload=true}if(prot.relArquivoEmailCheck?.checked){const email=String(prot.relArquivoEmail?.value||"").trim();if(!email){window.alert("Informe o e-mail para envio.");return}const subject=String(prot.relArquivoAssunto?.value||"").trim()||`RelatÃƒÂ³rio: ${titulo}`;const body=String(prot.relArquivoCorpo?.value||"").trim();const formData=new FormData();formData.append("to_email",email);formData.append("subject",subject);formData.append("body",body);formData.append("filename",nomeArquivo);formData.append("file",blob,nomeArquivo);const res=await protEnviarEmailRelatorio(formData);if(!res.ok){window.alert(res.message||"Falha ao enviar e-mail.");return}footerMsg.textContent=res.message||"E-mail enviado com sucesso."}else if(salvo){footerMsg.textContent=salvoPorDownload?"RelatÃƒÂ³rio exportado em arquivo (download do navegador).":"RelatÃƒÂ³rio exportado em arquivo."}protFecharRelatorioArquivo()}
+function protAbrirRelatorioArquivo(titulo,nomeTabela){if(!prot)return;prot.relArquivoContext={titulo,nomeTabela};const base=protNomeArquivoBase(titulo);if(prot.relArquivoFormato)prot.relArquivoFormato.value="PDF";if(prot.relArquivoPath)prot.relArquivoPath.value=`${base}.pdf`;if(prot.relArquivoAssunto)prot.relArquivoAssunto.value=`RelatÃƒÂ³rio: ${titulo}`;if(prot.relArquivoCorpo)prot.relArquivoCorpo.value="";if(prot.relArquivoEmailCheck)prot.relArquivoEmailCheck.checked=false;protAtualizarEmailRelatorioUI();if(prot.relArquivoBackdrop)prot.relArquivoBackdrop.classList.remove("hidden");if(prot.relArquivoPath)prot.relArquivoPath.focus()}
+function protAbrirRelatorio(){if(!prot)return;prot.relTabela.innerHTML=proteticosCache.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("");if(proteticoSelecionadoId&&prot.relTabela.querySelector(`option[value="${proteticoSelecionadoId}"]`))prot.relTabela.value=String(proteticoSelecionadoId);else if(proteticosCache[0])prot.relTabela.value=String(proteticosCache[0].id);prot.relTitulo.value="Tabela de serviÃƒÂ§os de protÃƒÂ©tico";prot.relSaida.value="Tela";prot.relBackdrop.classList.remove("hidden")}
 function protRelatorioHtml(titulo,nomeTabela,autoPrint=false){
   const cfg=relatorioConfigAtual();
   const {data,hora}=relatorioDataHoraAtual();
@@ -6076,15 +6262,15 @@ function protRelatorioHtml(titulo,nomeTabela,autoPrint=false){
       <div class="rel-head-text">
         ${cfg?.headerText?`<div class="rel-head-caption">${esc(cfg.headerText)}</div>`:""}
         <div class="rel-title">${esc(titulo)}</div>
-        ${showUser?`<div class="rel-user">UsuÃ¡rio: ${esc(usuario)}</div>`:""}
+        ${showUser?`<div class="rel-user">UsuÃƒÂ¡rio: ${esc(usuario)}</div>`:""}
       </div>
     </div>
     <div class="rel-meta" style="${cssCab}">
       ${showDateTime?`<div>Data: ${esc(data)}</div><div>Hora: ${esc(hora)}</div>`:""}
-      ${showPage?`<div>PÃ¡g.: 1</div>`:""}
+      ${showPage?`<div>PÃƒÂ¡g.: 1</div>`:""}
     </div>
   </div>`;
-  const linhas=protServicosCache.map(item=>`<tr><td>${esc(item.nome||"")}</td><td style="text-align:center">${esc(item.indice||"R$")}</td><td style="text-align:right">${formatMoney(item.preco||0)}</td><td style="text-align:center">${esc(String(item.prazo||0))}</td></tr>`).join("")||'<tr><td colspan="4" style="text-align:center">Sem serviÃ§os.</td></tr>';
+  const linhas=protServicosCache.map(item=>`<tr><td>${esc(item.nome||"")}</td><td style="text-align:center">${esc(item.indice||"R$")}</td><td style="text-align:right">${formatMoney(item.preco||0)}</td><td style="text-align:center">${esc(String(item.prazo||0))}</td></tr>`).join("")||'<tr><td colspan="4" style="text-align:center">Sem serviÃƒÂ§os.</td></tr>';
   const onload=autoPrint?' onload="window.print()"':"";
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo)}</title><style>
     @page { size: ${pageW}cm ${pageH}cm; margin: ${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm; }
@@ -6101,11 +6287,11 @@ function protRelatorioHtml(titulo,nomeTabela,autoPrint=false){
     th{${cssCol};padding:3px 4px;border-bottom:1px solid #000;text-align:left;white-space:nowrap}
     td{${cssCorpo};padding:3px 4px;border-bottom:1px solid #ddd;white-space:nowrap}
     td.money{text-align:right}
-  </style></head><body${onload}>${headerHtml}<div class="rel-sub"><strong>Tabela:</strong> ${esc(nomeTabela||"")}</div><table><thead><tr><th>ServiÃ§o</th><th style="text-align:center">Ãndice</th><th style="text-align:right">PreÃ§o</th><th style="text-align:center">Prazo</th></tr></thead><tbody>${linhas}</tbody></table></body></html>`;
+  </style></head><body${onload}>${headerHtml}<div class="rel-sub"><strong>Tabela:</strong> ${esc(nomeTabela||"")}</div><table><thead><tr><th>ServiÃƒÂ§o</th><th style="text-align:center">ÃƒÂndice</th><th style="text-align:right">PreÃƒÂ§o</th><th style="text-align:center">Prazo</th></tr></thead><tbody>${linhas}</tbody></table></body></html>`;
 }
 function protExecutarRelatorio(){
   const nomeTabela=prot.relTabela.options[prot.relTabela.selectedIndex]?.textContent?.trim()||"";
-  const titulo=String(prot.relTitulo.value||"").trim()||"Tabela de serviÃ§os de protÃ©tico";
+  const titulo=String(prot.relTitulo.value||"").trim()||"Tabela de serviÃƒÂ§os de protÃƒÂ©tico";
   const saida=String(prot.relSaida.value||"Tela");
   protFecharRelatorio();
   if(saida==="Arquivo"){
@@ -6113,11 +6299,11 @@ function protExecutarRelatorio(){
     return;
   }
   if(saida==="Tela"){
-    const campos=["ServiÃ§o","Ãndice","PreÃ§o","Prazo"];
+    const campos=["ServiÃƒÂ§o","ÃƒÂndice","PreÃƒÂ§o","Prazo"];
     const rows=protServicosCache.map(item=>({
-      "ServiÃ§o":String(item.nome||""),
-      "Ãndice":String(item.indice||"R$"),
-      "PreÃ§o":Number(item.preco||0),
+      "ServiÃƒÂ§o":String(item.nome||""),
+      "ÃƒÂndice":String(item.indice||"R$"),
+      "PreÃƒÂ§o":Number(item.preco||0),
       "Prazo":Number(item.prazo||0)
     }));
     if(prot?.panel)prot.panel.classList.add("hidden");
@@ -6136,7 +6322,7 @@ function protExecutarRelatorio(){
     const onPrint=()=>{procRelatorioImprimirPreview();};
     const note=nomeTabela?`Tabela: ${nomeTabela}`:"";
     procRelatorioAbrirPreview(campos,rows,titulo,note,{onBack,onClose,onPrint,orientacao:"retrato"});
-    footerMsg.textContent=`RelatÃ³rio de serviÃ§os de protÃ©tico: ${titulo} (${nomeTabela||"sem tabela"}) - saÃ­da Tela.`;
+    footerMsg.textContent=`RelatÃƒÂ³rio de serviÃƒÂ§os de protÃƒÂ©tico: ${titulo} (${nomeTabela||"sem tabela"}) - saÃƒÂ­da Tela.`;
     return;
   }
   const html=protRelatorioHtml(titulo,nomeTabela,saida==="Impressora");
@@ -6151,20 +6337,20 @@ function protExecutarRelatorio(){
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
   if(saida==="Tela"){
-    footerMsg.textContent=`RelatÃ³rio de serviÃ§os de protÃ©tico: ${titulo} (${nomeTabela||"sem tabela"}) - saÃ­da ${saida}.`;
+    footerMsg.textContent=`RelatÃƒÂ³rio de serviÃƒÂ§os de protÃƒÂ©tico: ${titulo} (${nomeTabela||"sem tabela"}) - saÃƒÂ­da ${saida}.`;
   }
 }
-function protRender(){if(!prot)return;prot.tbody.innerHTML=protServicosCache.map(item=>`<tr data-id="${item.id}" class="${item.id===protServicoSelecionadoId?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.indice||"R$")}</td><td>${formatMoney(item.preco||0)}</td><td>${esc(String(item.prazo||0))}</td></tr>`).join("")||'<tr><td colspan="4"></td></tr>';prot.total.textContent=`${protServicosCache.length} serviÃ§os`}
-async function protCarregarServicos(){if(!prot||!proteticoSelecionadoId){protServicosCache=[];protServicoSelecionadoId=null;protRender();return}const{res,data}=await requestJson("GET",`/proteticos/${proteticoSelecionadoId}/servicos`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar serviÃ§os de protÃ©tico.";return}protServicosCache=Array.isArray(data)?data:[];protServicoSelecionadoId=protServicosCache.some(item=>item.id===protServicoSelecionadoId)?protServicoSelecionadoId:(protServicosCache[0]?.id||null);protRender()}
-async function protCarregar(){protEnsureUI();const atual=proteticoSelecionadoId;const{res,data}=await requestJson("GET","/proteticos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar protÃ©ticos.";return}proteticosCache=Array.isArray(data)?data:[];proteticoSelecionadoId=proteticosCache.some(item=>item.id===atual)?atual:(proteticosCache[0]?.id||null);prot.cbo.innerHTML=proteticosCache.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("");if(proteticoSelecionadoId)prot.cbo.value=String(proteticoSelecionadoId);await protCarregarServicos()}
-async function protAbrir(){protEnsureUI();protVincularEventos();hideAllPanels();ensurePanelChrome(prot.panel);prot.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await protCarregar();footerMsg.textContent="MÃ³dulo ServiÃ§os de protÃ©tico aberto."}
+function protRender(){if(!prot)return;prot.tbody.innerHTML=protServicosCache.map(item=>`<tr data-id="${item.id}" class="${item.id===protServicoSelecionadoId?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.indice||"R$")}</td><td>${formatMoney(item.preco||0)}</td><td>${esc(String(item.prazo||0))}</td></tr>`).join("")||'<tr><td colspan="4"></td></tr>';prot.total.textContent=`${protServicosCache.length} serviÃƒÂ§os`}
+async function protCarregarServicos(){if(!prot||!proteticoSelecionadoId){protServicosCache=[];protServicoSelecionadoId=null;protRender();return}const{res,data}=await requestJson("GET",`/proteticos/${proteticoSelecionadoId}/servicos`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar serviÃƒÂ§os de protÃƒÂ©tico.";return}protServicosCache=Array.isArray(data)?data:[];protServicoSelecionadoId=protServicosCache.some(item=>item.id===protServicoSelecionadoId)?protServicoSelecionadoId:(protServicosCache[0]?.id||null);protRender()}
+async function protCarregar(){protEnsureUI();const atual=proteticoSelecionadoId;const{res,data}=await requestJson("GET","/proteticos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar protÃƒÂ©ticos.";return}proteticosCache=Array.isArray(data)?data:[];proteticoSelecionadoId=proteticosCache.some(item=>item.id===atual)?atual:(proteticosCache[0]?.id||null);prot.cbo.innerHTML=proteticosCache.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("");if(proteticoSelecionadoId)prot.cbo.value=String(proteticoSelecionadoId);await protCarregarServicos()}
+async function protAbrir(){protEnsureUI();protVincularEventos();hideAllPanels();ensurePanelChrome(prot.panel);prot.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await protCarregar();footerMsg.textContent="MÃƒÂ³dulo ServiÃƒÂ§os de protÃƒÂ©tico aberto."}
 function protFecharModal(){if(prot?.modalBackdrop)prot.modalBackdrop.classList.add("hidden");prot.modalBackdrop.dataset.editId=""}
-function protAbrirModal(item=null){if(!prot||!proteticoSelecionadoId){window.alert("Selecione um protÃ©tico.");return}prot.modalTitle.textContent=item?"Altera serviÃ§o":"Insere serviÃ§o";prot.modalNome.value=item?.nome||"";prot.modalIndice.value=item?.indice||"R$";prot.modalPreco.value=procFmtBr(item?.preco||0);prot.modalPrazo.value=String(item?.prazo||0);prot.modalBackdrop.dataset.editId=item?String(item.id):"";prot.modalBackdrop.classList.remove("hidden");prot.modalNome.focus();prot.modalNome.select()}
-async function protSalvarModal(){const nome=String(prot.modalNome.value||"").trim();if(!nome){window.alert("Informe o serviÃ§o.");return}let preco=0;try{preco=procParse(prot.modalPreco.value||"0")}catch{window.alert("PreÃ§o invÃ¡lido.");return}const prazo=Math.max(0,parseInt(prot.modalPrazo.value||"0",10)||0);const payload={nome,indice:String(prot.modalIndice.value||"R$").trim()||"R$",preco,prazo};const editId=Number(prot.modalBackdrop.dataset.editId||0);const path=editId?`/proteticos/servicos/${editId}`:`/proteticos/${proteticoSelecionadoId}/servicos`;const method=editId?"PUT":"POST";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar serviÃ§o.");return}protFecharModal();await protCarregarServicos()}
-async function protNovoCadastro(){const nome=window.prompt("Nome do protÃ©tico:","");if(nome===null)return;const base=String(nome||"").trim();if(!base)return;const{res,data}=await requestJson("POST","/proteticos",{nome:base},true);if(!res.ok){window.alert(data.detail||"Falha ao criar protÃ©tico.");return}proteticoSelecionadoId=Number(data.id||0);await protCarregar()}
-async function protEditarCadastro(){const atual=proteticosCache.find(item=>item.id===proteticoSelecionadoId);if(!atual){window.alert("Selecione um protÃ©tico.");return}const nome=window.prompt("Altere o nome do protÃ©tico:",atual.nome||"");if(nome===null)return;const base=String(nome||"").trim();if(!base)return;const{res,data}=await requestJson("PATCH",`/proteticos/${atual.id}`,{nome:base},true);if(!res.ok){window.alert(data.detail||"Falha ao alterar protÃ©tico.");return}proteticoSelecionadoId=Number(data.id||atual.id);await protCarregar()}
-async function protExcluirCadastro(){const atual=proteticosCache.find(item=>item.id===proteticoSelecionadoId);if(!atual){window.alert("Selecione um protÃ©tico.");return}if(!window.confirm(`Deseja realmente excluir o protÃ©tico '${atual.nome}'?\n\nTodos os serviÃ§os dele serÃ£o removidos.`))return;const{res,data}=await requestJson("DELETE",`/proteticos/${atual.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir protÃ©tico.");return}proteticoSelecionadoId=null;await protCarregar()}
-async function protExcluirServico(){const item=protServicoSelecionado();if(!item){window.alert("Selecione um serviÃ§o.");return}if(!window.confirm(`Deseja realmente eliminar o serviÃ§o '${item.nome}'?`))return;const{res,data}=await requestJson("DELETE",`/proteticos/servicos/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir serviÃ§o.");return}await protCarregarServicos()}
+function protAbrirModal(item=null){if(!prot||!proteticoSelecionadoId){window.alert("Selecione um protÃƒÂ©tico.");return}prot.modalTitle.textContent=item?"Altera serviÃƒÂ§o":"Insere serviÃƒÂ§o";prot.modalNome.value=item?.nome||"";prot.modalIndice.value=item?.indice||"R$";prot.modalPreco.value=procFmtBr(item?.preco||0);prot.modalPrazo.value=String(item?.prazo||0);prot.modalBackdrop.dataset.editId=item?String(item.id):"";prot.modalBackdrop.classList.remove("hidden");prot.modalNome.focus();prot.modalNome.select()}
+async function protSalvarModal(){const nome=String(prot.modalNome.value||"").trim();if(!nome){window.alert("Informe o serviÃƒÂ§o.");return}let preco=0;try{preco=procParse(prot.modalPreco.value||"0")}catch{window.alert("PreÃƒÂ§o invÃƒÂ¡lido.");return}const prazo=Math.max(0,parseInt(prot.modalPrazo.value||"0",10)||0);const payload={nome,indice:String(prot.modalIndice.value||"R$").trim()||"R$",preco,prazo};const editId=Number(prot.modalBackdrop.dataset.editId||0);const path=editId?`/proteticos/servicos/${editId}`:`/proteticos/${proteticoSelecionadoId}/servicos`;const method=editId?"PUT":"POST";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar serviÃƒÂ§o.");return}protFecharModal();await protCarregarServicos()}
+async function protNovoCadastro(){const nome=window.prompt("Nome do protÃƒÂ©tico:","");if(nome===null)return;const base=String(nome||"").trim();if(!base)return;const{res,data}=await requestJson("POST","/proteticos",{nome:base},true);if(!res.ok){window.alert(data.detail||"Falha ao criar protÃƒÂ©tico.");return}proteticoSelecionadoId=Number(data.id||0);await protCarregar()}
+async function protEditarCadastro(){const atual=proteticosCache.find(item=>item.id===proteticoSelecionadoId);if(!atual){window.alert("Selecione um protÃƒÂ©tico.");return}const nome=window.prompt("Altere o nome do protÃƒÂ©tico:",atual.nome||"");if(nome===null)return;const base=String(nome||"").trim();if(!base)return;const{res,data}=await requestJson("PATCH",`/proteticos/${atual.id}`,{nome:base},true);if(!res.ok){window.alert(data.detail||"Falha ao alterar protÃƒÂ©tico.");return}proteticoSelecionadoId=Number(data.id||atual.id);await protCarregar()}
+async function protExcluirCadastro(){const atual=proteticosCache.find(item=>item.id===proteticoSelecionadoId);if(!atual){window.alert("Selecione um protÃƒÂ©tico.");return}if(!window.confirm(`Deseja realmente excluir o protÃƒÂ©tico '${atual.nome}'?\n\nTodos os serviÃƒÂ§os dele serÃƒÂ£o removidos.`))return;const{res,data}=await requestJson("DELETE",`/proteticos/${atual.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir protÃƒÂ©tico.");return}proteticoSelecionadoId=null;await protCarregar()}
+async function protExcluirServico(){const item=protServicoSelecionado();if(!item){window.alert("Selecione um serviÃƒÂ§o.");return}if(!window.confirm(`Deseja realmente eliminar o serviÃƒÂ§o '${item.nome}'?`))return;const{res,data}=await requestJson("DELETE",`/proteticos/servicos/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir serviÃƒÂ§o.");return}await protCarregarServicos()}
 function protVincularEventos(){
   if(!prot||prot.panel.dataset.bound==="1")return;
   prot.panel.dataset.bound="1";
@@ -6186,23 +6372,23 @@ function protVincularEventos(){
   if(prot.relArquivoPath)prot.relArquivoPath.addEventListener("input",()=>{prot.relArquivoHandle=null});
 }
 
-function ctrlProtMeses(){return["Janeiro","Fevereiro","MarÃ§o","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]}
+function ctrlProtMeses(){return["Janeiro","Fevereiro","MarÃƒÂ§o","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]}
 function ctrlProtRender(totalPendente=0){if(!ctrlProt)return;ctrlProt.tbody.innerHTML=ctrlProtRegistrosCache.map(item=>`<tr data-id="${item.id||""}"><td>${esc(item.entrega||"")}</td><td>${esc(item.servico||"")}</td><td>${esc(item.paciente||"")}</td><td>${esc(item.indice||"")}</td><td>${formatDec2(item.valor||0)}</td><td>${item.ok?"Ok":""}</td></tr>`).join("")||'<tr><td colspan="6"></td></tr>';ctrlProt.total.textContent=formatDec2(totalPendente||0)}
-async function ctrlProtCarregarRegistros(){if(!ctrlProt)return;const params=new URLSearchParams();if(ctrlProt.mes.value)params.set("mes",String(ctrlProt.mes.value));if(ctrlProt.ano.value)params.set("ano",String(ctrlProt.ano.value));if(ctrlProt.protetico.value)params.set("protetico_id",String(ctrlProt.protetico.value));if(ctrlProt.cirurgiao.value)params.set("cirurgiao_id",String(ctrlProt.cirurgiao.value));const{res,data}=await requestJson("GET",`/controle-proteticos?${params.toString()}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar controle de protÃ©ticos.";ctrlProtRegistrosCache=[];ctrlProtRender(0);return}ctrlProtRegistrosCache=Array.isArray(data?.itens)?data.itens:[];ctrlProtRender(Number(data?.total_pendente||0))}
+async function ctrlProtCarregarRegistros(){if(!ctrlProt)return;const params=new URLSearchParams();if(ctrlProt.mes.value)params.set("mes",String(ctrlProt.mes.value));if(ctrlProt.ano.value)params.set("ano",String(ctrlProt.ano.value));if(ctrlProt.protetico.value)params.set("protetico_id",String(ctrlProt.protetico.value));if(ctrlProt.cirurgiao.value)params.set("cirurgiao_id",String(ctrlProt.cirurgiao.value));const{res,data}=await requestJson("GET",`/controle-proteticos?${params.toString()}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar controle de protÃƒÂ©ticos.";ctrlProtRegistrosCache=[];ctrlProtRender(0);return}ctrlProtRegistrosCache=Array.isArray(data?.itens)?data.itens:[];ctrlProtRender(Number(data?.total_pendente||0))}
 async function ctrlProtCarregarFiltros(){if(!ctrlProt)return;const anoAtual=(new Date()).getFullYear();ctrlProt.mes.innerHTML=ctrlProtMeses().map((mes,idx)=>`<option value="${idx+1}">${mes}</option>`).join("");ctrlProt.mes.value=String((new Date()).getMonth()+1);ctrlProt.ano.value=String(anoAtual);const{res,data}=await requestJson("GET","/controle-proteticos/filtros",undefined,true);const proteticos=(res.ok&&Array.isArray(data?.proteticos)?data.proteticos:[]);const cirurgioes=(res.ok&&Array.isArray(data?.cirurgioes)?data.cirurgioes:[]);ctrlProt.protetico.innerHTML=`<option value=""></option>${proteticos.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("")}`;ctrlProt.cirurgiao.innerHTML=`<option value=""></option>${cirurgioes.map(item=>`<option value="${item.id}">${esc(item.nome||"")}</option>`).join("")}`;await ctrlProtCarregarRegistros()}
-function ctrlProtEnsureUI(){if(ctrlProt)return;const style=document.createElement("style");style.textContent=".ctrlprot-panel{width:min(980px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.ctrlprot-toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.ctrlprot-filtros{display:grid;grid-template-columns:140px 90px minmax(220px,1fr) minmax(180px,220px);gap:8px;align-items:end;margin-bottom:8px}.ctrlprot-filtros label{display:block;margin-bottom:2px}.ctrlprot-filtros input,.ctrlprot-filtros select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.ctrlprot-grid{border:1px solid #cfd8e3;min-height:330px;background:#fff}.ctrlprot-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.ctrlprot-grid th,.ctrlprot-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ctrlprot-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.ctrlprot-grid th:nth-child(1),.ctrlprot-grid td:nth-child(1),.ctrlprot-grid th:nth-child(4),.ctrlprot-grid td:nth-child(4),.ctrlprot-grid th:nth-child(5),.ctrlprot-grid td:nth-child(5),.ctrlprot-grid th:nth-child(6),.ctrlprot-grid td:nth-child(6){text-align:center}.ctrlprot-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px}.ctrlprot-total-box{min-width:110px;height:24px;padding:0 8px;display:flex;align-items:center;justify-content:flex-end;border:1px solid #35b4bd;background:#3de0ea;color:#003b41;font-weight:700}.ctrlprot-sep{border-top:1px solid #d3dbe5;margin:6px 0 8px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="ctrl-proteticos-panel" class="ctrlprot-panel hidden"><div class="panel-title">Controle de serviÃ§os de prÃ³tese</div><div class="ctrlprot-toolbar"><button id="ctrlprot-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo serviÃ§o...</button><button id="ctrlprot-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="ctrlprot-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="ctrlprot-btn-configura" class="materiais-btn" type="button"><img src="/desktop-assets/configuracoes.png" alt="">Configura...</button><button id="ctrlprot-btn-baixa" class="materiais-btn" type="button"><img src="/desktop-assets/ok.png" alt="">Baixa...</button><button id="ctrlprot-btn-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="ctrlprot-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="ctrlprot-filtros"><div><label for="ctrlprot-mes">MÃªs de entrega:</label><select id="ctrlprot-mes"></select></div><div><label for="ctrlprot-ano">Ano:</label><input id="ctrlprot-ano" type="number" min="2000" max="2100"></div><div><label for="ctrlprot-protetico">ProtÃ©tico:</label><select id="ctrlprot-protetico"></select></div><div><label for="ctrlprot-cirurgiao">CirurgiÃ£o:</label><select id="ctrlprot-cirurgiao"></select></div></div><div class="ctrlprot-grid"><table><colgroup><col style="width:90px"><col><col style="width:220px"><col style="width:80px"><col style="width:90px"><col style="width:50px"></colgroup><thead><tr><th>Entrega</th><th>ServiÃ§o</th><th>Paciente</th><th>Ãndice</th><th>Valor</th><th>Ok</th></tr></thead><tbody id="ctrlprot-tbody"></tbody></table></div><div class="ctrlprot-footer"><span>Total pendente: R$</span><div id="ctrlprot-total" class="ctrlprot-total-box">0,00</div></div></section>`);ctrlProt={panel:document.getElementById("ctrl-proteticos-panel"),mes:document.getElementById("ctrlprot-mes"),ano:document.getElementById("ctrlprot-ano"),protetico:document.getElementById("ctrlprot-protetico"),cirurgiao:document.getElementById("ctrlprot-cirurgiao"),tbody:document.getElementById("ctrlprot-tbody"),total:document.getElementById("ctrlprot-total"),btnNovo:document.getElementById("ctrlprot-btn-novo"),btnEditar:document.getElementById("ctrlprot-btn-editar"),btnExcluir:document.getElementById("ctrlprot-btn-excluir"),btnConfigura:document.getElementById("ctrlprot-btn-configura"),btnBaixa:document.getElementById("ctrlprot-btn-baixa"),btnImprime:document.getElementById("ctrlprot-btn-imprime"),btnFechar:document.getElementById("ctrlprot-btn-fechar")};ensurePanelChrome(ctrlProt.panel)}
-function ctrlProtVincularEventos(){if(!ctrlProt||ctrlProt.panel.dataset.bound==="1")return;ctrlProt.panel.dataset.bound="1";[ctrlProt.mes,ctrlProt.ano,ctrlProt.protetico,ctrlProt.cirurgiao].forEach(el=>el&&el.addEventListener("change",ctrlProtCarregarRegistros));ctrlProt.btnFechar.addEventListener("click",()=>{ctrlProt.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});ctrlProt.btnNovo.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Novo serviÃ§o: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnEditar.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Altera: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnExcluir.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Elimina: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnConfigura.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Configura: em desenvolvimento."});ctrlProt.btnBaixa.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Baixa: em desenvolvimento."});ctrlProt.btnImprime.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃ©ticos > Imprime: em desenvolvimento."})}
-async function ctrlProtAbrir(){ctrlProtEnsureUI();ctrlProtVincularEventos();hideAllPanels();ensurePanelChrome(ctrlProt.panel);ctrlProt.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await ctrlProtCarregarFiltros();footerMsg.textContent="Cadastro > Controle de protÃ©ticos aberto."}
+function ctrlProtEnsureUI(){if(ctrlProt)return;const style=document.createElement("style");style.textContent=".ctrlprot-panel{width:min(980px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.ctrlprot-toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.ctrlprot-filtros{display:grid;grid-template-columns:140px 90px minmax(220px,1fr) minmax(180px,220px);gap:8px;align-items:end;margin-bottom:8px}.ctrlprot-filtros label{display:block;margin-bottom:2px}.ctrlprot-filtros input,.ctrlprot-filtros select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.ctrlprot-grid{border:1px solid #cfd8e3;min-height:330px;background:#fff}.ctrlprot-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.ctrlprot-grid th,.ctrlprot-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ctrlprot-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.ctrlprot-grid th:nth-child(1),.ctrlprot-grid td:nth-child(1),.ctrlprot-grid th:nth-child(4),.ctrlprot-grid td:nth-child(4),.ctrlprot-grid th:nth-child(5),.ctrlprot-grid td:nth-child(5),.ctrlprot-grid th:nth-child(6),.ctrlprot-grid td:nth-child(6){text-align:center}.ctrlprot-footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:8px}.ctrlprot-total-box{min-width:110px;height:24px;padding:0 8px;display:flex;align-items:center;justify-content:flex-end;border:1px solid #35b4bd;background:#3de0ea;color:#003b41;font-weight:700}.ctrlprot-sep{border-top:1px solid #d3dbe5;margin:6px 0 8px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="ctrl-proteticos-panel" class="ctrlprot-panel hidden"><div class="panel-title">Controle de serviÃƒÂ§os de prÃƒÂ³tese</div><div class="ctrlprot-toolbar"><button id="ctrlprot-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo serviÃƒÂ§o...</button><button id="ctrlprot-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="ctrlprot-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="ctrlprot-btn-configura" class="materiais-btn" type="button"><img src="/desktop-assets/configuracoes.png" alt="">Configura...</button><button id="ctrlprot-btn-baixa" class="materiais-btn" type="button"><img src="/desktop-assets/ok.png" alt="">Baixa...</button><button id="ctrlprot-btn-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="ctrlprot-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="ctrlprot-filtros"><div><label for="ctrlprot-mes">MÃƒÂªs de entrega:</label><select id="ctrlprot-mes"></select></div><div><label for="ctrlprot-ano">Ano:</label><input id="ctrlprot-ano" type="number" min="2000" max="2100"></div><div><label for="ctrlprot-protetico">ProtÃƒÂ©tico:</label><select id="ctrlprot-protetico"></select></div><div><label for="ctrlprot-cirurgiao">CirurgiÃƒÂ£o:</label><select id="ctrlprot-cirurgiao"></select></div></div><div class="ctrlprot-grid"><table><colgroup><col style="width:90px"><col><col style="width:220px"><col style="width:80px"><col style="width:90px"><col style="width:50px"></colgroup><thead><tr><th>Entrega</th><th>ServiÃƒÂ§o</th><th>Paciente</th><th>ÃƒÂndice</th><th>Valor</th><th>Ok</th></tr></thead><tbody id="ctrlprot-tbody"></tbody></table></div><div class="ctrlprot-footer"><span>Total pendente: R$</span><div id="ctrlprot-total" class="ctrlprot-total-box">0,00</div></div></section>`);ctrlProt={panel:document.getElementById("ctrl-proteticos-panel"),mes:document.getElementById("ctrlprot-mes"),ano:document.getElementById("ctrlprot-ano"),protetico:document.getElementById("ctrlprot-protetico"),cirurgiao:document.getElementById("ctrlprot-cirurgiao"),tbody:document.getElementById("ctrlprot-tbody"),total:document.getElementById("ctrlprot-total"),btnNovo:document.getElementById("ctrlprot-btn-novo"),btnEditar:document.getElementById("ctrlprot-btn-editar"),btnExcluir:document.getElementById("ctrlprot-btn-excluir"),btnConfigura:document.getElementById("ctrlprot-btn-configura"),btnBaixa:document.getElementById("ctrlprot-btn-baixa"),btnImprime:document.getElementById("ctrlprot-btn-imprime"),btnFechar:document.getElementById("ctrlprot-btn-fechar")};ensurePanelChrome(ctrlProt.panel)}
+function ctrlProtVincularEventos(){if(!ctrlProt||ctrlProt.panel.dataset.bound==="1")return;ctrlProt.panel.dataset.bound="1";[ctrlProt.mes,ctrlProt.ano,ctrlProt.protetico,ctrlProt.cirurgiao].forEach(el=>el&&el.addEventListener("change",ctrlProtCarregarRegistros));ctrlProt.btnFechar.addEventListener("click",()=>{ctrlProt.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});ctrlProt.btnNovo.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Novo serviÃƒÂ§o: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnEditar.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Altera: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnExcluir.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Elimina: estrutura pronta, detalhes operacionais em desenvolvimento."});ctrlProt.btnConfigura.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Configura: em desenvolvimento."});ctrlProt.btnBaixa.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Baixa: em desenvolvimento."});ctrlProt.btnImprime.addEventListener("click",()=>{footerMsg.textContent="Controle de protÃƒÂ©ticos > Imprime: em desenvolvimento."})}
+async function ctrlProtAbrir(){ctrlProtEnsureUI();ctrlProtVincularEventos();hideAllPanels();ensurePanelChrome(ctrlProt.panel);ctrlProt.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await ctrlProtCarregarFiltros();footerMsg.textContent="Cadastro > Controle de protÃƒÂ©ticos aberto."}
 
-function convPlanRenderConvenios(){if(!convPlanCfg)return;convPlanCfg.tbConvenios.innerHTML=convPlanConveniosCache.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelConvenioId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.codigo||"")}</td><td>${esc(item.telefone||"")}</td><td>${esc(item.telefone2||"")}</td><td style="text-align:center">${item.inativo?"":"ðŸŸ¢"}</td></tr>`).join("");convPlanCfg.totalConvenios.textContent=`${convPlanConveniosCache.length} convÃªnios`}
-function convPlanRenderPlanos(){if(!convPlanCfg)return;const itens=convPlanPlanosCache.filter(item=>!convPlanSelConvenioId||Number(item.convenio_id||0)===Number(convPlanSelConvenioId));convPlanCfg.tbPlanos.innerHTML=itens.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelPlanoId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.cobertura||"")}</td><td style="text-align:center">${item.inativo?"":"ðŸŸ¢"}</td></tr>`).join("");convPlanCfg.totalPlanos.textContent=`${itens.length} planos`}
+function convPlanRenderConvenios(){if(!convPlanCfg)return;convPlanCfg.tbConvenios.innerHTML=convPlanConveniosCache.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelConvenioId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.codigo||"")}</td><td>${esc(item.telefone||"")}</td><td>${esc(item.telefone2||"")}</td><td style="text-align:center">${item.inativo?"":"Ã°Å¸Å¸Â¢"}</td></tr>`).join("");convPlanCfg.totalConvenios.textContent=`${convPlanConveniosCache.length} convÃƒÂªnios`}
+function convPlanRenderPlanos(){if(!convPlanCfg)return;const itens=convPlanPlanosCache.filter(item=>!convPlanSelConvenioId||Number(item.convenio_id||0)===Number(convPlanSelConvenioId));convPlanCfg.tbPlanos.innerHTML=itens.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelPlanoId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.cobertura||"")}</td><td style="text-align:center">${item.inativo?"":"Ã°Å¸Å¸Â¢"}</td></tr>`).join("");convPlanCfg.totalPlanos.textContent=`${itens.length} planos`}
 function convPlanSelecionarConvenio(tr){convPlanSelConvenioId=Number(tr?.dataset.id||0)||null;convPlanSelPlanoId=null;convPlanRenderConvenios();convPlanRenderPlanos()}
 function convPlanSelecionarPlano(tr){convPlanSelPlanoId=Number(tr?.dataset.id||0)||null;convPlanRenderPlanos()}
-function convPlanEnsureUI(){if(convPlanCfg)return;const style=document.createElement("style");style.textContent=".convplan-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-toolbar,.convplan-subtoolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-subtoolbar{margin-top:10px}.convplan-toolbar .sep,.convplan-subtoolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.convplan-grid{border:1px solid #cfd8e3;background:#fff;overflow:auto}.convplan-grid.top{height:260px}.convplan-grid.bottom{height:160px}.convplan-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-grid th,.convplan-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-grid tr.selected{background:#d9e8fb}.convplan-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convenios-planos-panel" class="convplan-panel hidden"><div class="panel-title">ConvÃªnios e planos</div><div class="convplan-toolbar"><button id="convplan-btn-novo-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo convÃªnio...</button><button id="convplan-btn-editar-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-btn-excluir-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-btn-calendario" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">CalendÃ¡rio de faturamento...</button><button id="convplan-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-grid top"><table><colgroup><col><col style="width:80px"><col style="width:100px"><col style="width:100px"><col style="width:60px"></colgroup><thead><tr><th>Nome da operadora</th><th>CÃ³digo</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="convplan-tb-convenios"></tbody></table></div><div id="convplan-total-convenios" class="convplan-total">0 convÃªnios</div><div class="convplan-subtoolbar"><button id="convplan-btn-novo-plano" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo plano...</button><button id="convplan-btn-editar-plano" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera plano...</button><button id="convplan-btn-excluir-plano" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina plano</button></div><div class="convplan-grid bottom"><table><colgroup><col><col><col style="width:60px"></colgroup><thead><tr><th>Nome do plano</th><th>Cobertura</th><th>Status</th></tr></thead><tbody id="convplan-tb-planos"></tbody></table></div><div id="convplan-total-planos" class="convplan-total">0 planos</div></section>`);convPlanCfg={panel:document.getElementById("convenios-planos-panel"),tbConvenios:document.getElementById("convplan-tb-convenios"),tbPlanos:document.getElementById("convplan-tb-planos"),totalConvenios:document.getElementById("convplan-total-convenios"),totalPlanos:document.getElementById("convplan-total-planos"),btnNovoConvenio:document.getElementById("convplan-btn-novo-convenio"),btnEditarConvenio:document.getElementById("convplan-btn-editar-convenio"),btnExcluirConvenio:document.getElementById("convplan-btn-excluir-convenio"),btnCalendario:document.getElementById("convplan-btn-calendario"),btnNovoPlano:document.getElementById("convplan-btn-novo-plano"),btnEditarPlano:document.getElementById("convplan-btn-editar-plano"),btnExcluirPlano:document.getElementById("convplan-btn-excluir-plano"),btnFechar:document.getElementById("convplan-btn-fechar")};ensurePanelChrome(convPlanCfg.panel)}
-async function convPlanCarregar(){const {res,data}=await requestJson("GET","/cadastros/convenios-planos/combos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar convÃªnios e planos.";return}convPlanConveniosCache=Array.isArray(data?.convenios)?data.convenios:[];convPlanPlanosCache=Array.isArray(data?.planos)?data.planos:[];if(!convPlanConveniosCache.some(item=>Number(item.id)===Number(convPlanSelConvenioId)))convPlanSelConvenioId=convPlanConveniosCache[0]?.id||null;if(convPlanSelPlanoId&&!convPlanPlanosCache.some(item=>Number(item.id)===Number(convPlanSelPlanoId)&&Number(item.convenio_id||0)===Number(convPlanSelConvenioId)))convPlanSelPlanoId=null;convPlanRenderConvenios();convPlanRenderPlanos()}
-function convPlanVincularEventos(){if(!convPlanCfg||convPlanCfg.panel.dataset.bound==="1")return;convPlanCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCfg.tbConvenios,tr=>convPlanSelecionarConvenio(tr),()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: alteraÃ§Ã£o de convÃªnio em planejamento.");bindStandardGridActivation(convPlanCfg.tbPlanos,tr=>convPlanSelecionarPlano(tr),()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: alteraÃ§Ã£o de plano em planejamento.");convPlanCfg.btnNovoConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: novo convÃªnio em planejamento.");convPlanCfg.btnEditarConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: alteraÃ§Ã£o de convÃªnio em planejamento.");convPlanCfg.btnExcluirConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: exclusÃ£o de convÃªnio em planejamento.");convPlanCfg.btnCalendario.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: calendÃ¡rio de faturamento em planejamento.");convPlanCfg.btnNovoPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: novo plano em planejamento.");convPlanCfg.btnEditarPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: alteraÃ§Ã£o de plano em planejamento.");convPlanCfg.btnExcluirPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: exclusÃ£o de plano em planejamento.");convPlanCfg.btnFechar.addEventListener("click",()=>{convPlanCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")})}
-async function convPlanAbrir(){convPlanEnsureUI();convPlanVincularEventos();hideAllPanels();ensurePanelChrome(convPlanCfg.panel);convPlanCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await convPlanCarregar();footerMsg.textContent="Cadastro > ConvÃªnios e planos aberto."}
-const CONVPLAN_LOGRADOUROS_V2=[{id:"",nome:""},{id:"1",nome:"Rua"},{id:"2",nome:"Avenida"},{id:"3",nome:"Alameda"},{id:"4",nome:"PraÃ§a"},{id:"5",nome:"Travessa"},{id:"6",nome:"Rodovia"},{id:"7",nome:"Outro"}];
+function convPlanEnsureUI(){if(convPlanCfg)return;const style=document.createElement("style");style.textContent=".convplan-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-toolbar,.convplan-subtoolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-subtoolbar{margin-top:10px}.convplan-toolbar .sep,.convplan-subtoolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.convplan-grid{border:1px solid #cfd8e3;background:#fff;overflow:auto}.convplan-grid.top{height:260px}.convplan-grid.bottom{height:160px}.convplan-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-grid th,.convplan-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-grid tr.selected{background:#d9e8fb}.convplan-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convenios-planos-panel" class="convplan-panel hidden"><div class="panel-title">ConvÃƒÂªnios e planos</div><div class="convplan-toolbar"><button id="convplan-btn-novo-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo convÃƒÂªnio...</button><button id="convplan-btn-editar-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-btn-excluir-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-btn-calendario" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">CalendÃƒÂ¡rio de faturamento...</button><button id="convplan-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-grid top"><table><colgroup><col><col style="width:80px"><col style="width:100px"><col style="width:100px"><col style="width:60px"></colgroup><thead><tr><th>Nome da operadora</th><th>CÃƒÂ³digo</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="convplan-tb-convenios"></tbody></table></div><div id="convplan-total-convenios" class="convplan-total">0 convÃƒÂªnios</div><div class="convplan-subtoolbar"><button id="convplan-btn-novo-plano" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo plano...</button><button id="convplan-btn-editar-plano" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera plano...</button><button id="convplan-btn-excluir-plano" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina plano</button></div><div class="convplan-grid bottom"><table><colgroup><col><col><col style="width:60px"></colgroup><thead><tr><th>Nome do plano</th><th>Cobertura</th><th>Status</th></tr></thead><tbody id="convplan-tb-planos"></tbody></table></div><div id="convplan-total-planos" class="convplan-total">0 planos</div></section>`);convPlanCfg={panel:document.getElementById("convenios-planos-panel"),tbConvenios:document.getElementById("convplan-tb-convenios"),tbPlanos:document.getElementById("convplan-tb-planos"),totalConvenios:document.getElementById("convplan-total-convenios"),totalPlanos:document.getElementById("convplan-total-planos"),btnNovoConvenio:document.getElementById("convplan-btn-novo-convenio"),btnEditarConvenio:document.getElementById("convplan-btn-editar-convenio"),btnExcluirConvenio:document.getElementById("convplan-btn-excluir-convenio"),btnCalendario:document.getElementById("convplan-btn-calendario"),btnNovoPlano:document.getElementById("convplan-btn-novo-plano"),btnEditarPlano:document.getElementById("convplan-btn-editar-plano"),btnExcluirPlano:document.getElementById("convplan-btn-excluir-plano"),btnFechar:document.getElementById("convplan-btn-fechar")};ensurePanelChrome(convPlanCfg.panel)}
+async function convPlanCarregar(){const {res,data}=await requestJson("GET","/cadastros/convenios-planos/combos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar convÃƒÂªnios e planos.";return}convPlanConveniosCache=Array.isArray(data?.convenios)?data.convenios:[];convPlanPlanosCache=Array.isArray(data?.planos)?data.planos:[];if(!convPlanConveniosCache.some(item=>Number(item.id)===Number(convPlanSelConvenioId)))convPlanSelConvenioId=convPlanConveniosCache[0]?.id||null;if(convPlanSelPlanoId&&!convPlanPlanosCache.some(item=>Number(item.id)===Number(convPlanSelPlanoId)&&Number(item.convenio_id||0)===Number(convPlanSelConvenioId)))convPlanSelPlanoId=null;convPlanRenderConvenios();convPlanRenderPlanos()}
+function convPlanVincularEventos(){if(!convPlanCfg||convPlanCfg.panel.dataset.bound==="1")return;convPlanCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCfg.tbConvenios,tr=>convPlanSelecionarConvenio(tr),()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: alteraÃƒÂ§ÃƒÂ£o de convÃƒÂªnio em planejamento.");bindStandardGridActivation(convPlanCfg.tbPlanos,tr=>convPlanSelecionarPlano(tr),()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: alteraÃƒÂ§ÃƒÂ£o de plano em planejamento.");convPlanCfg.btnNovoConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: novo convÃƒÂªnio em planejamento.");convPlanCfg.btnEditarConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: alteraÃƒÂ§ÃƒÂ£o de convÃƒÂªnio em planejamento.");convPlanCfg.btnExcluirConvenio.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: exclusÃƒÂ£o de convÃƒÂªnio em planejamento.");convPlanCfg.btnCalendario.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: calendÃƒÂ¡rio de faturamento em planejamento.");convPlanCfg.btnNovoPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: novo plano em planejamento.");convPlanCfg.btnEditarPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: alteraÃƒÂ§ÃƒÂ£o de plano em planejamento.");convPlanCfg.btnExcluirPlano.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: exclusÃƒÂ£o de plano em planejamento.");convPlanCfg.btnFechar.addEventListener("click",()=>{convPlanCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")})}
+async function convPlanAbrir(){convPlanEnsureUI();convPlanVincularEventos();hideAllPanels();ensurePanelChrome(convPlanCfg.panel);convPlanCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await convPlanCarregar();footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos aberto."}
+const CONVPLAN_LOGRADOUROS_V2=[{id:"",nome:""},{id:"1",nome:"Rua"},{id:"2",nome:"Avenida"},{id:"3",nome:"Alameda"},{id:"4",nome:"PraÃƒÂ§a"},{id:"5",nome:"Travessa"},{id:"6",nome:"Rodovia"},{id:"7",nome:"Outro"}];
 const CONVPLAN_TIPOS_FONE_V2=[{id:"",nome:""},{id:"1",nome:"Comercial 1"},{id:"2",nome:"Comercial 2"},{id:"3",nome:"Comercial 3"},{id:"4",nome:"Fax"}];
 const CONVPLAN_MODALIDADE_FAT_V2=[{id:"1",nome:"Parcial"},{id:"2",nome:"Total"}];
 async function convPlanCarregarAuxConvenioV2(item=null){
@@ -6232,49 +6418,49 @@ async function convPlanCarregarAuxConvenioV2(item=null){
     m.cidade.value=String(item?.cidade??"");
   }
 }
-function convPlanStatusDotV2(inativo){return inativo?"":"ðŸŸ¢"}
+function convPlanStatusDotV2(inativo){return inativo?"":"Ã°Å¸Å¸Â¢"}
 function convPlanCurrentConvenioV2(){return convPlanConveniosCache.find(item=>Number(item.id)===Number(convPlanSelConvenioId))||null}
 function convPlanCurrentPlanoV2(){return convPlanPlanosCache.find(item=>Number(item.id)===Number(convPlanSelPlanoId))||null}
 function convPlanSetObjectOptionsV2(selectEl,itens,blankLabel=""){if(!(selectEl instanceof HTMLSelectElement))return;const atual=String(selectEl.value||"");const html=[];if(blankLabel!==null)html.push(`<option value="">${esc(blankLabel)}</option>`);(Array.isArray(itens)?itens:[]).forEach(item=>{const value=String(item?.id??"");const nome=String(item?.nome??value);html.push(`<option value="${esc(value)}">${esc(nome)}</option>`)});selectEl.innerHTML=html.join("");if(atual&&Array.from(selectEl.options).some(opt=>opt.value===atual))selectEl.value=atual}
 function convPlanTabSetV2(modal,tab){if(!modal)return;modal.tabPrincipal.classList.toggle("active",tab==="principal");if(modal.tabDetalhes)modal.tabDetalhes.classList.toggle("active",tab==="detalhes");modal.panePrincipal.classList.toggle("hidden",tab!=="principal");if(modal.paneDetalhes)modal.paneDetalhes.classList.toggle("hidden",tab!=="detalhes")}
 function convPlanConvenioPayloadV2(){const m=convPlanCfg?.convenioModal;if(!m)return null;return{codigo:m.codigo.value,codigo_ans:m.ans.value,nome:m.nome.value,razao_social:m.razao.value,tipo_logradouro:m.tipolog.value||null,endereco:m.endereco.value,numero:m.numero.value,complemento:m.complemento.value,bairro:m.bairro.value,cidade:m.cidade.value,cep:m.cep.value,uf:m.uf.value,tipo_fone1:m.tipo1.value||null,telefone:m.fone1.value,contato1:m.contato1.value,tipo_fone2:m.tipo2.value||null,telefone2:m.fone2.value,contato2:m.contato2.value,tipo_fone3:m.tipo3.value||null,telefone3:m.fone3.value,contato3:m.contato3.value,tipo_fone4:m.tipo4.value||null,telefone4:m.fone4.value,contato4:m.contato4.value,email:m.email.value,email_tecnico:m.emailTec.value,homepage:m.homepage.value,cnpj:m.cnpj.value,inscricao_estadual:m.ie.value,inscricao_municipal:m.im.value,tipo_faturamento:m.fat.value||null,observacoes:m.obs.value,inativo:m.inativo.checked}}
 function convPlanPlanoPayloadV2(){const m=convPlanCfg?.planoModal;const convenio=convPlanCurrentConvenioV2();if(!m||!convenio)return null;return{convenio_row_id:Number(convenio.row_id||0),codigo:m.codigo.value,nome:m.nome.value,cobertura:m.cobertura.value,inativo:m.inativo.checked}}
-function convPlanConvenioModalPreencherV2(item=null){const m=convPlanCfg?.convenioModal;if(!m)return;m.editRowId=item?.row_id??null;m.title.textContent=item?"Altera convÃªnio":"Novo convÃªnio";m.codigo.value=item?.codigo||"";m.nome.value=item?.nome||"";m.razao.value=item?.razao_social||"";m.ans.value=item?.codigo_ans||"";m.tipolog.value=String(item?.tipo_logradouro??"");m.endereco.value=item?.endereco||"";m.numero.value=item?.numero||"";m.complemento.value=item?.complemento||"";m.bairro.value=item?.bairro||"";m.cidade.value=item?.cidade||"";m.cep.value=item?.cep||"";m.uf.value=item?.uf||"";m.tipo1.value=String(item?.tipo_fone1??"");m.fone1.value=item?.telefone||"";m.contato1.value=item?.contato1||"";m.tipo2.value=String(item?.tipo_fone2??"");m.fone2.value=item?.telefone2||"";m.contato2.value=item?.contato2||"";m.tipo3.value=String(item?.tipo_fone3??"");m.fone3.value=item?.telefone3||"";m.contato3.value=item?.contato3||"";m.tipo4.value=String(item?.tipo_fone4??"");m.fone4.value=item?.telefone4||"";m.contato4.value=item?.contato4||"";m.email.value=item?.email||"";m.emailTec.value=item?.email_tecnico||"";m.homepage.value=item?.homepage||"";m.cnpj.value=item?.cnpj||"";m.ie.value=item?.inscricao_estadual||"";m.im.value=item?.inscricao_municipal||"";m.fat.value=String(item?.tipo_faturamento??"1");m.obs.value=item?.observacoes||"";m.inativo.checked=!!item?.inativo;m.inclusao.value=item?.data_inclusao||"";m.alteracao.value=item?.data_alteracao||"";convPlanTabSetV2(m,"principal")}
+function convPlanConvenioModalPreencherV2(item=null){const m=convPlanCfg?.convenioModal;if(!m)return;m.editRowId=item?.row_id??null;m.title.textContent=item?"Altera convÃƒÂªnio":"Novo convÃƒÂªnio";m.codigo.value=item?.codigo||"";m.nome.value=item?.nome||"";m.razao.value=item?.razao_social||"";m.ans.value=item?.codigo_ans||"";m.tipolog.value=String(item?.tipo_logradouro??"");m.endereco.value=item?.endereco||"";m.numero.value=item?.numero||"";m.complemento.value=item?.complemento||"";m.bairro.value=item?.bairro||"";m.cidade.value=item?.cidade||"";m.cep.value=item?.cep||"";m.uf.value=item?.uf||"";m.tipo1.value=String(item?.tipo_fone1??"");m.fone1.value=item?.telefone||"";m.contato1.value=item?.contato1||"";m.tipo2.value=String(item?.tipo_fone2??"");m.fone2.value=item?.telefone2||"";m.contato2.value=item?.contato2||"";m.tipo3.value=String(item?.tipo_fone3??"");m.fone3.value=item?.telefone3||"";m.contato3.value=item?.contato3||"";m.tipo4.value=String(item?.tipo_fone4??"");m.fone4.value=item?.telefone4||"";m.contato4.value=item?.contato4||"";m.email.value=item?.email||"";m.emailTec.value=item?.email_tecnico||"";m.homepage.value=item?.homepage||"";m.cnpj.value=item?.cnpj||"";m.ie.value=item?.inscricao_estadual||"";m.im.value=item?.inscricao_municipal||"";m.fat.value=String(item?.tipo_faturamento??"1");m.obs.value=item?.observacoes||"";m.inativo.checked=!!item?.inativo;m.inclusao.value=item?.data_inclusao||"";m.alteracao.value=item?.data_alteracao||"";convPlanTabSetV2(m,"principal")}
 function convPlanPlanoModalPreencherV2(item=null){const m=convPlanCfg?.planoModal;if(!m)return;m.editRowId=item?.row_id??null;m.title.textContent=item?"Altera plano":"Novo plano";m.codigo.value=item?.codigo||"";m.nome.value=item?.nome||"";m.cobertura.value=item?.cobertura||"";m.inativo.checked=!!item?.inativo;m.inclusao.value=item?.data_inclusao||"";m.alteracao.value=item?.data_alteracao||""}
-async function convPlanAbrirModalConvenioV2(modo){const item=modo==="editar"?convPlanCurrentConvenioV2():null;if(modo==="editar"&&!item){window.alert("Selecione um convÃªnio.");return}await convPlanCarregarAuxConvenioV2(item);convPlanConvenioModalPreencherV2(item);convPlanCfg.convenioModal.backdrop.classList.remove("hidden");setTimeout(()=>{try{convPlanCfg.convenioModal.codigo.focus()}catch{}},10)}
-function convPlanAbrirModalPlanoV2(modo){if(!convPlanSelConvenioId){window.alert("Selecione um convÃªnio.");return}const item=modo==="editar"?convPlanCurrentPlanoV2():null;if(modo==="editar"&&!item){window.alert("Selecione um plano.");return}convPlanPlanoModalPreencherV2(item);convPlanCfg.planoModal.backdrop.classList.remove("hidden");setTimeout(()=>{try{convPlanCfg.planoModal.codigo.focus()}catch{}},10)}
-async function convPlanSalvarConvenioV2(){const payload=convPlanConvenioPayloadV2();const m=convPlanCfg?.convenioModal;if(!payload||!m)return;const isEdit=!!m.editRowId;const {res,data}=await requestJson(isEdit?"PUT":"POST",isEdit?`/cadastros/convenios-planos/convenios/${m.editRowId}`:"/cadastros/convenios-planos/convenios",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar convÃªnio.");return}m.backdrop.classList.add("hidden");convPlanSelConvenioId=Number(data?.id||convPlanSelConvenioId)||convPlanSelConvenioId;await convPlanCarregar();footerMsg.textContent=isEdit?"ConvÃªnio alterado com sucesso.":"ConvÃªnio criado com sucesso."}
+async function convPlanAbrirModalConvenioV2(modo){const item=modo==="editar"?convPlanCurrentConvenioV2():null;if(modo==="editar"&&!item){window.alert("Selecione um convÃƒÂªnio.");return}await convPlanCarregarAuxConvenioV2(item);convPlanConvenioModalPreencherV2(item);convPlanCfg.convenioModal.backdrop.classList.remove("hidden");setTimeout(()=>{try{convPlanCfg.convenioModal.codigo.focus()}catch{}},10)}
+function convPlanAbrirModalPlanoV2(modo){if(!convPlanSelConvenioId){window.alert("Selecione um convÃƒÂªnio.");return}const item=modo==="editar"?convPlanCurrentPlanoV2():null;if(modo==="editar"&&!item){window.alert("Selecione um plano.");return}convPlanPlanoModalPreencherV2(item);convPlanCfg.planoModal.backdrop.classList.remove("hidden");setTimeout(()=>{try{convPlanCfg.planoModal.codigo.focus()}catch{}},10)}
+async function convPlanSalvarConvenioV2(){const payload=convPlanConvenioPayloadV2();const m=convPlanCfg?.convenioModal;if(!payload||!m)return;const isEdit=!!m.editRowId;const {res,data}=await requestJson(isEdit?"PUT":"POST",isEdit?`/cadastros/convenios-planos/convenios/${m.editRowId}`:"/cadastros/convenios-planos/convenios",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar convÃƒÂªnio.");return}m.backdrop.classList.add("hidden");convPlanSelConvenioId=Number(data?.id||convPlanSelConvenioId)||convPlanSelConvenioId;await convPlanCarregar();footerMsg.textContent=isEdit?"ConvÃƒÂªnio alterado com sucesso.":"ConvÃƒÂªnio criado com sucesso."}
 async function convPlanSalvarPlanoV2(){const payload=convPlanPlanoPayloadV2();const m=convPlanCfg?.planoModal;if(!payload||!m)return;const isEdit=!!m.editRowId;const {res,data}=await requestJson(isEdit?"PUT":"POST",isEdit?`/cadastros/convenios-planos/planos/${m.editRowId}`:"/cadastros/convenios-planos/planos",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar plano.");return}m.backdrop.classList.add("hidden");convPlanSelPlanoId=Number(data?.id||convPlanSelPlanoId)||convPlanSelPlanoId;await convPlanCarregar();footerMsg.textContent=isEdit?"Plano alterado com sucesso.":"Plano criado com sucesso."}
-async function convPlanExcluirConvenioV2(){const item=convPlanCurrentConvenioV2();if(!item){window.alert("Selecione um convÃªnio.");return}if(!window.confirm(`Deseja eliminar o convÃªnio ${item.nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/convenios-planos/convenios/${item.row_id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir convÃªnio.");return}convPlanSelConvenioId=null;convPlanSelPlanoId=null;await convPlanCarregar();footerMsg.textContent="ConvÃªnio eliminado com sucesso."}
+async function convPlanExcluirConvenioV2(){const item=convPlanCurrentConvenioV2();if(!item){window.alert("Selecione um convÃƒÂªnio.");return}if(!window.confirm(`Deseja eliminar o convÃƒÂªnio ${item.nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/convenios-planos/convenios/${item.row_id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir convÃƒÂªnio.");return}convPlanSelConvenioId=null;convPlanSelPlanoId=null;await convPlanCarregar();footerMsg.textContent="ConvÃƒÂªnio eliminado com sucesso."}
 async function convPlanExcluirPlanoV2(){const item=convPlanCurrentPlanoV2();if(!item){window.alert("Selecione um plano.");return}if(!window.confirm(`Deseja eliminar o plano ${item.nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/convenios-planos/planos/${item.row_id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir plano.");return}convPlanSelPlanoId=null;await convPlanCarregar();footerMsg.textContent="Plano eliminado com sucesso."}
 function convPlanCloseModalV2(backdrop){if(backdrop instanceof HTMLElement)backdrop.classList.add("hidden")}
-function convPlanConvenioPhoneRowV2(prefix,label){return `<div class="convplan-phone-row"><select id="convplan-convenio-${prefix}-tipo"></select><input id="convplan-convenio-${prefix}-fone" type="text"><input id="convplan-convenio-${prefix}-contato" type="text" placeholder="Contato"><span class="convplan-phone-ico" title="${esc(label)}">â˜Ž</span></div>`}
-function convPlanBuildConvenioModalHtmlV2(){return `<div id="convplan-convenio-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-modal" style="width:610px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-convenio-modal-title" class="modal-title">Novo convÃªnio</div><button id="convplan-convenio-modal-close" class="modal-close" type="button" aria-label="Fechar">Ã—</button></div><div class="modal-body convplan-modal-body"><div class="convplan-tabs"><button id="convplan-convenio-tab-principal" class="convplan-tab active" type="button">Principal</button><button id="convplan-convenio-tab-detalhes" class="convplan-tab" type="button">Detalhes</button></div><section id="convplan-convenio-pane-principal" class="convplan-pane"><div class="convplan-row convplan-row-codigo"><div class="convplan-field"><label>CÃ³digo:</label><input id="convplan-convenio-codigo" type="text" maxlength="20"></div><div class="convplan-field grow"><label>Nome do convÃªnio:</label><input id="convplan-convenio-nome" type="text" maxlength="120"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>RazÃ£o social da operadora:</label><input id="convplan-convenio-razao" type="text" maxlength="160"></div><div class="convplan-field convplan-ans"><label>CÃ³digo ANS:</label><input id="convplan-convenio-ans" type="text" maxlength="20"></div></div><div class="convplan-row convplan-address"><div class="convplan-field convplan-log"><label>Logradouro:</label><select id="convplan-convenio-tipolog"></select></div><div class="convplan-field grow"><label>EndereÃ§o:</label><input id="convplan-convenio-endereco" type="text" maxlength="180"></div><div class="convplan-field convplan-num"><label>NÂº:</label><input id="convplan-convenio-numero" type="text" maxlength="20"></div><div class="convplan-field convplan-comp"><label>Complemento:</label><input id="convplan-convenio-complemento" type="text" maxlength="120"></div></div><div class="convplan-row"><div class="convplan-field convplan-bairro"><label>Bairro:</label><select id="convplan-convenio-bairro"></select></div><div class="convplan-field grow"><label>Cidade:</label><select id="convplan-convenio-cidade"></select></div><div class="convplan-field convplan-cep"><label>CEP:</label><input id="convplan-convenio-cep" type="text" maxlength="20"></div><div class="convplan-field convplan-uf"><label>UF:</label><input id="convplan-convenio-uf" type="text" maxlength="10"></div></div><div class="convplan-divider"></div><div class="convplan-phone-head"><span>Telefones</span><span>NÃºmero</span><span>Contato</span></div>${convPlanConvenioPhoneRowV2("1","Telefone 1")}${convPlanConvenioPhoneRowV2("2","Telefone 2")}${convPlanConvenioPhoneRowV2("3","Telefone 3")}${convPlanConvenioPhoneRowV2("4","Telefone 4")}<div class="convplan-row convplan-row-footer"><div class="convplan-field grow"><label>InclusÃ£o:</label><input id="convplan-convenio-inclusao" type="text" readonly></div><div class="convplan-field grow"><label>AlteraÃ§Ã£o:</label><input id="convplan-convenio-alteracao" type="text" readonly></div></div></section><section id="convplan-convenio-pane-detalhes" class="convplan-pane hidden"><div class="convplan-row"><div class="convplan-field grow"><label>E-mail de contato:</label><input id="convplan-convenio-email" type="text" maxlength="180"></div><div class="convplan-field grow"><label>E-mail depto tÃ©cnico:</label><input id="convplan-convenio-email-tec" type="text" maxlength="180"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>Home-page:</label><input id="convplan-convenio-homepage" type="text" maxlength="180"></div><div class="convplan-field grow"><label>CNPJ:</label><input id="convplan-convenio-cnpj" type="text" maxlength="30"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>InscriÃ§Ã£o estadual:</label><input id="convplan-convenio-ie" type="text" maxlength="40"></div><div class="convplan-field grow"><label>InscriÃ§Ã£o municipal:</label><input id="convplan-convenio-im" type="text" maxlength="40"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>Modalidade de faturamento:</label><select id="convplan-convenio-fat"></select></div></div><div class="convplan-field"><label>ObservaÃ§Ãµes:</label><textarea id="convplan-convenio-obs" rows="7"></textarea></div><label class="convplan-check"><input id="convplan-convenio-inativo" type="checkbox"> Inativar convÃªnio</label></section></div><div class="modal-actions"><button id="convplan-convenio-ok" class="btn-primary" type="button">Ok</button><button id="convplan-convenio-cancelar" class="btn" type="button">Cancela</button></div></div></div>`}
-function convPlanBuildPlanoModalHtmlV2(){return `<div id="convplan-plano-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-modal convplan-plano-modal" style="width:430px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-plano-modal-title" class="modal-title">Novo plano</div><button id="convplan-plano-modal-close" class="modal-close" type="button" aria-label="Fechar">Ã—</button></div><div class="modal-body convplan-modal-body"><div class="convplan-row convplan-row-codigo"><div class="convplan-field convplan-plano-codigo"><label>CÃ³digo:</label><input id="convplan-plano-codigo" type="text" maxlength="20"></div><div class="convplan-field grow"><label>Nome do plano:</label><input id="convplan-plano-nome" type="text" maxlength="120"></div></div><div class="convplan-field"><label>Cobertura:</label><textarea id="convplan-plano-cobertura" rows="6"></textarea></div><label class="convplan-check"><input id="convplan-plano-inativo" type="checkbox"> Inativar plano</label><div class="convplan-row convplan-row-footer"><div class="convplan-field grow"><label>InclusÃ£o:</label><input id="convplan-plano-inclusao" type="text" readonly></div><div class="convplan-field grow"><label>AlteraÃ§Ã£o:</label><input id="convplan-plano-alteracao" type="text" readonly></div></div></div><div class="modal-actions"><button id="convplan-plano-ok" class="btn-primary" type="button">Ok</button><button id="convplan-plano-cancelar" class="btn" type="button">Cancela</button></div></div></div>`}
+function convPlanConvenioPhoneRowV2(prefix,label){return `<div class="convplan-phone-row"><select id="convplan-convenio-${prefix}-tipo"></select><input id="convplan-convenio-${prefix}-fone" type="text"><input id="convplan-convenio-${prefix}-contato" type="text" placeholder="Contato"><span class="convplan-phone-ico" title="${esc(label)}">Ã¢ËœÅ½</span></div>`}
+function convPlanBuildConvenioModalHtmlV2(){return `<div id="convplan-convenio-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-modal" style="width:610px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-convenio-modal-title" class="modal-title">Novo convÃƒÂªnio</div><button id="convplan-convenio-modal-close" class="modal-close" type="button" aria-label="Fechar">Ãƒâ€”</button></div><div class="modal-body convplan-modal-body"><div class="convplan-tabs"><button id="convplan-convenio-tab-principal" class="convplan-tab active" type="button">Principal</button><button id="convplan-convenio-tab-detalhes" class="convplan-tab" type="button">Detalhes</button></div><section id="convplan-convenio-pane-principal" class="convplan-pane"><div class="convplan-row convplan-row-codigo"><div class="convplan-field"><label>CÃƒÂ³digo:</label><input id="convplan-convenio-codigo" type="text" maxlength="20"></div><div class="convplan-field grow"><label>Nome do convÃƒÂªnio:</label><input id="convplan-convenio-nome" type="text" maxlength="120"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>RazÃƒÂ£o social da operadora:</label><input id="convplan-convenio-razao" type="text" maxlength="160"></div><div class="convplan-field convplan-ans"><label>CÃƒÂ³digo ANS:</label><input id="convplan-convenio-ans" type="text" maxlength="20"></div></div><div class="convplan-row convplan-address"><div class="convplan-field convplan-log"><label>Logradouro:</label><select id="convplan-convenio-tipolog"></select></div><div class="convplan-field grow"><label>EndereÃƒÂ§o:</label><input id="convplan-convenio-endereco" type="text" maxlength="180"></div><div class="convplan-field convplan-num"><label>NÃ‚Âº:</label><input id="convplan-convenio-numero" type="text" maxlength="20"></div><div class="convplan-field convplan-comp"><label>Complemento:</label><input id="convplan-convenio-complemento" type="text" maxlength="120"></div></div><div class="convplan-row"><div class="convplan-field convplan-bairro"><label>Bairro:</label><select id="convplan-convenio-bairro"></select></div><div class="convplan-field grow"><label>Cidade:</label><select id="convplan-convenio-cidade"></select></div><div class="convplan-field convplan-cep"><label>CEP:</label><input id="convplan-convenio-cep" type="text" maxlength="20"></div><div class="convplan-field convplan-uf"><label>UF:</label><input id="convplan-convenio-uf" type="text" maxlength="10"></div></div><div class="convplan-divider"></div><div class="convplan-phone-head"><span>Telefones</span><span>NÃƒÂºmero</span><span>Contato</span></div>${convPlanConvenioPhoneRowV2("1","Telefone 1")}${convPlanConvenioPhoneRowV2("2","Telefone 2")}${convPlanConvenioPhoneRowV2("3","Telefone 3")}${convPlanConvenioPhoneRowV2("4","Telefone 4")}<div class="convplan-row convplan-row-footer"><div class="convplan-field grow"><label>InclusÃƒÂ£o:</label><input id="convplan-convenio-inclusao" type="text" readonly></div><div class="convplan-field grow"><label>AlteraÃƒÂ§ÃƒÂ£o:</label><input id="convplan-convenio-alteracao" type="text" readonly></div></div></section><section id="convplan-convenio-pane-detalhes" class="convplan-pane hidden"><div class="convplan-row"><div class="convplan-field grow"><label>E-mail de contato:</label><input id="convplan-convenio-email" type="text" maxlength="180"></div><div class="convplan-field grow"><label>E-mail depto tÃƒÂ©cnico:</label><input id="convplan-convenio-email-tec" type="text" maxlength="180"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>Home-page:</label><input id="convplan-convenio-homepage" type="text" maxlength="180"></div><div class="convplan-field grow"><label>CNPJ:</label><input id="convplan-convenio-cnpj" type="text" maxlength="30"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>InscriÃƒÂ§ÃƒÂ£o estadual:</label><input id="convplan-convenio-ie" type="text" maxlength="40"></div><div class="convplan-field grow"><label>InscriÃƒÂ§ÃƒÂ£o municipal:</label><input id="convplan-convenio-im" type="text" maxlength="40"></div></div><div class="convplan-row"><div class="convplan-field grow"><label>Modalidade de faturamento:</label><select id="convplan-convenio-fat"></select></div></div><div class="convplan-field"><label>ObservaÃƒÂ§ÃƒÂµes:</label><textarea id="convplan-convenio-obs" rows="7"></textarea></div><label class="convplan-check"><input id="convplan-convenio-inativo" type="checkbox"> Inativar convÃƒÂªnio</label></section></div><div class="modal-actions"><button id="convplan-convenio-ok" class="btn-primary" type="button">Ok</button><button id="convplan-convenio-cancelar" class="btn" type="button">Cancela</button></div></div></div>`}
+function convPlanBuildPlanoModalHtmlV2(){return `<div id="convplan-plano-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-modal convplan-plano-modal" style="width:430px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-plano-modal-title" class="modal-title">Novo plano</div><button id="convplan-plano-modal-close" class="modal-close" type="button" aria-label="Fechar">Ãƒâ€”</button></div><div class="modal-body convplan-modal-body"><div class="convplan-row convplan-row-codigo"><div class="convplan-field convplan-plano-codigo"><label>CÃƒÂ³digo:</label><input id="convplan-plano-codigo" type="text" maxlength="20"></div><div class="convplan-field grow"><label>Nome do plano:</label><input id="convplan-plano-nome" type="text" maxlength="120"></div></div><div class="convplan-field"><label>Cobertura:</label><textarea id="convplan-plano-cobertura" rows="6"></textarea></div><label class="convplan-check"><input id="convplan-plano-inativo" type="checkbox"> Inativar plano</label><div class="convplan-row convplan-row-footer"><div class="convplan-field grow"><label>InclusÃƒÂ£o:</label><input id="convplan-plano-inclusao" type="text" readonly></div><div class="convplan-field grow"><label>AlteraÃƒÂ§ÃƒÂ£o:</label><input id="convplan-plano-alteracao" type="text" readonly></div></div></div><div class="modal-actions"><button id="convplan-plano-ok" class="btn-primary" type="button">Ok</button><button id="convplan-plano-cancelar" class="btn" type="button">Cancela</button></div></div></div>`}
 function convPlanCaptureConvenioModalV2(){return{backdrop:document.getElementById("convplan-convenio-modal-backdrop"),title:document.getElementById("convplan-convenio-modal-title"),tabPrincipal:document.getElementById("convplan-convenio-tab-principal"),tabDetalhes:document.getElementById("convplan-convenio-tab-detalhes"),panePrincipal:document.getElementById("convplan-convenio-pane-principal"),paneDetalhes:document.getElementById("convplan-convenio-pane-detalhes"),close:document.getElementById("convplan-convenio-modal-close"),cancelar:document.getElementById("convplan-convenio-cancelar"),ok:document.getElementById("convplan-convenio-ok"),codigo:document.getElementById("convplan-convenio-codigo"),nome:document.getElementById("convplan-convenio-nome"),razao:document.getElementById("convplan-convenio-razao"),ans:document.getElementById("convplan-convenio-ans"),tipolog:document.getElementById("convplan-convenio-tipolog"),endereco:document.getElementById("convplan-convenio-endereco"),numero:document.getElementById("convplan-convenio-numero"),complemento:document.getElementById("convplan-convenio-complemento"),bairro:document.getElementById("convplan-convenio-bairro"),cidade:document.getElementById("convplan-convenio-cidade"),cep:document.getElementById("convplan-convenio-cep"),uf:document.getElementById("convplan-convenio-uf"),tipo1:document.getElementById("convplan-convenio-1-tipo"),fone1:document.getElementById("convplan-convenio-1-fone"),contato1:document.getElementById("convplan-convenio-1-contato"),tipo2:document.getElementById("convplan-convenio-2-tipo"),fone2:document.getElementById("convplan-convenio-2-fone"),contato2:document.getElementById("convplan-convenio-2-contato"),tipo3:document.getElementById("convplan-convenio-3-tipo"),fone3:document.getElementById("convplan-convenio-3-fone"),contato3:document.getElementById("convplan-convenio-3-contato"),tipo4:document.getElementById("convplan-convenio-4-tipo"),fone4:document.getElementById("convplan-convenio-4-fone"),contato4:document.getElementById("convplan-convenio-4-contato"),email:document.getElementById("convplan-convenio-email"),emailTec:document.getElementById("convplan-convenio-email-tec"),homepage:document.getElementById("convplan-convenio-homepage"),cnpj:document.getElementById("convplan-convenio-cnpj"),ie:document.getElementById("convplan-convenio-ie"),im:document.getElementById("convplan-convenio-im"),fat:document.getElementById("convplan-convenio-fat"),obs:document.getElementById("convplan-convenio-obs"),inativo:document.getElementById("convplan-convenio-inativo"),inclusao:document.getElementById("convplan-convenio-inclusao"),alteracao:document.getElementById("convplan-convenio-alteracao")}}
 function convPlanCapturePlanoModalV2(){return{backdrop:document.getElementById("convplan-plano-modal-backdrop"),title:document.getElementById("convplan-plano-modal-title"),close:document.getElementById("convplan-plano-modal-close"),cancelar:document.getElementById("convplan-plano-cancelar"),ok:document.getElementById("convplan-plano-ok"),codigo:document.getElementById("convplan-plano-codigo"),nome:document.getElementById("convplan-plano-nome"),cobertura:document.getElementById("convplan-plano-cobertura"),inativo:document.getElementById("convplan-plano-inativo"),inclusao:document.getElementById("convplan-plano-inclusao"),alteracao:document.getElementById("convplan-plano-alteracao")}}
 function convPlanEnsureModalUiV2(){if(!convPlanCfg||convPlanCfg.convenioModal)return;const style=document.createElement("style");style.textContent=".convplan-modal{font:12px Tahoma,sans-serif}.convplan-modal-body{display:flex;flex-direction:column;gap:8px}.convplan-tabs{display:flex;gap:2px;margin-bottom:2px}.convplan-tab{height:28px;padding:0 14px;border:1px solid #bfc9d6;background:#f3f3f3;cursor:pointer}.convplan-tab.active{background:#fff;border-bottom-color:#fff;font-weight:700}.convplan-pane{display:flex;flex-direction:column;gap:8px}.convplan-row{display:flex;gap:10px;align-items:flex-end}.convplan-row-codigo .convplan-field:first-child{width:110px;flex:0 0 110px}.convplan-field{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}.convplan-field.grow{flex:1 1 auto}.convplan-ans{flex:0 0 160px}.convplan-log{flex:0 0 120px}.convplan-num{flex:0 0 54px}.convplan-comp{flex:0 0 160px}.convplan-bairro{flex:0 0 165px}.convplan-cep{flex:0 0 95px}.convplan-uf{flex:0 0 62px}.convplan-plano-codigo{flex:0 0 90px}.convplan-modal input,.convplan-modal select,.convplan-modal textarea{width:100%;min-width:0;box-sizing:border-box;border:1px solid #bfc9d6;padding:0 6px;background:#fff;font:12px Tahoma,sans-serif}.convplan-modal input,.convplan-modal select{height:24px}.convplan-modal textarea{padding:6px;resize:none}.convplan-divider{border-top:1px solid #d9dfe7;margin-top:2px}.convplan-phone-head,.convplan-phone-row{display:grid;grid-template-columns:120px 1fr 1fr 24px;gap:10px;align-items:center}.convplan-phone-head{font-weight:700;color:#444;margin-top:2px}.convplan-phone-ico{display:inline-flex;align-items:center;justify-content:center;color:#b20000;font-size:16px}.convplan-check{display:flex;align-items:center;gap:6px;margin-top:2px}.convplan-check input{width:auto;height:auto}.convplan-row-footer .convplan-field input{background:#45edf2;color:#00353b;font-weight:700}.convplan-pane.hidden{display:none}";document.head.appendChild(style);document.body.insertAdjacentHTML("beforeend",convPlanBuildConvenioModalHtmlV2());document.body.insertAdjacentHTML("beforeend",convPlanBuildPlanoModalHtmlV2());convPlanCfg.convenioModal=convPlanCaptureConvenioModalV2();convPlanCfg.planoModal=convPlanCapturePlanoModalV2();convPlanSetObjectOptionsV2(convPlanCfg.convenioModal.tipolog,CONVPLAN_LOGRADOUROS_V2,"");[convPlanCfg.convenioModal.tipo1,convPlanCfg.convenioModal.tipo2,convPlanCfg.convenioModal.tipo3,convPlanCfg.convenioModal.tipo4].forEach(selectEl=>convPlanSetObjectOptionsV2(selectEl,CONVPLAN_TIPOS_FONE_V2,""));convPlanSetObjectOptionsV2(convPlanCfg.convenioModal.fat,CONVPLAN_MODALIDADE_FAT_V2,null);ensureModalChrome(convPlanCfg.convenioModal.backdrop);ensureModalChrome(convPlanCfg.planoModal.backdrop)}
 function convPlanVincularModaisV2(){if(!convPlanCfg||convPlanCfg.panel.dataset.modalBound==="1")return;convPlanCfg.panel.dataset.modalBound="1";const cm=convPlanCfg.convenioModal;const pm=convPlanCfg.planoModal;cm.tabPrincipal.addEventListener("click",()=>convPlanTabSetV2(cm,"principal"));cm.tabDetalhes.addEventListener("click",()=>convPlanTabSetV2(cm,"detalhes"));cm.close.addEventListener("click",()=>convPlanCloseModalV2(cm.backdrop));cm.cancelar.addEventListener("click",()=>convPlanCloseModalV2(cm.backdrop));cm.ok.addEventListener("click",convPlanSalvarConvenioV2);cm.backdrop.addEventListener("click",e=>{if(e.target===cm.backdrop)convPlanCloseModalV2(cm.backdrop)});pm.close.addEventListener("click",()=>convPlanCloseModalV2(pm.backdrop));pm.cancelar.addEventListener("click",()=>convPlanCloseModalV2(pm.backdrop));pm.ok.addEventListener("click",convPlanSalvarPlanoV2);pm.backdrop.addEventListener("click",e=>{if(e.target===pm.backdrop)convPlanCloseModalV2(pm.backdrop)})}
-function convPlanRenderConvenios(){if(!convPlanCfg)return;convPlanCfg.tbConvenios.innerHTML=convPlanConveniosCache.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelConvenioId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.codigo||"")}</td><td>${esc(item.telefone||"")}</td><td>${esc(item.telefone2||"")}</td><td style="text-align:center">${convPlanStatusDotV2(item.inativo)}</td></tr>`).join("");convPlanCfg.totalConvenios.textContent=`${convPlanConveniosCache.length} convÃªnios`}
+function convPlanRenderConvenios(){if(!convPlanCfg)return;convPlanCfg.tbConvenios.innerHTML=convPlanConveniosCache.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelConvenioId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.codigo||"")}</td><td>${esc(item.telefone||"")}</td><td>${esc(item.telefone2||"")}</td><td style="text-align:center">${convPlanStatusDotV2(item.inativo)}</td></tr>`).join("");convPlanCfg.totalConvenios.textContent=`${convPlanConveniosCache.length} convÃƒÂªnios`}
 function convPlanRenderPlanos(){if(!convPlanCfg)return;const itens=convPlanPlanosCache.filter(item=>!convPlanSelConvenioId||Number(item.convenio_id||0)===Number(convPlanSelConvenioId));convPlanCfg.tbPlanos.innerHTML=itens.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanSelPlanoId)?"selected":""}"><td>${esc(item.nome||"")}</td><td>${esc(item.cobertura||"")}</td><td style="text-align:center">${convPlanStatusDotV2(item.inativo)}</td></tr>`).join("");convPlanCfg.totalPlanos.textContent=`${itens.length} planos`}
-function convPlanEnsureUI(){if(convPlanCfg)return;const style=document.createElement("style");style.textContent=".convplan-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-toolbar,.convplan-subtoolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-subtoolbar{margin-top:10px}.convplan-toolbar .sep,.convplan-subtoolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.convplan-grid{border:1px solid #cfd8e3;background:#fff;overflow:auto}.convplan-grid.top{height:260px}.convplan-grid.bottom{height:160px}.convplan-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-grid th,.convplan-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-grid tr.selected{background:#d9e8fb}.convplan-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convenios-planos-panel" class="convplan-panel hidden"><div class="panel-title">ConvÃªnios e planos</div><div class="convplan-toolbar"><button id="convplan-btn-novo-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo convÃªnio...</button><button id="convplan-btn-editar-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-btn-excluir-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-btn-calendario" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">CalendÃ¡rio de faturamento...</button><button id="convplan-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-grid top"><table><colgroup><col><col style="width:80px"><col style="width:100px"><col style="width:100px"><col style="width:60px"></colgroup><thead><tr><th>Nome da operadora</th><th>CÃ³digo</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="convplan-tb-convenios"></tbody></table></div><div id="convplan-total-convenios" class="convplan-total">0 convÃªnios</div><div class="convplan-subtoolbar"><button id="convplan-btn-novo-plano" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo plano...</button><button id="convplan-btn-editar-plano" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera plano...</button><button id="convplan-btn-excluir-plano" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina plano</button></div><div class="convplan-grid bottom"><table><colgroup><col><col><col style="width:60px"></colgroup><thead><tr><th>Nome do plano</th><th>Cobertura</th><th>Status</th></tr></thead><tbody id="convplan-tb-planos"></tbody></table></div><div id="convplan-total-planos" class="convplan-total">0 planos</div></section>`);convPlanCfg={panel:document.getElementById("convenios-planos-panel"),tbConvenios:document.getElementById("convplan-tb-convenios"),tbPlanos:document.getElementById("convplan-tb-planos"),totalConvenios:document.getElementById("convplan-total-convenios"),totalPlanos:document.getElementById("convplan-total-planos"),btnNovoConvenio:document.getElementById("convplan-btn-novo-convenio"),btnEditarConvenio:document.getElementById("convplan-btn-editar-convenio"),btnExcluirConvenio:document.getElementById("convplan-btn-excluir-convenio"),btnCalendario:document.getElementById("convplan-btn-calendario"),btnNovoPlano:document.getElementById("convplan-btn-novo-plano"),btnEditarPlano:document.getElementById("convplan-btn-editar-plano"),btnExcluirPlano:document.getElementById("convplan-btn-excluir-plano"),btnFechar:document.getElementById("convplan-btn-fechar")};ensurePanelChrome(convPlanCfg.panel);convPlanEnsureModalUiV2();convPlanVincularModaisV2()}
-async function convPlanCarregar(){const {res,data}=await requestJson("GET","/cadastros/convenios-planos/combos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar convÃªnios e planos.";return}convPlanConveniosCache=Array.isArray(data?.convenios)?data.convenios:[];convPlanPlanosCache=Array.isArray(data?.planos)?data.planos:[];if(!convPlanConveniosCache.some(item=>Number(item.id)===Number(convPlanSelConvenioId)))convPlanSelConvenioId=convPlanConveniosCache[0]?.id||null;if(convPlanSelPlanoId&&!convPlanPlanosCache.some(item=>Number(item.id)===Number(convPlanSelPlanoId)&&Number(item.convenio_id||0)===Number(convPlanSelConvenioId)))convPlanSelPlanoId=null;convPlanRenderConvenios();convPlanRenderPlanos();try{if(typeof fichaCarregarCombos==="function"&&ficha)await fichaCarregarCombos()}catch{}}
-function convPlanVincularEventos(){if(!convPlanCfg||convPlanCfg.panel.dataset.bound==="1")return;convPlanCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCfg.tbConvenios,tr=>convPlanSelecionarConvenio(tr),()=>convPlanAbrirModalConvenioV2("editar"));bindStandardGridActivation(convPlanCfg.tbPlanos,tr=>convPlanSelecionarPlano(tr),()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnNovoConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("novo"));convPlanCfg.btnEditarConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("editar"));convPlanCfg.btnExcluirConvenio.addEventListener("click",convPlanExcluirConvenioV2);convPlanCfg.btnCalendario.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃªnios e planos: calendÃ¡rio de faturamento serÃ¡ a prÃ³xima etapa.");convPlanCfg.btnNovoPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("novo"));convPlanCfg.btnEditarPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnExcluirPlano.addEventListener("click",convPlanExcluirPlanoV2);convPlanCfg.btnFechar.addEventListener("click",()=>{convPlanCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")})}
+function convPlanEnsureUI(){if(convPlanCfg)return;const style=document.createElement("style");style.textContent=".convplan-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-toolbar,.convplan-subtoolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-subtoolbar{margin-top:10px}.convplan-toolbar .sep,.convplan-subtoolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.convplan-grid{border:1px solid #cfd8e3;background:#fff;overflow:auto}.convplan-grid.top{height:260px}.convplan-grid.bottom{height:160px}.convplan-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-grid th,.convplan-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-grid tr.selected{background:#d9e8fb}.convplan-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convenios-planos-panel" class="convplan-panel hidden"><div class="panel-title">ConvÃƒÂªnios e planos</div><div class="convplan-toolbar"><button id="convplan-btn-novo-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo convÃƒÂªnio...</button><button id="convplan-btn-editar-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-btn-excluir-convenio" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-btn-calendario" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">CalendÃƒÂ¡rio de faturamento...</button><button id="convplan-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-grid top"><table><colgroup><col><col style="width:80px"><col style="width:100px"><col style="width:100px"><col style="width:60px"></colgroup><thead><tr><th>Nome da operadora</th><th>CÃƒÂ³digo</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="convplan-tb-convenios"></tbody></table></div><div id="convplan-total-convenios" class="convplan-total">0 convÃƒÂªnios</div><div class="convplan-subtoolbar"><button id="convplan-btn-novo-plano" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo plano...</button><button id="convplan-btn-editar-plano" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera plano...</button><button id="convplan-btn-excluir-plano" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina plano</button></div><div class="convplan-grid bottom"><table><colgroup><col><col><col style="width:60px"></colgroup><thead><tr><th>Nome do plano</th><th>Cobertura</th><th>Status</th></tr></thead><tbody id="convplan-tb-planos"></tbody></table></div><div id="convplan-total-planos" class="convplan-total">0 planos</div></section>`);convPlanCfg={panel:document.getElementById("convenios-planos-panel"),tbConvenios:document.getElementById("convplan-tb-convenios"),tbPlanos:document.getElementById("convplan-tb-planos"),totalConvenios:document.getElementById("convplan-total-convenios"),totalPlanos:document.getElementById("convplan-total-planos"),btnNovoConvenio:document.getElementById("convplan-btn-novo-convenio"),btnEditarConvenio:document.getElementById("convplan-btn-editar-convenio"),btnExcluirConvenio:document.getElementById("convplan-btn-excluir-convenio"),btnCalendario:document.getElementById("convplan-btn-calendario"),btnNovoPlano:document.getElementById("convplan-btn-novo-plano"),btnEditarPlano:document.getElementById("convplan-btn-editar-plano"),btnExcluirPlano:document.getElementById("convplan-btn-excluir-plano"),btnFechar:document.getElementById("convplan-btn-fechar")};ensurePanelChrome(convPlanCfg.panel);convPlanEnsureModalUiV2();convPlanVincularModaisV2()}
+async function convPlanCarregar(){const {res,data}=await requestJson("GET","/cadastros/convenios-planos/combos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar convÃƒÂªnios e planos.";return}convPlanConveniosCache=Array.isArray(data?.convenios)?data.convenios:[];convPlanPlanosCache=Array.isArray(data?.planos)?data.planos:[];if(!convPlanConveniosCache.some(item=>Number(item.id)===Number(convPlanSelConvenioId)))convPlanSelConvenioId=convPlanConveniosCache[0]?.id||null;if(convPlanSelPlanoId&&!convPlanPlanosCache.some(item=>Number(item.id)===Number(convPlanSelPlanoId)&&Number(item.convenio_id||0)===Number(convPlanSelConvenioId)))convPlanSelPlanoId=null;convPlanRenderConvenios();convPlanRenderPlanos();try{if(typeof fichaCarregarCombos==="function"&&ficha)await fichaCarregarCombos()}catch{}}
+function convPlanVincularEventos(){if(!convPlanCfg||convPlanCfg.panel.dataset.bound==="1")return;convPlanCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCfg.tbConvenios,tr=>convPlanSelecionarConvenio(tr),()=>convPlanAbrirModalConvenioV2("editar"));bindStandardGridActivation(convPlanCfg.tbPlanos,tr=>convPlanSelecionarPlano(tr),()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnNovoConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("novo"));convPlanCfg.btnEditarConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("editar"));convPlanCfg.btnExcluirConvenio.addEventListener("click",convPlanExcluirConvenioV2);convPlanCfg.btnCalendario.addEventListener("click",()=>footerMsg.textContent="Cadastro > ConvÃƒÂªnios e planos: calendÃƒÂ¡rio de faturamento serÃƒÂ¡ a prÃƒÂ³xima etapa.");convPlanCfg.btnNovoPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("novo"));convPlanCfg.btnEditarPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnExcluirPlano.addEventListener("click",convPlanExcluirPlanoV2);convPlanCfg.btnFechar.addEventListener("click",()=>{convPlanCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")})}
 let convPlanCalCfg=null;
 let convPlanCalSelId=null;
 let convPlanCalItens=[];
 function convPlanCalCurrentItem(){return convPlanCalItens.find(item=>Number(item.id)===Number(convPlanCalSelId))||null}
 function convPlanCalModalPayload(){const m=convPlanCalCfg?.modal;if(!m)return null;return{convenio_row_id:Number(m.convenio.value||0),data_fechamento:m.fechamento.value,data_pagamento:m.pagamento.value}}
 function convPlanCalModalPreencher(item=null){const m=convPlanCalCfg?.modal;if(!m)return;const convenioAtual=convPlanCurrentConvenioV2();m.editRowId=item?.row_id??null;m.title.textContent=item?"Altera data de faturamento":"Nova data de faturamento";convPlanSetObjectOptionsV2(m.convenio,convPlanConveniosCache,null);m.convenio.value=String(item?.convenio_row_id||convenioAtual?.row_id||"");m.fechamento.value=item?.data_fechamento||new Date().toLocaleDateString("pt-BR");m.pagamento.value=item?.data_pagamento||new Date().toLocaleDateString("pt-BR")}
-async function convPlanCalSalvar(){const m=convPlanCalCfg?.modal;const payload=convPlanCalModalPayload();if(!m||!payload)return;if(!payload.convenio_row_id){window.alert("Selecione um convÃªnio.");return}const isEdit=!!m.editRowId;const {res,data}=await requestJson(isEdit?"PUT":"POST",isEdit?`/cadastros/convenios-planos/calendario-faturamento/${m.editRowId}`:"/cadastros/convenios-planos/calendario-faturamento",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar data de faturamento.");return}m.backdrop.classList.add("hidden");if(payload.convenio_row_id)convPlanCalCfg.convenio.value=String(payload.convenio_row_id);await convPlanCalCarregar();footerMsg.textContent=isEdit?"Data de faturamento alterada com sucesso.":"Data de faturamento criada com sucesso."}
-async function convPlanCalExcluir(){const item=convPlanCalCurrentItem();if(!item){window.alert("Selecione uma data.");return}if(!window.confirm(`Deseja eliminar a data de faturamento do convÃªnio ${item.convenio_nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/convenios-planos/calendario-faturamento/${item.row_id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir data de faturamento.");return}convPlanCalSelId=null;await convPlanCalCarregar();footerMsg.textContent="Data de faturamento eliminada com sucesso."}
+async function convPlanCalSalvar(){const m=convPlanCalCfg?.modal;const payload=convPlanCalModalPayload();if(!m||!payload)return;if(!payload.convenio_row_id){window.alert("Selecione um convÃƒÂªnio.");return}const isEdit=!!m.editRowId;const {res,data}=await requestJson(isEdit?"PUT":"POST",isEdit?`/cadastros/convenios-planos/calendario-faturamento/${m.editRowId}`:"/cadastros/convenios-planos/calendario-faturamento",payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar data de faturamento.");return}m.backdrop.classList.add("hidden");if(payload.convenio_row_id)convPlanCalCfg.convenio.value=String(payload.convenio_row_id);await convPlanCalCarregar();footerMsg.textContent=isEdit?"Data de faturamento alterada com sucesso.":"Data de faturamento criada com sucesso."}
+async function convPlanCalExcluir(){const item=convPlanCalCurrentItem();if(!item){window.alert("Selecione uma data.");return}if(!window.confirm(`Deseja eliminar a data de faturamento do convÃƒÂªnio ${item.convenio_nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/convenios-planos/calendario-faturamento/${item.row_id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir data de faturamento.");return}convPlanCalSelId=null;await convPlanCalCarregar();footerMsg.textContent="Data de faturamento eliminada com sucesso."}
 function convPlanCalSelecionar(tr){convPlanCalSelId=Number(tr?.dataset.id||0)||null;convPlanCalRender()}
 function convPlanCalRender(){if(!convPlanCalCfg)return;convPlanCalCfg.tbody.innerHTML=convPlanCalItens.map(item=>`<tr data-id="${item.id}" class="${Number(item.id)===Number(convPlanCalSelId)?"selected":""}"><td>${esc(item.convenio_nome||"")}</td><td>${esc(item.data_fechamento||"")}</td><td>${esc(item.data_pagamento||"")}</td></tr>`).join("");convPlanCalCfg.total.textContent=`${convPlanCalItens.length} datas`}
-async function convPlanCalCarregar(){if(!convPlanCalCfg)return;const convenioRowId=Number(convPlanCalCfg.convenio.value||0)||0;const qs=convenioRowId?`?convenio_row_id=${convenioRowId}`:"";const {res,data}=await requestJson("GET",`/cadastros/convenios-planos/calendario-faturamento${qs}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar calendÃ¡rio de faturamento.";return}convPlanCalItens=Array.isArray(data?.itens)?data.itens:[];if(!convPlanCalItens.some(item=>Number(item.id)===Number(convPlanCalSelId)))convPlanCalSelId=convPlanCalItens[0]?.id||null;convPlanCalRender()}
+async function convPlanCalCarregar(){if(!convPlanCalCfg)return;const convenioRowId=Number(convPlanCalCfg.convenio.value||0)||0;const qs=convenioRowId?`?convenio_row_id=${convenioRowId}`:"";const {res,data}=await requestJson("GET",`/cadastros/convenios-planos/calendario-faturamento${qs}`,undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar calendÃƒÂ¡rio de faturamento.";return}convPlanCalItens=Array.isArray(data?.itens)?data.itens:[];if(!convPlanCalItens.some(item=>Number(item.id)===Number(convPlanCalSelId)))convPlanCalSelId=convPlanCalItens[0]?.id||null;convPlanCalRender()}
 function convPlanCalAbrirModal(modo){const item=modo==="editar"?convPlanCalCurrentItem():null;if(modo==="editar"&&!item){window.alert("Selecione uma data.");return}convPlanCalModalPreencher(item);convPlanCalCfg.modal.backdrop.classList.remove("hidden");setTimeout(()=>{try{convPlanCalCfg.modal.fechamento.focus()}catch{}},10)}
-function convPlanCalEnsureUI(){if(convPlanCalCfg)return;const style=document.createElement("style");style.textContent=".convplan-cal-panel{width:min(530px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-cal-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-cal-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.convplan-cal-filter{display:flex;align-items:center;gap:8px;margin:6px 0}.convplan-cal-filter label{white-space:nowrap}.convplan-cal-filter select{height:24px;min-width:220px;border:1px solid #bfc9d6;padding:0 6px}.convplan-cal-grid{border:1px solid #cfd8e3;background:#fff;min-height:320px}.convplan-cal-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-cal-grid th,.convplan-cal-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-cal-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-cal-grid tr.selected{background:#d9e8fb}.convplan-cal-total{margin-top:5px;color:#5b6b7e}.convplan-cal-modal .modal-body{display:flex;flex-direction:column;gap:10px}.convplan-cal-modal .convplan-field{display:flex;flex-direction:column;gap:2px}.convplan-cal-modal input,.convplan-cal-modal select{height:24px;border:1px solid #bfc9d6;padding:0 6px;font:12px Tahoma,sans-serif}.convplan-cal-row{display:flex;gap:12px}.convplan-cal-row .convplan-field{flex:1}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convplan-cal-panel" class="convplan-cal-panel hidden"><div class="panel-title">ConfiguraÃ§Ã£o de calendÃ¡rio de faturamento</div><div class="convplan-cal-toolbar"><button id="convplan-cal-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="convplan-cal-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-cal-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-cal-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-cal-filter"><label for="convplan-cal-convenio">ConvÃªnio:</label><select id="convplan-cal-convenio"></select></div><div class="convplan-cal-grid"><table><colgroup><col><col style="width:140px"><col style="width:140px"></colgroup><thead><tr><th>ConvÃªnio</th><th>Data fechamento</th><th>Data pagamento</th></tr></thead><tbody id="convplan-cal-tbody"></tbody></table></div><div id="convplan-cal-total" class="convplan-cal-total">0 datas</div></section>`);document.body.insertAdjacentHTML("beforeend",`<div id="convplan-cal-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-cal-modal" style="width:370px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-cal-modal-title" class="modal-title">Nova data de faturamento</div><button id="convplan-cal-modal-close" class="modal-close" type="button" aria-label="Fechar">Ã—</button></div><div class="modal-body"><div class="convplan-field"><label>ConvÃªnio:</label><select id="convplan-cal-modal-convenio"></select></div><div class="convplan-cal-row"><div class="convplan-field"><label>Data de fechamento:</label><input id="convplan-cal-modal-fechamento" type="text" maxlength="10" placeholder="dd/mm/aaaa"></div><div class="convplan-field"><label>Data de pagamento:</label><input id="convplan-cal-modal-pagamento" type="text" maxlength="10" placeholder="dd/mm/aaaa"></div></div></div><div class="modal-actions"><button id="convplan-cal-modal-ok" class="btn-primary" type="button">Ok</button><button id="convplan-cal-modal-cancelar" class="btn" type="button">Cancela</button></div></div></div>`);convPlanCalCfg={panel:document.getElementById("convplan-cal-panel"),convenio:document.getElementById("convplan-cal-convenio"),tbody:document.getElementById("convplan-cal-tbody"),total:document.getElementById("convplan-cal-total"),btnNovo:document.getElementById("convplan-cal-btn-novo"),btnEditar:document.getElementById("convplan-cal-btn-editar"),btnExcluir:document.getElementById("convplan-cal-btn-excluir"),btnFechar:document.getElementById("convplan-cal-btn-fechar"),modal:{backdrop:document.getElementById("convplan-cal-modal-backdrop"),title:document.getElementById("convplan-cal-modal-title"),close:document.getElementById("convplan-cal-modal-close"),convenio:document.getElementById("convplan-cal-modal-convenio"),fechamento:document.getElementById("convplan-cal-modal-fechamento"),pagamento:document.getElementById("convplan-cal-modal-pagamento"),ok:document.getElementById("convplan-cal-modal-ok"),cancelar:document.getElementById("convplan-cal-modal-cancelar")}};ensurePanelChrome(convPlanCalCfg.panel);ensureModalChrome(convPlanCalCfg.modal.backdrop);convPlanSetObjectOptionsV2(convPlanCalCfg.convenio,convPlanConveniosCache,null);convPlanSetObjectOptionsV2(convPlanCalCfg.modal.convenio,convPlanConveniosCache,null)}
+function convPlanCalEnsureUI(){if(convPlanCalCfg)return;const style=document.createElement("style");style.textContent=".convplan-cal-panel{width:min(530px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.convplan-cal-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.convplan-cal-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.convplan-cal-filter{display:flex;align-items:center;gap:8px;margin:6px 0}.convplan-cal-filter label{white-space:nowrap}.convplan-cal-filter select{height:24px;min-width:220px;border:1px solid #bfc9d6;padding:0 6px}.convplan-cal-grid{border:1px solid #cfd8e3;background:#fff;min-height:320px}.convplan-cal-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.convplan-cal-grid th,.convplan-cal-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.convplan-cal-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.convplan-cal-grid tr.selected{background:#d9e8fb}.convplan-cal-total{margin-top:5px;color:#5b6b7e}.convplan-cal-modal .modal-body{display:flex;flex-direction:column;gap:10px}.convplan-cal-modal .convplan-field{display:flex;flex-direction:column;gap:2px}.convplan-cal-modal input,.convplan-cal-modal select{height:24px;border:1px solid #bfc9d6;padding:0 6px;font:12px Tahoma,sans-serif}.convplan-cal-row{display:flex;gap:12px}.convplan-cal-row .convplan-field{flex:1}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="convplan-cal-panel" class="convplan-cal-panel hidden"><div class="panel-title">ConfiguraÃƒÂ§ÃƒÂ£o de calendÃƒÂ¡rio de faturamento</div><div class="convplan-cal-toolbar"><button id="convplan-cal-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="convplan-cal-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="convplan-cal-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="convplan-cal-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="convplan-cal-filter"><label for="convplan-cal-convenio">ConvÃƒÂªnio:</label><select id="convplan-cal-convenio"></select></div><div class="convplan-cal-grid"><table><colgroup><col><col style="width:140px"><col style="width:140px"></colgroup><thead><tr><th>ConvÃƒÂªnio</th><th>Data fechamento</th><th>Data pagamento</th></tr></thead><tbody id="convplan-cal-tbody"></tbody></table></div><div id="convplan-cal-total" class="convplan-cal-total">0 datas</div></section>`);document.body.insertAdjacentHTML("beforeend",`<div id="convplan-cal-modal-backdrop" class="modal-backdrop hidden"><div class="modal convplan-cal-modal" style="width:370px;max-width:calc(100vw - 24px)"><div class="modal-header"><div id="convplan-cal-modal-title" class="modal-title">Nova data de faturamento</div><button id="convplan-cal-modal-close" class="modal-close" type="button" aria-label="Fechar">Ãƒâ€”</button></div><div class="modal-body"><div class="convplan-field"><label>ConvÃƒÂªnio:</label><select id="convplan-cal-modal-convenio"></select></div><div class="convplan-cal-row"><div class="convplan-field"><label>Data de fechamento:</label><input id="convplan-cal-modal-fechamento" type="text" maxlength="10" placeholder="dd/mm/aaaa"></div><div class="convplan-field"><label>Data de pagamento:</label><input id="convplan-cal-modal-pagamento" type="text" maxlength="10" placeholder="dd/mm/aaaa"></div></div></div><div class="modal-actions"><button id="convplan-cal-modal-ok" class="btn-primary" type="button">Ok</button><button id="convplan-cal-modal-cancelar" class="btn" type="button">Cancela</button></div></div></div>`);convPlanCalCfg={panel:document.getElementById("convplan-cal-panel"),convenio:document.getElementById("convplan-cal-convenio"),tbody:document.getElementById("convplan-cal-tbody"),total:document.getElementById("convplan-cal-total"),btnNovo:document.getElementById("convplan-cal-btn-novo"),btnEditar:document.getElementById("convplan-cal-btn-editar"),btnExcluir:document.getElementById("convplan-cal-btn-excluir"),btnFechar:document.getElementById("convplan-cal-btn-fechar"),modal:{backdrop:document.getElementById("convplan-cal-modal-backdrop"),title:document.getElementById("convplan-cal-modal-title"),close:document.getElementById("convplan-cal-modal-close"),convenio:document.getElementById("convplan-cal-modal-convenio"),fechamento:document.getElementById("convplan-cal-modal-fechamento"),pagamento:document.getElementById("convplan-cal-modal-pagamento"),ok:document.getElementById("convplan-cal-modal-ok"),cancelar:document.getElementById("convplan-cal-modal-cancelar")}};ensurePanelChrome(convPlanCalCfg.panel);ensureModalChrome(convPlanCalCfg.modal.backdrop);convPlanSetObjectOptionsV2(convPlanCalCfg.convenio,convPlanConveniosCache,null);convPlanSetObjectOptionsV2(convPlanCalCfg.modal.convenio,convPlanConveniosCache,null)}
 function convPlanCalBind(){if(!convPlanCalCfg||convPlanCalCfg.panel.dataset.bound==="1")return;convPlanCalCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCalCfg.tbody,tr=>convPlanCalSelecionar(tr),()=>convPlanCalAbrirModal("editar"));convPlanCalCfg.convenio.addEventListener("change",convPlanCalCarregar);convPlanCalCfg.btnNovo.addEventListener("click",()=>convPlanCalAbrirModal("novo"));convPlanCalCfg.btnEditar.addEventListener("click",()=>convPlanCalAbrirModal("editar"));convPlanCalCfg.btnExcluir.addEventListener("click",convPlanCalExcluir);convPlanCalCfg.btnFechar.addEventListener("click",()=>{convPlanCalCfg.panel.classList.add("hidden");convPlanCfg.panel.classList.remove("hidden");ensurePanelChrome(convPlanCfg.panel)});convPlanCalCfg.modal.close.addEventListener("click",()=>convPlanCloseModalV2(convPlanCalCfg.modal.backdrop));convPlanCalCfg.modal.cancelar.addEventListener("click",()=>convPlanCloseModalV2(convPlanCalCfg.modal.backdrop));convPlanCalCfg.modal.ok.addEventListener("click",convPlanCalSalvar);convPlanCalCfg.modal.backdrop.addEventListener("click",e=>{if(e.target===convPlanCalCfg.modal.backdrop)convPlanCloseModalV2(convPlanCalCfg.modal.backdrop)})}
-async function convPlanCalAbrir(){convPlanCalEnsureUI();convPlanCalBind();hideAllPanels();const convenioAtual=convPlanCurrentConvenioV2();convPlanSetObjectOptionsV2(convPlanCalCfg.convenio,convPlanConveniosCache,null);convPlanSetObjectOptionsV2(convPlanCalCfg.modal.convenio,convPlanConveniosCache,null);if(convenioAtual?.row_id)convPlanCalCfg.convenio.value=String(convenioAtual.row_id);convPlanCalCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");ensurePanelChrome(convPlanCalCfg.panel);await convPlanCalCarregar();footerMsg.textContent="CalendÃ¡rio de faturamento aberto."}
+async function convPlanCalAbrir(){convPlanCalEnsureUI();convPlanCalBind();hideAllPanels();const convenioAtual=convPlanCurrentConvenioV2();convPlanSetObjectOptionsV2(convPlanCalCfg.convenio,convPlanConveniosCache,null);convPlanSetObjectOptionsV2(convPlanCalCfg.modal.convenio,convPlanConveniosCache,null);if(convenioAtual?.row_id)convPlanCalCfg.convenio.value=String(convenioAtual.row_id);convPlanCalCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");ensurePanelChrome(convPlanCalCfg.panel);await convPlanCalCarregar();footerMsg.textContent="CalendÃƒÂ¡rio de faturamento aberto."}
 function convPlanVincularEventos(){if(!convPlanCfg||convPlanCfg.panel.dataset.bound==="1")return;convPlanCfg.panel.dataset.bound="1";bindStandardGridActivation(convPlanCfg.tbConvenios,tr=>convPlanSelecionarConvenio(tr),()=>convPlanAbrirModalConvenioV2("editar"));bindStandardGridActivation(convPlanCfg.tbPlanos,tr=>convPlanSelecionarPlano(tr),()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnNovoConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("novo"));convPlanCfg.btnEditarConvenio.addEventListener("click",()=>convPlanAbrirModalConvenioV2("editar"));convPlanCfg.btnExcluirConvenio.addEventListener("click",convPlanExcluirConvenioV2);convPlanCfg.btnCalendario.addEventListener("click",convPlanCalAbrir);convPlanCfg.btnNovoPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("novo"));convPlanCfg.btnEditarPlano.addEventListener("click",()=>convPlanAbrirModalPlanoV2("editar"));convPlanCfg.btnExcluirPlano.addEventListener("click",convPlanExcluirPlanoV2);convPlanCfg.btnFechar.addEventListener("click",()=>{convPlanCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")})}
 function agendaContatosSelecionarLinha(tr){
   if(!agendaContatos||!(tr instanceof HTMLElement))return;
@@ -6316,7 +6502,7 @@ function agendaContatosBuildPhoneRow(selectId,inputId,options){
   return agendaContatosNode("div",{cls:"agenda-phone-row"},[
     agendaContatosSelect(selectId,options),
     agendaContatosNode("input",{id:inputId,attrs:{type:"text"}}),
-    agendaContatosNode("div",{cls:"agenda-phone-ico",text:"â˜Ž"})
+    agendaContatosNode("div",{cls:"agenda-phone-ico",text:"Ã¢ËœÅ½"})
   ]);
 }
 function agendaContatosGarantirAbaDetalhes(){
@@ -6333,9 +6519,9 @@ function agendaContatosReconstruirModalBody(){
   const modalBody=agendaContatos.modalBackdrop.querySelector(".agenda-modal-body");
   if(!(modalBody instanceof HTMLElement))return;
   modalBody.replaceChildren();
-  const tiposBase=["CirurgiÃ£o","ProtÃ©tico","Fornecedor","Outros"];
+  const tiposBase=["CirurgiÃƒÂ£o","ProtÃƒÂ©tico","Fornecedor","Outros"];
   const meses=[
-    {value:"1",label:"Janeiro"},{value:"2",label:"Fevereiro"},{value:"3",label:"MarÃ§o"},{value:"4",label:"Abril"},
+    {value:"1",label:"Janeiro"},{value:"2",label:"Fevereiro"},{value:"3",label:"MarÃƒÂ§o"},{value:"4",label:"Abril"},
     {value:"5",label:"Maio"},{value:"6",label:"Junho"},{value:"7",label:"Julho"},{value:"8",label:"Agosto"},
     {value:"9",label:"Setembro"},{value:"10",label:"Outubro"},{value:"11",label:"Novembro"},{value:"12",label:"Dezembro"}
   ];
@@ -6355,7 +6541,7 @@ function agendaContatosReconstruirModalBody(){
 
   const anivWrap=agendaContatosNode("div",{cls:"agenda-inline-block"});
   anivWrap.append(
-    agendaContatosNode("label",{text:"Data de aniversÃ¡rio:"}),
+    agendaContatosNode("label",{text:"Data de aniversÃƒÂ¡rio:"}),
     agendaContatosNode("div",{cls:"agenda-aniv-grid"},[
       agendaContatosSelect("agenda-contatos-aniv-dia",dias,{blank:true}),
       agendaContatosSelect("agenda-contatos-aniv-mes",meses,{blank:true})
@@ -6365,15 +6551,15 @@ function agendaContatosReconstruirModalBody(){
 
   grid.append(
     agendaContatosNode("div",{cls:"agenda-address-grid full-span"},[
-      agendaContatosField("EndereÃ§o (rua, nÂº, complemento):",agendaContatosNode("input",{id:"agenda-contatos-endereco",attrs:{type:"text"}})),
+      agendaContatosField("EndereÃƒÂ§o (rua, nÃ‚Âº, complemento):",agendaContatosNode("input",{id:"agenda-contatos-endereco",attrs:{type:"text"}})),
       agendaContatosField("Complemento:",agendaContatosNode("input",{id:"agenda-contatos-complemento",attrs:{type:"text"}})),
       agendaContatosField("Bairro:",agendaContatosSelect("agenda-contatos-bairro",[],{blank:true}))
     ]),
     agendaContatosNode("div",{cls:"agenda-city-grid full-span"},[
-      agendaContatosField("Cidade:",agendaContatosSelect("agenda-contatos-cidade",["SÃ£o JosÃ© do Rio Preto"],{blank:true})),
+      agendaContatosField("Cidade:",agendaContatosSelect("agenda-contatos-cidade",["SÃƒÂ£o JosÃƒÂ© do Rio Preto"],{blank:true})),
       agendaContatosField("CEP:",agendaContatosNode("input",{id:"agenda-contatos-cep",attrs:{type:"text"}})),
       agendaContatosField("UF:",agendaContatosSelect("agenda-contatos-uf",["SP","RJ","MG","PR","SC","RS"],{blank:true})),
-      agendaContatosField("PaÃ­s:",agendaContatosNode("input",{id:"agenda-contatos-pais",attrs:{type:"text"}}))
+      agendaContatosField("PaÃƒÂ­s:",agendaContatosNode("input",{id:"agenda-contatos-pais",attrs:{type:"text"}}))
     ])
   );
 
@@ -6428,7 +6614,7 @@ function agendaContatosReconstruirModalBody(){
       agendaContatosField("Especialidade:",agendaContatosSelect("agenda-contatos-especialidade",[],{blank:true}))
     ]),
     agendaContatosNode("div",{cls:"agenda-detalhes-divider"}),
-    agendaContatosField("ObservaÃ§Ãµes:",agendaContatosNode("textarea",{id:"agenda-contatos-notas"}),{cls:"agenda-detalhes-notas"})
+    agendaContatosField("ObservaÃƒÂ§ÃƒÂµes:",agendaContatosNode("textarea",{id:"agenda-contatos-notas"}),{cls:"agenda-detalhes-notas"})
   ]);
 
   modalBody.append(panePrincipal,paneDetalhes);
@@ -6469,7 +6655,7 @@ function agendaContatosEnsureUI(){
   const style=document.createElement("style");
   style.textContent=".agenda-panel{width:min(980px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.agenda-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 6px}.agenda-divider{border-top:1px solid #d3dbe5;margin:8px 0 6px}.agenda-filters{display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:end}.agenda-filters label{display:block;margin-bottom:2px}.agenda-filters select,.agenda-filters input{height:24px;border:1px solid #bfc9d6;border-radius:4px;padding:0 6px}.agenda-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.agenda-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.agenda-grid th,.agenda-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agenda-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.agenda-grid th:nth-child(3),.agenda-grid td:nth-child(3){text-align:left}.agenda-grid tr.selected{background:#d9e8fb}.agenda-total{margin-top:6px;color:#5b6b7e}.agenda-modal{width:min(600px,96vw);background:#fff;border:1px solid #bfc9d6;border-radius:10px;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif}.agenda-modal .modal-tabs{display:flex;gap:4px;margin:2px 0 4px}.agenda-modal .modal-tab-btn{min-width:60px;border:1px solid #bfc9d6;border-bottom:none;background:#f7f7f7;border-radius:4px 4px 0 0;padding:4px 10px;font:400 12px Tahoma,sans-serif}.agenda-modal .modal-tab-btn.active{background:#fff}.agenda-modal-body{border:1px solid #bfc9d6;padding:10px 10px 8px}.agenda-field label,.agenda-inline-block label{display:block;margin-bottom:2px}.agenda-field input,.agenda-field select,.agenda-field textarea,.agenda-inline-block input,.agenda-inline-block select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;width:100%;font:12px Tahoma,sans-serif}.agenda-field textarea{height:90px;padding:6px;resize:vertical}.agenda-contact-grid{display:grid;grid-template-columns:1fr 170px;gap:8px 14px}.agenda-contact-grid .full-span{grid-column:1/-1}.agenda-inline-block{display:block}.agenda-aniv-grid{display:grid;grid-template-columns:48px 1fr;gap:6px}.agenda-address-grid{display:grid;grid-template-columns:1fr 150px 160px;gap:8px 10px;margin-top:6px}.agenda-city-grid{display:grid;grid-template-columns:1fr 110px 62px 1fr;gap:8px 10px;margin-top:6px}.agenda-phones-wrap{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;margin-top:6px;align-items:start}.agenda-left-phones{display:grid;gap:6px}.agenda-phone-row{display:grid;grid-template-columns:118px 1fr 24px;gap:6px;align-items:center}.agenda-side-box{display:grid;gap:6px}.agenda-side-line{display:grid;grid-template-columns:1fr 24px;gap:6px;align-items:end}.agenda-phone-ico{height:20px;width:20px;border:1px solid #d12d2d;border-radius:3px;color:#b00020;font:700 9px Tahoma,sans-serif;display:grid;place-items:center;background:#fff}.agenda-inline-ico{height:20px;width:20px;border:1px solid #1f9c57;border-radius:50%;color:#12713e;font:700 8px Tahoma,sans-serif;display:grid;place-items:center;background:#fff}.agenda-checks{display:grid;gap:4px;margin-top:2px}.agenda-checks label{display:flex;align-items:center;gap:6px}.agenda-checks input{width:14px;height:14px}.agenda-detalhes-top{display:grid;grid-template-columns:1fr 70px 185px;gap:0 12px;align-items:end}.agenda-detalhes-palavras{display:grid;grid-template-columns:24px 1fr;gap:6px;align-items:center}.agenda-detalhes-palavras + .agenda-detalhes-palavras{margin-top:8px}.agenda-detalhes-divider{border-top:1px solid #d3dbe5;margin:10px 0 8px}.agenda-detalhes-notas textarea{height:240px;resize:none}.agenda-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}.agenda-actions .materiais-btn[disabled]{opacity:.5;cursor:not-allowed}";
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-contatos-panel" class="agenda-panel hidden"><div class="panel-title">Agenda de contatos</div><div class="agenda-toolbar"><button id="agenda-contatos-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo contato...</button><button id="agenda-contatos-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="agenda-contatos-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-contatos-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="agenda-contatos-btn-relatorio" class="materiais-btn" type="button"><img src="/desktop-assets/relatorio.png" alt="">RelatÃ³rio...</button><button id="agenda-contatos-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="agenda-divider"></div><div class="agenda-filters"><div><label for="agenda-contatos-filtro">Filtro:</label><select id="agenda-contatos-filtro"><option value=\"\"><<Todos>></option></select></div><div><label for="agenda-contatos-busca">Nome ou iniciais:</label><input id="agenda-contatos-busca" type="text"></div></div><div class="agenda-divider"></div><div class="agenda-grid"><table><colgroup><col><col style="width:180px"><col style="width:260px"></colgroup><thead><tr><th>Nome</th><th>Tipo</th><th>Telefones</th></tr></thead><tbody id="agenda-contatos-tbody"></tbody></table></div><div id="agenda-contatos-total" class="agenda-total">0 contatos</div></section><div id="agenda-contatos-modal-backdrop" class="modal-backdrop hidden"><div class="modal agenda-modal"><div class="modal-header"><div id="agenda-contatos-modal-title" class="modal-title">Novo contato</div></div><div class="modal-tabs"><button id="agenda-contatos-tab-principal" class="modal-tab-btn active" type="button">Principal</button><button id="agenda-contatos-tab-detalhes" class="modal-tab-btn" type="button">Detalhes</button></div><div class="agenda-modal-body"><div id="agenda-contatos-pane-principal"><div class="agenda-contact-grid"><div class="agenda-field"><label for="agenda-contatos-nome">Nome:</label><input id="agenda-contatos-nome" type="text"></div><div class="agenda-field"><label for="agenda-contatos-tipo">Tipo:</label><select id="agenda-contatos-tipo"><option>CirurgiÃ£o</option><option>ProtÃ©tico</option><option>Fornecedor</option><option>Outros</option></select></div><div class="agenda-field"><label for="agenda-contatos-contato">Contato:</label><input id="agenda-contatos-contato" type="text"></div><div class="agenda-inline-block"><label>Data de aniversÃ¡rio:</label><div class="agenda-aniv-grid"><select id="agenda-contatos-aniv-dia"><option value=""></option>${Array.from({length:31},(_,i)=>`<option value="${String(i+1)}">${String(i+1)}</option>`).join("")}</select><select id="agenda-contatos-aniv-mes"><option value=""></option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">MarÃ§o</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div></div><div class="agenda-address-grid full-span"><div class="agenda-field"><label for="agenda-contatos-endereco">EndereÃ§o (rua, nÂº, complemento):</label><input id="agenda-contatos-endereco" type="text"></div><div class="agenda-field"><label for="agenda-contatos-complemento">Complemento:</label><input id="agenda-contatos-complemento" type="text"></div><div class="agenda-field"><label for="agenda-contatos-bairro">Bairro:</label><select id="agenda-contatos-bairro"><option value=""></option></select></div></div><div class="agenda-city-grid full-span"><div class="agenda-field"><label for="agenda-contatos-cidade">Cidade:</label><select id="agenda-contatos-cidade"><option value=""></option><option>SÃ£o JosÃ© do Rio Preto</option></select></div><div class="agenda-field"><label for="agenda-contatos-cep">CEP:</label><input id="agenda-contatos-cep" type="text"></div><div class="agenda-field"><label for="agenda-contatos-uf">UF:</label><select id="agenda-contatos-uf"><option value=""></option><option>SP</option><option>RJ</option><option>MG</option><option>PR</option><option>SC</option><option>RS</option></select></div><div class="agenda-field"><label for="agenda-contatos-pais">PaÃ­s:</label><input id="agenda-contatos-pais" type="text"></div></div><div class="full-span"><div class="agenda-field"><label>Telefones:</label><div class="agenda-phones-wrap"><div class="agenda-left-phones"><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-1"><option>Residencial</option><option>Comercial</option><option>Fax</option><option>Celular</option></select><input id="agenda-contatos-tel-1" type="text"><div class="agenda-phone-ico">â˜Ž</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-2"><option>Comercial</option><option>Residencial</option><option>Fax</option><option>Celular</option></select><input id="agenda-contatos-tel-2" type="text"><div class="agenda-phone-ico">â˜Ž</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-3"><option>Fax</option><option>Residencial</option><option>Comercial</option><option>Celular</option></select><input id="agenda-contatos-tel-3" type="text"><div class="agenda-phone-ico">â˜Ž</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-4"><option>Celular</option><option>Residencial</option><option>Comercial</option><option>Fax</option></select><input id="agenda-contatos-tel-4" type="text"><div class="agenda-phone-ico">â˜Ž</div></div></div><div class="agenda-side-box"><div class="agenda-side-line"><div class="agenda-field"><label for="agenda-contatos-email">E-mail:</label><input id="agenda-contatos-email" type="email"></div><div class="agenda-inline-ico">www</div></div><div class="agenda-field"><label for="agenda-contatos-homepage">Home-page:</label><input id="agenda-contatos-homepage" type="text"></div><div class="agenda-checks"><label><input id="agenda-contatos-diretas" type="checkbox" checked> Incluir nas malas diretas</label><label><input id="agenda-contatos-preferidos" type="checkbox"> Incluir na lista de preferidos</label></div></div></div></div></div></div><div id="agenda-contatos-pane-detalhes" class="hidden"><div class="agenda-detalhes-top"><div><label>Palavras-chave:</label><div class="agenda-detalhes-palavras"><span>1)</span><select id="agenda-contatos-palavra1"><option value=""></option></select></div><div class="agenda-detalhes-palavras"><span>2)</span><select id="agenda-contatos-palavra2"><option value=""></option></select></div></div><div class="agenda-field"><label for="agenda-contatos-registro">Registro:</label><input id="agenda-contatos-registro" type="text"></div><div class="agenda-field"><label for="agenda-contatos-especialidade">Especialidade:</label><select id="agenda-contatos-especialidade"><option value=""></option></select></div></div><div class="agenda-detalhes-divider"></div><div class="agenda-field agenda-detalhes-notas"><label for="agenda-contatos-notas">ObservaÃ§Ãµes:</label><textarea id="agenda-contatos-notas"></textarea></div></div></div><div class="agenda-actions"><button id="agenda-contatos-modal-elimina" class="materiais-btn" type="button" disabled><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-contatos-modal-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime</button><button id="agenda-contatos-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="agenda-contatos-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-contatos-panel" class="agenda-panel hidden"><div class="panel-title">Agenda de contatos</div><div class="agenda-toolbar"><button id="agenda-contatos-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo contato...</button><button id="agenda-contatos-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="agenda-contatos-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-contatos-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button><button id="agenda-contatos-btn-relatorio" class="materiais-btn" type="button"><img src="/desktop-assets/relatorio.png" alt="">RelatÃƒÂ³rio...</button><button id="agenda-contatos-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="agenda-divider"></div><div class="agenda-filters"><div><label for="agenda-contatos-filtro">Filtro:</label><select id="agenda-contatos-filtro"><option value=\"\"><<Todos>></option></select></div><div><label for="agenda-contatos-busca">Nome ou iniciais:</label><input id="agenda-contatos-busca" type="text"></div></div><div class="agenda-divider"></div><div class="agenda-grid"><table><colgroup><col><col style="width:180px"><col style="width:260px"></colgroup><thead><tr><th>Nome</th><th>Tipo</th><th>Telefones</th></tr></thead><tbody id="agenda-contatos-tbody"></tbody></table></div><div id="agenda-contatos-total" class="agenda-total">0 contatos</div></section><div id="agenda-contatos-modal-backdrop" class="modal-backdrop hidden"><div class="modal agenda-modal"><div class="modal-header"><div id="agenda-contatos-modal-title" class="modal-title">Novo contato</div></div><div class="modal-tabs"><button id="agenda-contatos-tab-principal" class="modal-tab-btn active" type="button">Principal</button><button id="agenda-contatos-tab-detalhes" class="modal-tab-btn" type="button">Detalhes</button></div><div class="agenda-modal-body"><div id="agenda-contatos-pane-principal"><div class="agenda-contact-grid"><div class="agenda-field"><label for="agenda-contatos-nome">Nome:</label><input id="agenda-contatos-nome" type="text"></div><div class="agenda-field"><label for="agenda-contatos-tipo">Tipo:</label><select id="agenda-contatos-tipo"><option>CirurgiÃƒÂ£o</option><option>ProtÃƒÂ©tico</option><option>Fornecedor</option><option>Outros</option></select></div><div class="agenda-field"><label for="agenda-contatos-contato">Contato:</label><input id="agenda-contatos-contato" type="text"></div><div class="agenda-inline-block"><label>Data de aniversÃƒÂ¡rio:</label><div class="agenda-aniv-grid"><select id="agenda-contatos-aniv-dia"><option value=""></option>${Array.from({length:31},(_,i)=>`<option value="${String(i+1)}">${String(i+1)}</option>`).join("")}</select><select id="agenda-contatos-aniv-mes"><option value=""></option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">MarÃƒÂ§o</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div></div><div class="agenda-address-grid full-span"><div class="agenda-field"><label for="agenda-contatos-endereco">EndereÃƒÂ§o (rua, nÃ‚Âº, complemento):</label><input id="agenda-contatos-endereco" type="text"></div><div class="agenda-field"><label for="agenda-contatos-complemento">Complemento:</label><input id="agenda-contatos-complemento" type="text"></div><div class="agenda-field"><label for="agenda-contatos-bairro">Bairro:</label><select id="agenda-contatos-bairro"><option value=""></option></select></div></div><div class="agenda-city-grid full-span"><div class="agenda-field"><label for="agenda-contatos-cidade">Cidade:</label><select id="agenda-contatos-cidade"><option value=""></option><option>SÃƒÂ£o JosÃƒÂ© do Rio Preto</option></select></div><div class="agenda-field"><label for="agenda-contatos-cep">CEP:</label><input id="agenda-contatos-cep" type="text"></div><div class="agenda-field"><label for="agenda-contatos-uf">UF:</label><select id="agenda-contatos-uf"><option value=""></option><option>SP</option><option>RJ</option><option>MG</option><option>PR</option><option>SC</option><option>RS</option></select></div><div class="agenda-field"><label for="agenda-contatos-pais">PaÃƒÂ­s:</label><input id="agenda-contatos-pais" type="text"></div></div><div class="full-span"><div class="agenda-field"><label>Telefones:</label><div class="agenda-phones-wrap"><div class="agenda-left-phones"><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-1"><option>Residencial</option><option>Comercial</option><option>Fax</option><option>Celular</option></select><input id="agenda-contatos-tel-1" type="text"><div class="agenda-phone-ico">Ã¢ËœÅ½</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-2"><option>Comercial</option><option>Residencial</option><option>Fax</option><option>Celular</option></select><input id="agenda-contatos-tel-2" type="text"><div class="agenda-phone-ico">Ã¢ËœÅ½</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-3"><option>Fax</option><option>Residencial</option><option>Comercial</option><option>Celular</option></select><input id="agenda-contatos-tel-3" type="text"><div class="agenda-phone-ico">Ã¢ËœÅ½</div></div><div class="agenda-phone-row"><select id="agenda-contatos-tel-tipo-4"><option>Celular</option><option>Residencial</option><option>Comercial</option><option>Fax</option></select><input id="agenda-contatos-tel-4" type="text"><div class="agenda-phone-ico">Ã¢ËœÅ½</div></div></div><div class="agenda-side-box"><div class="agenda-side-line"><div class="agenda-field"><label for="agenda-contatos-email">E-mail:</label><input id="agenda-contatos-email" type="email"></div><div class="agenda-inline-ico">www</div></div><div class="agenda-field"><label for="agenda-contatos-homepage">Home-page:</label><input id="agenda-contatos-homepage" type="text"></div><div class="agenda-checks"><label><input id="agenda-contatos-diretas" type="checkbox" checked> Incluir nas malas diretas</label><label><input id="agenda-contatos-preferidos" type="checkbox"> Incluir na lista de preferidos</label></div></div></div></div></div></div><div id="agenda-contatos-pane-detalhes" class="hidden"><div class="agenda-detalhes-top"><div><label>Palavras-chave:</label><div class="agenda-detalhes-palavras"><span>1)</span><select id="agenda-contatos-palavra1"><option value=""></option></select></div><div class="agenda-detalhes-palavras"><span>2)</span><select id="agenda-contatos-palavra2"><option value=""></option></select></div></div><div class="agenda-field"><label for="agenda-contatos-registro">Registro:</label><input id="agenda-contatos-registro" type="text"></div><div class="agenda-field"><label for="agenda-contatos-especialidade">Especialidade:</label><select id="agenda-contatos-especialidade"><option value=""></option></select></div></div><div class="agenda-detalhes-divider"></div><div class="agenda-field agenda-detalhes-notas"><label for="agenda-contatos-notas">ObservaÃƒÂ§ÃƒÂµes:</label><textarea id="agenda-contatos-notas"></textarea></div></div></div><div class="agenda-actions"><button id="agenda-contatos-modal-elimina" class="materiais-btn" type="button" disabled><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-contatos-modal-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime</button><button id="agenda-contatos-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="agenda-contatos-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
   const panel=document.getElementById("agenda-contatos-panel");
   const modalBackdrop=document.getElementById("agenda-contatos-modal-backdrop");
   agendaContatos={
@@ -6573,7 +6759,7 @@ function agendaContatosAtualizarFiltroTipos(){
   if(!agendaContatos)return;
   const opts=agendaContatosTiposCache.length
     ? agendaContatosTiposCache.map(item=>`<option value="${esc(item.descricao||"")}">${esc(item.descricao||"")}</option>`).join("")
-    : '<option value="CirurgiÃ£o">CirurgiÃ£o</option><option value="ProtÃ©tico">ProtÃ©tico</option><option value="Fornecedor">Fornecedor</option><option value="Outros">Outros</option>';
+    : '<option value="CirurgiÃƒÂ£o">CirurgiÃƒÂ£o</option><option value="ProtÃƒÂ©tico">ProtÃƒÂ©tico</option><option value="Fornecedor">Fornecedor</option><option value="Outros">Outros</option>';
   agendaContatos.filtro.innerHTML=`<option value=""><<Todos>></option>${opts}`;
   agendaContatos.tipo.innerHTML=opts;
 }
@@ -6791,15 +6977,15 @@ function agendaContatosVincularEventos(){
   agendaContatos.btnNovo.addEventListener("click",()=>agendaContatosAbrirModal("novo"));
   agendaContatos.btnEditar.addEventListener("click",()=>{if(!agendaContatosSelId){window.alert("Selecione um contato.");return}agendaContatosAbrirModal("editar")});
   agendaContatos.btnExcluir.addEventListener("click",agendaContatosExcluir);
-  agendaContatos.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃ£o da agenda de contatos: em planejamento."});
-  agendaContatos.btnRelatorio.addEventListener("click",()=>{footerMsg.textContent="RelatÃ³rio de contatos: em planejamento."});
+  agendaContatos.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃƒÂ£o da agenda de contatos: em planejamento."});
+  agendaContatos.btnRelatorio.addEventListener("click",()=>{footerMsg.textContent="RelatÃƒÂ³rio de contatos: em planejamento."});
   agendaContatos.btnFechar.addEventListener("click",()=>{agendaContatos.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});
   agendaContatos.tabPrincipal.addEventListener("click",()=>agendaContatosSetTab("principal"));
   agendaContatos.tabDetalhes.addEventListener("click",()=>{agendaContatosGarantirAbaDetalhes();agendaContatosSetTab("detalhes")});
   agendaContatos.modalElimina.addEventListener("click",async()=>{if(!agendaContatos.modalBackdrop.dataset.editId)return;agendaContatosFecharModal();await agendaContatosExcluir()});
   agendaContatos.modalCancelar.addEventListener("click",agendaContatosFecharModal);
   agendaContatos.modalOk.addEventListener("click",agendaContatosSalvarModal);
-  agendaContatos.modalImprime.addEventListener("click",()=>{footerMsg.textContent="ImpressÃ£o de contato: em planejamento."});
+  agendaContatos.modalImprime.addEventListener("click",()=>{footerMsg.textContent="ImpressÃƒÂ£o de contato: em planejamento."});
   if(agendaContatos.modalBackdrop)agendaContatos.modalBackdrop.addEventListener("click",ev=>{if(ev.target===agendaContatos.modalBackdrop)agendaContatosFecharModal()});
 }
 
@@ -6817,13 +7003,15 @@ async function agendaContatosAbrir(){
   footerMsg.textContent="Agenda de contatos aberta.";
 }
 let agendaLegadoStatusCache=[];
+let agendaLegadoNomeUltimoPrompt="";
+let agendaLegadoNomeConfirmadoComoLivre="";
 let agendaLegadoTiposContatoCache=[];
 function agendaLegadoEnsureUI(){
   if(agendaLegado)return;
   const style=document.createElement("style");
   style.textContent=".agenda-legado-panel{width:min(980px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.agenda-legado-panel .agenda-divider{border-top:1px solid #d3dbe5;margin:8px 0 6px}.agenda-legado-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 6px}.agenda-legado-filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:end}.agenda-legado-filters label{display:block;margin-bottom:2px}.agenda-legado-filters input,.agenda-legado-filters select{height:24px;border:1px solid #bfc9d6;border-radius:4px;padding:0 6px}.agenda-legado-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.agenda-legado-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.agenda-legado-grid th,.agenda-legado-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.agenda-legado-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.agenda-legado-grid tr.selected{background:#d9e8fb}.agenda-legado-total{margin-top:6px;color:#5b6b7e}.agenda-legado-modal{width:min(520px,96vw);background:#fff;border:1px solid #bfc9d6;border-radius:8px;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif}.agenda-legado-modal-body{display:grid;grid-template-columns:100px 1fr;gap:8px 10px}.agenda-legado-modal-body label{display:block;margin-bottom:2px}.agenda-legado-modal-body input,.agenda-legado-modal-body textarea{width:100%;border:1px solid #bfc9d6;padding:4px 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif}.agenda-legado-modal-body input{height:24px}.agenda-legado-modal-body textarea{height:90px;resize:vertical}.agenda-legado-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}";
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-legado-panel" class="agenda-legado-panel hidden"><div class="panel-title">Agenda (legado)</div><div class="agenda-legado-toolbar"><button id="agenda-legado-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="agenda-legado-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="agenda-legado-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-legado-btn-hoje" class="materiais-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">Hoje</button><button id="agenda-legado-btn-semana" class="materiais-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">Semana</button><button id="agenda-legado-btn-atualizar" class="materiais-btn" type="button"><img src="/desktop-assets/restaura.png" alt="">Atualiza</button><button id="agenda-legado-btn-proximo" class="materiais-btn" type="button"><img src="/desktop-assets/procedimentos.png" alt="">PrÃ³ximo</button><button id="agenda-legado-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="agenda-divider"></div><div class="agenda-legado-filters"><div><label for="agenda-legado-inicio">Data inicial:</label><input id="agenda-legado-inicio" type="date"></div><div><label for="agenda-legado-fim">Data final:</label><input id="agenda-legado-fim" type="date"></div><div><label for="agenda-legado-prestador">Prestador:</label><select id="agenda-legado-prestador"><option value="">Todos</option></select></div><div><label for="agenda-legado-unidade">Unidade:</label><select id="agenda-legado-unidade"><option value="">Todas</option></select></div><div><label for="agenda-legado-busca">Nome ou motivo:</label><input id="agenda-legado-busca" type="text"></div></div><div class="agenda-divider"></div><div class="agenda-legado-grid"><table><colgroup><col style="width:110px"><col style="width:70px"><col style="width:70px"><col style="width:220px"><col></colgroup><thead><tr><th>Data</th><th>InÃ­cio</th><th>Fim</th><th>Nome</th><th>Motivo</th></tr></thead><tbody id="agenda-legado-tbody"></tbody></table></div><div id="agenda-legado-total" class="agenda-legado-total">0 agendamentos</div></section><div id="agenda-legado-modal-backdrop" class="modal-backdrop hidden"><div class="modal agenda-legado-modal"><div class="modal-header"><div id="agenda-legado-modal-title" class="modal-title">Novo agendamento</div></div><div class="agenda-legado-modal-body"><div><label for="agenda-legado-modal-data">Data:</label><input id="agenda-legado-modal-data" type="date"></div><div><label for="agenda-legado-modal-inicio">InÃ­cio:</label><input id="agenda-legado-modal-inicio" type="time"></div><div><label for="agenda-legado-modal-fim">Fim:</label><input id="agenda-legado-modal-fim" type="time"></div><div><label for="agenda-legado-modal-nome">Nome:</label><input id="agenda-legado-modal-nome" type="text" list="agenda-legado-contatos"></div><div><label for="agenda-legado-modal-telefone">Telefone:</label><input id="agenda-legado-modal-telefone" type="text" readonly></div><div class="agenda-legado-modal-full" style="grid-column:1/-1"><label for="agenda-legado-modal-motivo">Motivo:</label><textarea id="agenda-legado-modal-motivo"></textarea></div></div><div class="agenda-legado-modal-actions"><button id="agenda-legado-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="agenda-legado-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><datalist id="agenda-legado-contatos"></datalist>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-legado-panel" class="agenda-legado-panel hidden"><div class="panel-title">Agenda (legado)</div><div class="agenda-legado-toolbar"><button id="agenda-legado-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="agenda-legado-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="agenda-legado-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="agenda-legado-btn-hoje" class="materiais-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">Hoje</button><button id="agenda-legado-btn-semana" class="materiais-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">Semana</button><button id="agenda-legado-btn-atualizar" class="materiais-btn" type="button"><img src="/desktop-assets/restaura.png" alt="">Atualiza</button><button id="agenda-legado-btn-proximo" class="materiais-btn" type="button"><img src="/desktop-assets/procedimentos.png" alt="">PrÃƒÂ³ximo</button><button id="agenda-legado-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="agenda-divider"></div><div class="agenda-legado-filters"><div><label for="agenda-legado-inicio">Data inicial:</label><input id="agenda-legado-inicio" type="date"></div><div><label for="agenda-legado-fim">Data final:</label><input id="agenda-legado-fim" type="date"></div><div><label for="agenda-legado-prestador">Prestador:</label><select id="agenda-legado-prestador"><option value="">Todos</option></select></div><div><label for="agenda-legado-unidade">Unidade:</label><select id="agenda-legado-unidade"><option value="">Todas</option></select></div><div><label for="agenda-legado-busca">Nome ou motivo:</label><input id="agenda-legado-busca" type="text"></div></div><div class="agenda-divider"></div><div class="agenda-legado-grid"><table><colgroup><col style="width:110px"><col style="width:70px"><col style="width:70px"><col style="width:220px"><col></colgroup><thead><tr><th>Data</th><th>InÃƒÂ­cio</th><th>Fim</th><th>Nome</th><th>Motivo</th></tr></thead><tbody id="agenda-legado-tbody"></tbody></table></div><div id="agenda-legado-total" class="agenda-legado-total">0 agendamentos</div></section><div id="agenda-legado-modal-backdrop" class="modal-backdrop hidden"><div class="modal agenda-legado-modal"><div class="modal-header"><div id="agenda-legado-modal-title" class="modal-title">Novo agendamento</div></div><div class="agenda-legado-modal-body"><div><label for="agenda-legado-modal-data">Data:</label><input id="agenda-legado-modal-data" type="date"></div><div><label for="agenda-legado-modal-inicio">InÃƒÂ­cio:</label><input id="agenda-legado-modal-inicio" type="time"></div><div><label for="agenda-legado-modal-fim">Fim:</label><input id="agenda-legado-modal-fim" type="time"></div><div><label for="agenda-legado-modal-nome">Nome:</label><input id="agenda-legado-modal-nome" type="text"></div><div><label for="agenda-legado-modal-telefone">Telefone:</label><input id="agenda-legado-modal-telefone" type="text" readonly></div><div class="agenda-legado-modal-full" style="grid-column:1/-1"><label for="agenda-legado-modal-motivo">Motivo:</label><textarea id="agenda-legado-modal-motivo"></textarea></div></div><div class="agenda-legado-modal-actions"><button id="agenda-legado-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="agenda-legado-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><datalist id="agenda-legado-contatos"></datalist>`);
   agendaLegado={
     panel:document.getElementById("agenda-legado-panel"),
     btnNovo:document.getElementById("agenda-legado-btn-novo"),
@@ -6850,7 +7038,9 @@ function agendaLegadoEnsureUI(){
     modalTelefone:document.getElementById("agenda-legado-modal-telefone"),
     modalMotivo:document.getElementById("agenda-legado-modal-motivo"),
     modalOk:document.getElementById("agenda-legado-modal-ok"),
-    modalCancelar:document.getElementById("agenda-legado-modal-cancelar")
+    modalCancelar:document.getElementById("agenda-legado-modal-cancelar"),
+    modalNroPac:null,
+    modalNomeVinculado:""
   };
   ensureModalChrome(agendaLegado.modalBackdrop.querySelector(".agenda-legado-modal"));
   agendaLegadoEnriquecerModal();
@@ -6870,6 +7060,36 @@ function agendaLegadoNumOrNull(value){
   const n=Number(value);
   return Number.isFinite(n)?Math.trunc(n):null;
 }
+function agendaLegadoSetPacienteVinculo(nroPac,nome){
+  if(!agendaLegado)return;
+  const id=Number(nroPac||0)||0;
+  agendaLegado.modalNroPac=id>0?id:null;
+  agendaLegado.modalNomeVinculado=String(nome||"").trim();
+  if(id>0)agendaLegadoNomeConfirmadoComoLivre="";
+}
+function agendaLegadoLimparPacienteVinculo(){
+  if(!agendaLegado)return;
+  agendaLegado.modalNroPac=null;
+  agendaLegado.modalNomeVinculado="";
+}
+function agendaLegadoSincronizarVinculoComNome(nomeAtual){
+  if(!agendaLegado)return;
+  const tipo=String(agendaLegado?.modalTipo?.value||"").trim();
+  if(tipo==="2"){
+    agendaLegadoLimparPacienteVinculo();
+    return;
+  }
+  if(!agendaLegado.modalNroPac)return;
+  const nomeDigitado=String(nomeAtual||"").trim();
+  const nomeVinculado=String(agendaLegado.modalNomeVinculado||"").trim();
+  if(!nomeDigitado){
+    agendaLegadoLimparPacienteVinculo();
+    return;
+  }
+  if(agendaLegadoNomeKey(nomeDigitado)!==agendaLegadoNomeKey(nomeVinculado)){
+    agendaLegadoLimparPacienteVinculo();
+  }
+}
 function agendaLegadoSetModalTab(tab){
   if(!agendaLegado)return;
   const t=tab==="repete"?"repete":"dados";
@@ -6877,6 +7097,22 @@ function agendaLegadoSetModalTab(tab){
   if(agendaLegado.tabRepete)agendaLegado.tabRepete.classList.toggle("active",t==="repete");
   if(agendaLegado.tabDadosPanel)agendaLegado.tabDadosPanel.classList.toggle("hidden",t!=="dados");
   if(agendaLegado.tabRepetePanel)agendaLegado.tabRepetePanel.classList.toggle("hidden",t!=="repete");
+}
+function agendaLegadoAplicarBloqueioPorTipo(){
+  if(!agendaLegado)return;
+  const tipo=String(agendaLegado?.modalTipo?.value||"").trim();
+  const isCompromisso=tipo==="2";
+  if(agendaLegado.modalNome){
+    agendaLegado.modalNome.disabled=isCompromisso;
+    if(isCompromisso){
+      agendaLegado.modalNome.value="";
+      agendaLegadoLimparPacienteVinculo();
+    }
+  }
+  if(agendaLegado.modalStatus){
+    agendaLegado.modalStatus.disabled=isCompromisso;
+    if(isCompromisso)agendaLegado.modalStatus.value="";
+  }
 }
 function agendaLegadoRenderAuxSelect(selectEl,itens,placeholder=""){
   if(!selectEl)return;
@@ -6891,6 +7127,138 @@ function agendaLegadoRenderAuxSelect(selectEl,itens,placeholder=""){
   });
   selectEl.innerHTML=opts.join("");
 }
+function agendaLegadoTipoFoneCodigoParaTexto(valor){
+  const raw=fichaNormalizarTexto(valor);
+  if(!raw)return "";
+  if(raw==="1"||raw==="residencial")return "Residencial";
+  if(raw==="2"||raw==="comercial")return "Comercial";
+  if(raw==="3"||raw==="fax"||raw==="4"||raw==="celular"||raw==="celular 1")return "Celular";
+  if(raw==="5"||raw==="recado"||raw==="outro")return "Recado";
+  return String(valor??"").trim();
+}
+function agendaLegadoTipoFoneTextoParaCodigo(valor){
+  const raw=fichaNormalizarTexto(valor);
+  if(!raw)return null;
+  if(raw==="residencial"||raw==="1")return 1;
+  if(raw==="comercial"||raw==="2")return 2;
+  if(raw==="celular"||raw==="celular 1"||raw==="fax"||raw==="3"||raw==="4")return 4;
+  if(raw==="recado"||raw==="outro"||raw==="5")return 5;
+  return null;
+}
+function agendaLegadoSetPhoneTypeOptions(selectEl,valorPreferido=""){
+  if(!selectEl)return;
+  const atual=String(selectEl.value||"").trim();
+  const canonicos=[...FICHA_TIPOS_FONE_PADRAO];
+  selectEl.innerHTML=canonicos.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("");
+  const alvo=String(valorPreferido||atual||"").trim();
+  if(alvo&&canonicos.includes(alvo))selectEl.value=alvo;
+  else if(canonicos.length)selectEl.value=canonicos[0];
+}
+function agendaLegadoNomeKey(nome){
+  let t=String(nome||"").trim().toLowerCase();
+  if(!t)return"";
+  t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  t=t.replace(/\s+/g," ");
+  return t;
+}
+function agendaLegadoBuscarContatoOuPaciente(nome){
+  const key=agendaLegadoNomeKey(nome);
+  if(!key)return null;
+  return agendaLegadoContatosMap.get(key)||agendaLegadoPacientesMap.get(key)||null;
+}
+function agendaLegadoNomeExisteNoCadastro(nome){
+  const raw=String(nome||"").trim();
+  if(!raw)return false;
+  if(agendaLegadoBuscarContatoOuPaciente(raw))return true;
+  if(/^\d+$/.test(raw)){
+    const cod=String(Math.trunc(Number(raw)));
+    return (agendaLegadoPacientesCache||[]).some(p=>{
+      const pid=String(Math.trunc(Number(p?.id||0)));
+      const pcod=String(p?.codigo||p?.codigo_paciente||"").trim();
+      return cod===pid||cod===pcod;
+    });
+  }
+  return false;
+}
+function agendaLegadoFecharDialogNomeNaoEncontrado(){
+  if(agendaLegado?.nfBackdrop)agendaLegado.nfBackdrop.classList.add("hidden");
+}
+async function agendaLegadoConfirmarDialogNomeNaoEncontrado(){
+  const textoNome=String(agendaLegado?.nfBackdrop?.dataset?.nomeBusca||agendaLegado?.modalNome?.value||"").trim();
+  const acao=(agendaLegado?.nfRadioNovo?.checked!==false)?"novo":"buscar";
+  agendaLegadoFecharDialogNomeNaoEncontrado();
+  if(acao==="buscar"){
+    await agendaLegadoAbrirMenuPacientesParaRetorno(textoNome);
+    return;
+  }
+  agendaLegadoNomeConfirmadoComoLivre=agendaLegadoNomeKey(textoNome);
+  agendaLegadoLimparPacienteVinculo();
+  if(agendaLegado?.modalNome){
+    agendaLegado.modalNome.value=textoNome;
+    agendaLegado.modalNome.focus();
+  }
+}
+function agendaLegadoAbrirDialogNomeNaoEncontrado(nomeDigitado){
+  if(!agendaLegado?.nfBackdrop||!agendaLegado?.nfTexto)return;
+  const texto=String(nomeDigitado||"").trim();
+  if(!texto)return;
+  agendaLegadoNomeUltimoPrompt=texto;
+  agendaLegado.nfBackdrop.dataset.nomeBusca=texto;
+  agendaLegado.nfTexto.textContent=`O paciente ${texto} nÃ£o foi encontrado no cadastro de pacientes.`;
+  if(agendaLegado.nfRadioNovo)agendaLegado.nfRadioNovo.checked=true;
+  if(agendaLegado.nfRadioBuscar)agendaLegado.nfRadioBuscar.checked=false;
+  agendaLegado.nfBackdrop.classList.remove("hidden");
+  if(agendaLegado.nfBtnOk)agendaLegado.nfBtnOk.focus();
+}
+function agendaLegadoAvaliarNomeDigitadoParaDialogo(nomeDigitado){
+  const nroPacVinculado=Number(agendaLegado?.modalNroPac||0)||0;
+  if(nroPacVinculado>0)return;
+  const texto=String(nomeDigitado||"").trim();
+  if(!texto)return;
+  if(String(agendaLegado?.modalTipo?.value||"1")!=="1")return;
+  if(agendaLegadoNomeExisteNoCadastro(texto))return;
+  if(!agendaLegado?.nfBackdrop)return;
+  if(!agendaLegado.nfBackdrop.classList.contains("hidden"))return;
+  if(agendaLegadoNomeUltimoPrompt.toLowerCase()===texto.toLowerCase())return;
+  agendaLegadoAbrirDialogNomeNaoEncontrado(texto);
+}
+async function agendaLegadoAbrirMenuPacientesParaRetorno(prefillNome=""){
+  const prefill=String(prefillNome||agendaLegado?.modalNome?.value||"").trim();
+  try{await agendaLegadoGarantirContatosCarregados()}catch{}
+  await fichaMenuPacAbrir(prefill,{
+    onSelect:async(item)=>{
+      const nome=String(item?.nome_paciente||item?.nome||"").trim();
+      const nroPac=Number(item?.id||0)||0;
+      if(!nome)return;
+      agendaLegadoSetPacienteVinculo(nroPac,nome);
+      if(agendaLegado?.modalNome)agendaLegado.modalNome.value=nome;
+      if(typeof agendaLegadoAplicarContato==="function")agendaLegadoAplicarContato(nome,nroPac);
+      agendaLegadoNomeUltimoPrompt="";
+      if(agendaLegado?.modalNome)agendaLegado.modalNome.focus();
+    }
+  });
+}
+async function agendaLegadoResolverNomeModal(){
+  if(!agendaLegado)return true;
+  const tipo=String(agendaLegado?.modalTipo?.value||"1").trim();
+  if(tipo==="2")return true;
+  const nome=String(agendaLegado?.modalNome?.value||"").trim();
+  if(typeof agendaLegadoSincronizarVinculoComNome==="function"){
+    agendaLegadoSincronizarVinculoComNome(nome);
+  }
+  const nroPacVinculado=Number(agendaLegado?.modalNroPac||0)||0;
+  if(nroPacVinculado>0)return true;
+  if(!nome)return true;
+  try{await agendaLegadoGarantirContatosCarregados()}catch{}
+  if(agendaLegadoNomeExisteNoCadastro(nome)){
+    await agendaLegadoAbrirMenuPacientesParaRetorno(nome);
+    return false;
+  }
+  const nomeKey=agendaLegadoNomeKey(nome);
+  if(nomeKey&&nomeKey===agendaLegadoNomeConfirmadoComoLivre)return true;
+  agendaLegadoAbrirDialogNomeNaoEncontrado(nome);
+  return false;
+}
 function agendaLegadoEnriquecerModal(){
   if(!agendaLegado?.modalBackdrop)return;
   const modal=agendaLegado.modalBackdrop.querySelector(".agenda-legado-modal");
@@ -6901,48 +7269,67 @@ function agendaLegadoEnriquecerModal(){
     const css=document.createElement("style");
     css.id="agenda-legado-modal-easy-css";
     css.textContent=`
-      .agenda-legado-modal.easy-like{width:min(580px,96vw);padding:8px;font:12px Tahoma,sans-serif}
-      .agenda-legado-modal.easy-like .modal-header{padding-bottom:4px}
-      .agenda-legado-tabs{display:flex;gap:2px;margin-bottom:5px}
-      .agenda-legado-tabbtn{height:24px;padding:0 10px;border:1px solid #b9c3cf;background:#f4f4f4;cursor:pointer;font:12px Tahoma,sans-serif}
-      .agenda-legado-tabbtn.active{background:#fff;border-bottom-color:#fff}
-      .agenda-legado-pane{border:1px solid #b9c3cf;padding:8px}
+      .agenda-legado-modal.easy-like.agenda-legado-modal-fixo{width:540px;min-width:540px;max-width:540px;padding:6px;font:12px Tahoma,sans-serif}
+      .agenda-legado-modal.easy-like.agenda-legado-modal-fixo .modal-header{padding:0 0 3px}
+      .agenda-legado-tabs{display:flex;gap:1px;margin-bottom:3px}
+      .agenda-legado-tabbtn{height:22px;padding:0 8px;border:1px solid #aeb7c4;background:#ececec;cursor:pointer;font:12px Tahoma,sans-serif}
+      .agenda-legado-tabbtn.active{background:#f5f5f5;border-bottom-color:#f5f5f5}
+      .agenda-legado-pane{border:1px solid #aeb7c4;padding:6px;background:#f5f5f5}
       .agenda-legado-pane.hidden{display:none}
-      .agenda-legado-row{display:grid;gap:8px;align-items:end}
-      .agenda-legado-row + .agenda-legado-row{margin-top:5px}
-      .agenda-legado-row label{display:block;margin-bottom:2px}
-      .agenda-legado-row input,.agenda-legado-row select,.agenda-legado-row textarea{width:100%;height:24px;border:1px solid #bfc9d6;padding:2px 6px;box-sizing:border-box;font:12px Tahoma,sans-serif;background:#fff}
-      .agenda-legado-row textarea{height:72px;resize:none}
-      .agenda-legado-top{grid-template-columns:120px 86px 74px 40px 56px 22px 22px 22px}
+      .agenda-legado-row{display:grid;gap:4px;align-items:end}
+      .agenda-legado-row + .agenda-legado-row{margin-top:4px}
+      .agenda-legado-row label{display:block;margin-bottom:1px}
+      .agenda-legado-row input,.agenda-legado-row select,.agenda-legado-row textarea{width:100%;height:22px;border:1px solid #9ea7b4;padding:1px 4px;box-sizing:border-box;font:12px Tahoma,sans-serif;background:#fff;border-radius:0;appearance:none;-webkit-appearance:none}
+      .agenda-legado-row textarea{height:86px;resize:none}
+      .agenda-legado-top{grid-template-columns:112px 62px 48px 22px 34px 16px 16px 16px}
       .agenda-legado-top .col-data{grid-column:1}
       .agenda-legado-top .col-hora{grid-column:2}
       .agenda-legado-top .col-dur{grid-column:3}
       .agenda-legado-top .col-min{grid-column:4}
       .agenda-legado-top .col-sala{grid-column:5}
-      .agenda-legado-mini{height:24px;border:1px solid #bfc9d6;background:#f2f2f2}
-      .agenda-legado-two{grid-template-columns:112px 1fr 20px}
-      .agenda-legado-two-tight{grid-template-columns:112px 1fr}
+      .agenda-legado-mini{height:22px;border:1px solid #9ea7b4;background:#ececec;padding:0;cursor:pointer}
+      .agenda-legado-mini:focus{outline:1px dotted #000;outline-offset:-3px}
+      .agenda-legado-two{grid-template-columns:106px 1fr 24px}
+      .agenda-legado-two-tight{grid-template-columns:106px 1fr}
       .agenda-legado-two .full{grid-column:1 / -1}
-      .agenda-legado-telefones{display:grid;grid-template-columns:94px 1fr 18px;gap:3px 6px;align-items:center}
-      .agenda-legado-telefones .ico{font-size:14px;line-height:1;text-align:center;color:#b30000}
-      .agenda-legado-bloco-telefones{display:grid;grid-template-columns:1fr 190px;gap:8px;align-items:start;margin-top:6px;padding-top:6px;border-top:1px solid #b9c3cf}
-      .agenda-legado-stamps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;padding-top:6px;border-top:1px solid #b9c3cf}
+      .agenda-legado-telefones{display:grid;grid-template-columns:118px 128px 24px;gap:8px 6px;align-items:center}
+      .agenda-legado-telefones select,.agenda-legado-telefones input{height:28px}
+      .agenda-legado-telefones .ico{height:28px;width:24px;border:1px solid #9ea7b4;background:#ececec url('/desktop-assets/whatsapp.png') center/14px 14px no-repeat;color:transparent;font-size:10px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center}
+      .agenda-legado-bloco-telefones{display:grid;grid-template-columns:278px 206px;gap:6px;align-items:start;justify-content:start;margin-top:4px;padding-top:4px;border-top:1px solid #b5bdc8}
+      .agenda-legado-bloco-telefones > div{min-width:0}
+      #agenda-legado-modal-observ{width:206px;height:96px;min-height:96px;max-height:96px;resize:none}
+      .agenda-legado-stamps{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px;padding-top:4px;border-top:1px solid #b5bdc8}
       .agenda-legado-stamps input[readonly]{background:#26e8ef}
-      .agenda-legado-actions{display:flex;justify-content:center;gap:8px;margin-top:8px}
-      .agenda-legado-actions .materiais-btn{min-width:74px;height:26px}
-      .agenda-legado-rep{max-width:370px}
-      .agenda-legado-rep-top{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-      .agenda-legado-rep-box{border:1px solid #b9c3cf;padding:8px 10px;min-height:96px}
+      #agenda-legado-modal-data[readonly]{background:#26e8ef}
+      .agenda-legado-actions{display:flex;justify-content:center;gap:6px;margin-top:6px}
+      .agenda-legado-actions .materiais-btn{min-width:72px;height:24px;padding:0 8px;border:1px solid #9ea7b4;background:#ececec;font:12px Tahoma,sans-serif;border-radius:0;box-shadow:none}
+      .agenda-legado-actions .materiais-btn img{display:none}
+      .agenda-legado-actions .materiais-btn:focus{outline:1px dotted #000;outline-offset:-3px}
+      .agenda-legado-rep{max-width:360px}
+      .agenda-legado-rep-top{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+      .agenda-legado-rep-box{border:1px solid #aeb7c4;padding:6px 8px;min-height:90px;background:#fff}
       .agenda-legado-rep .linha{display:grid;grid-template-columns:16px 72px 40px auto;gap:6px;align-items:center;margin:6px 0}
       .agenda-legado-rep .linha .extra{margin-left:2px}
-      .agenda-legado-rep-bottom{display:flex;align-items:center;gap:6px;margin-top:10px}
-      .agenda-legado-rep input[type="number"]{height:22px;padding:1px 4px}
-      .agenda-legado-rep select{height:22px}
+      .agenda-legado-rep-bottom{display:flex;align-items:center;gap:6px;margin-top:8px}
+      .agenda-legado-rep input[type="number"]{height:20px;padding:0 3px}
+      .agenda-legado-rep select{height:20px}
+      .agenda-legado-field-btn{width:24px;min-width:24px;height:22px;border:1px solid #9ea7b4;background:#ececec;padding:0;cursor:pointer}
+      .agenda-legado-field-btn:focus{outline:1px dotted #000;outline-offset:-3px}
       .agenda-legado-fim-hidden{display:none!important}
+      .agenda-legado-nf-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.28);display:grid;place-items:center;z-index:1700}
+      .agenda-legado-nf-backdrop.hidden{display:none}
+      .agenda-legado-nf-modal{width:460px;max-width:92vw;border:1px solid #9ea7b4;background:#ececec;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif}
+      .agenda-legado-nf-title{font:28px/1 Arial,sans-serif;color:#2f95e8;width:50px;text-align:center}
+      .agenda-legado-nf-body{display:grid;grid-template-columns:54px 1fr;gap:8px;align-items:start}
+      .agenda-legado-nf-message{margin:2px 0 8px}
+      .agenda-legado-nf-sub{margin-bottom:4px}
+      .agenda-legado-nf-opt{display:flex;align-items:center;gap:6px;margin:3px 0}
+      .agenda-legado-nf-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+      .agenda-legado-nf-actions .materiais-btn{min-width:84px;height:28px;padding:0 10px;border-radius:0}
     `;
     document.head.appendChild(css);
   }
-  modal.classList.add("easy-like");
+  modal.classList.add("easy-like","agenda-legado-modal-fixo");
   modal.innerHTML=`
     <div class="modal-header"><div id="agenda-legado-modal-title" class="modal-title">Edita agendamento</div></div>
     <div class="agenda-legado-tabs">
@@ -6951,31 +7338,31 @@ function agendaLegadoEnriquecerModal(){
     </div>
     <div id="agenda-legado-pane-dados" class="agenda-legado-pane">
       <div class="agenda-legado-row agenda-legado-top">
-        <div class="col-data"><label for="agenda-legado-modal-data">Data:</label><input id="agenda-legado-modal-data" type="date"></div>
-        <div class="col-hora"><label for="agenda-legado-modal-inicio">Horário:</label><input id="agenda-legado-modal-inicio" type="time"></div>
-        <div class="col-dur"><label for="agenda-legado-modal-duracao">Duração:</label><input id="agenda-legado-modal-duracao" type="number" min="1" step="1"></div>
+        <div class="col-data"><label for="agenda-legado-modal-data">Data:</label><input id="agenda-legado-modal-data" type="text" inputmode="numeric" maxlength="10" readonly></div>
+        <div class="col-hora"><label for="agenda-legado-modal-inicio">Horário:</label><input id="agenda-legado-modal-inicio" type="text" inputmode="numeric" maxlength="5"></div>
+        <div class="col-dur"><label for="agenda-legado-modal-duracao">Duração:</label><input id="agenda-legado-modal-duracao" type="number" min="5" step="5"></div>
         <div class="col-min"><label>&nbsp;</label><input value="min" readonly></div>
         <div class="col-sala"><label for="agenda-legado-modal-sala">Sala:</label><input id="agenda-legado-modal-sala" type="number" min="1" step="1"></div>
-        <div><label>&nbsp;</label><div class="agenda-legado-mini"></div></div>
-        <div><label>&nbsp;</label><div class="agenda-legado-mini"></div></div>
-        <div><label>&nbsp;</label><div class="agenda-legado-mini"></div></div>
+        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 1"></button></div>
+        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 2"></button></div>
+        <div><label>&nbsp;</label><button class="agenda-legado-mini" type="button" aria-label="Ação sala 3"></button></div>
       </div>
       <div class="agenda-legado-row agenda-legado-two" style="margin-top:6px">
-        <div><label for="agenda-legado-modal-tipo">Tipo:</label><select id="agenda-legado-modal-tipo"><option value="1">Paciente</option><option value="2">Compromisso</option><option value="0">Outros</option></select></div>
-        <div><label for="agenda-legado-modal-nome">Nome:</label><input id="agenda-legado-modal-nome" type="text" list="agenda-legado-contatos"></div>
-        <div><label>&nbsp;</label><div style="height:24px;display:flex;align-items:center;justify-content:center;font-size:13px">📁</div></div>
+        <div><label for="agenda-legado-modal-tipo">Tipo:</label><select id="agenda-legado-modal-tipo"><option value="1">Paciente</option><option value="2">Compromisso</option></select></div>
+        <div><label for="agenda-legado-modal-nome">Nome:</label><input id="agenda-legado-modal-nome" type="text"></div>
+        <div><label>&nbsp;</label><button id="agenda-legado-modal-nome-btn" class="agenda-legado-field-btn" type="button" aria-label="Pesquisar nome">...</button></div>
       </div>
       <div class="agenda-legado-row agenda-legado-two-tight">
-        <div><label for="agenda-legado-modal-status">Situação:</label><select id="agenda-legado-modal-status"><option value="">(sem situação)</option></select></div>
-        <div><label for="agenda-legado-modal-motivo">Motivo:</label><input id="agenda-legado-modal-motivo" type="text"></div>
+        <div><label for="agenda-legado-modal-status">Situação:</label><select id="agenda-legado-modal-status"></select></div>
+        <div><label for="agenda-legado-modal-motivo">Motivo:</label><select id="agenda-legado-modal-motivo"><option value=""></option></select></div>
       </div>
       <div class="agenda-legado-bloco-telefones">
         <div>
           <label>Telefones:</label>
           <div class="agenda-legado-telefones">
-            <select id="agenda-legado-modal-tipfone1"><option value="">(tipo)</option></select><input id="agenda-legado-modal-telefone" type="text"><span class="ico">☎</span>
-            <select id="agenda-legado-modal-tipfone2"><option value="">(tipo)</option></select><input id="agenda-legado-modal-fone2" type="text"><span class="ico">☎</span>
-            <select id="agenda-legado-modal-tipfone3"><option value="">(tipo)</option></select><input id="agenda-legado-modal-fone3" type="text"><span class="ico">☎</span>
+            <select id="agenda-legado-modal-tipfone1"></select><input id="agenda-legado-modal-telefone" type="text"><button id="agenda-legado-modal-wa1" class="ico" type="button" aria-label="WhatsApp telefone 1" title="WhatsApp telefone 1"></button>
+            <select id="agenda-legado-modal-tipfone2"></select><input id="agenda-legado-modal-fone2" type="text"><button id="agenda-legado-modal-wa2" class="ico" type="button" aria-label="WhatsApp telefone 2" title="WhatsApp telefone 2"></button>
+            <select id="agenda-legado-modal-tipfone3"></select><input id="agenda-legado-modal-fone3" type="text"><button id="agenda-legado-modal-wa3" class="ico" type="button" aria-label="WhatsApp telefone 3" title="WhatsApp telefone 3"></button>
           </div>
         </div>
         <div><label for="agenda-legado-modal-observ">Observações:</label><textarea id="agenda-legado-modal-observ"></textarea></div>
@@ -6984,7 +7371,7 @@ function agendaLegadoEnriquecerModal(){
         <div><label for="agenda-legado-modal-inclusao">Inclusão:</label><input id="agenda-legado-modal-inclusao" type="text" readonly></div>
         <div><label for="agenda-legado-modal-alteracao">Alteração:</label><input id="agenda-legado-modal-alteracao" type="text" readonly></div>
       </div>
-      <input id="agenda-legado-modal-fim" class="agenda-legado-fim-hidden" type="time">
+      <input id="agenda-legado-modal-fim" class="agenda-legado-fim-hidden" type="text">
     </div>
     <div id="agenda-legado-pane-repete" class="agenda-legado-pane hidden">
       <div class="agenda-legado-rep">
@@ -6993,9 +7380,9 @@ function agendaLegadoEnriquecerModal(){
           <span>Repete horário</span>
         </div>
         <div class="agenda-legado-rep-box">
-          <div class="linha"><input type="radio" disabled><span>Próximos</span><input type="number" value="1" disabled><span class="extra">dias</span></div>
-          <div class="linha"><input type="radio" disabled><span>Próximas</span><input type="number" value="1" disabled><select disabled><option>Quarta-feira</option></select></div>
-          <div class="linha"><input type="radio" disabled><span>Todo o dia</span><input type="number" value="8" disabled><span class="extra">dos próximos <input type="number" value="1" disabled style="width:38px;margin:0 4px"> meses</span></div>
+            <div class="linha"><input type="radio" disabled><span>Próximos</span><input type="number" value="1" disabled><span class="extra">dias</span></div>
+            <div class="linha"><input type="radio" disabled><span>Próximas</span><input type="number" value="1" disabled><select disabled><option>Quarta-feira</option></select></div>
+            <div class="linha"><input type="radio" disabled><span>Todo o dia</span><input type="number" value="8" disabled><span class="extra">dos próximos <input type="number" value="1" disabled style="width:38px;margin:0 4px"> meses</span></div>
         </div>
         <div class="agenda-legado-rep-bottom">
           <input type="checkbox" disabled>
@@ -7004,10 +7391,27 @@ function agendaLegadoEnriquecerModal(){
       </div>
     </div>
     <div class="agenda-legado-actions">
-      <button id="agenda-legado-modal-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo</button>
-      <button id="agenda-legado-modal-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button>
-      <button id="agenda-legado-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button>
-      <button id="agenda-legado-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button>
+      <button id="agenda-legado-modal-novo" class="materiais-btn" type="button">Novo</button>
+      <button id="agenda-legado-modal-elimina" class="materiais-btn" type="button">Elimina</button>
+      <button id="agenda-legado-modal-ok" class="materiais-btn" type="button">Ok</button>
+      <button id="agenda-legado-modal-cancelar" class="materiais-btn" type="button">Cancela</button>
+    </div>
+    <div id="agenda-legado-nf-backdrop" class="agenda-legado-nf-backdrop hidden">
+      <div class="agenda-legado-nf-modal">
+        <div class="agenda-legado-nf-body">
+          <div class="agenda-legado-nf-title">?</div>
+          <div>
+            <div id="agenda-legado-nf-texto" class="agenda-legado-nf-message"></div>
+            <div class="agenda-legado-nf-sub">Você deseja:</div>
+            <label class="agenda-legado-nf-opt"><input id="agenda-legado-nf-radio-novo" type="radio" name="agenda-legado-nf-acao" value="novo" checked> Agendá-lo como um novo paciente</label>
+            <label class="agenda-legado-nf-opt"><input id="agenda-legado-nf-radio-buscar" type="radio" name="agenda-legado-nf-acao" value="buscar"> Procurá-lo no cadastro de pacientes</label>
+          </div>
+        </div>
+        <div class="agenda-legado-nf-actions">
+          <button id="agenda-legado-nf-ok" class="materiais-btn" type="button">Ok</button>
+          <button id="agenda-legado-nf-cancelar" class="materiais-btn" type="button">Cancela</button>
+        </div>
+      </div>
     </div>
   `;
   agendaLegado.modalTitle=document.getElementById("agenda-legado-modal-title");
@@ -7022,6 +7426,7 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.modalSala=document.getElementById("agenda-legado-modal-sala");
   agendaLegado.modalTipo=document.getElementById("agenda-legado-modal-tipo");
   agendaLegado.modalNome=document.getElementById("agenda-legado-modal-nome");
+  agendaLegado.modalNomeBtn=document.getElementById("agenda-legado-modal-nome-btn");
   agendaLegado.modalStatus=document.getElementById("agenda-legado-modal-status");
   agendaLegado.modalMotivo=document.getElementById("agenda-legado-modal-motivo");
   agendaLegado.modalTelefone=document.getElementById("agenda-legado-modal-telefone");
@@ -7030,6 +7435,9 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.modalTipFone3=document.getElementById("agenda-legado-modal-tipfone3");
   agendaLegado.modalFone2=document.getElementById("agenda-legado-modal-fone2");
   agendaLegado.modalFone3=document.getElementById("agenda-legado-modal-fone3");
+  agendaLegado.modalWa1=document.getElementById("agenda-legado-modal-wa1");
+  agendaLegado.modalWa2=document.getElementById("agenda-legado-modal-wa2");
+  agendaLegado.modalWa3=document.getElementById("agenda-legado-modal-wa3");
   agendaLegado.modalObserv=document.getElementById("agenda-legado-modal-observ");
   agendaLegado.modalInclusao=document.getElementById("agenda-legado-modal-inclusao");
   agendaLegado.modalAlteracao=document.getElementById("agenda-legado-modal-alteracao");
@@ -7037,6 +7445,44 @@ function agendaLegadoEnriquecerModal(){
   agendaLegado.modalCancelar=document.getElementById("agenda-legado-modal-cancelar");
   agendaLegado.modalNovo=document.getElementById("agenda-legado-modal-novo");
   agendaLegado.modalElimina=document.getElementById("agenda-legado-modal-elimina");
+  agendaLegado.nfBackdrop=document.getElementById("agenda-legado-nf-backdrop");
+  agendaLegado.nfTexto=document.getElementById("agenda-legado-nf-texto");
+  agendaLegado.nfRadioNovo=document.getElementById("agenda-legado-nf-radio-novo");
+  agendaLegado.nfRadioBuscar=document.getElementById("agenda-legado-nf-radio-buscar");
+  agendaLegado.nfBtnOk=document.getElementById("agenda-legado-nf-ok");
+  agendaLegado.nfBtnCancelar=document.getElementById("agenda-legado-nf-cancelar");
+  if(agendaLegado.nfBtnOk&&!agendaLegado.nfBtnOk.dataset.bound){
+    agendaLegado.nfBtnOk.dataset.bound="1";
+    agendaLegado.nfBtnOk.addEventListener("click",agendaLegadoConfirmarDialogNomeNaoEncontrado);
+  }
+  if(agendaLegado.nfBtnCancelar&&!agendaLegado.nfBtnCancelar.dataset.bound){
+    agendaLegado.nfBtnCancelar.dataset.bound="1";
+    agendaLegado.nfBtnCancelar.addEventListener("click",agendaLegadoFecharDialogNomeNaoEncontrado);
+  }
+  if(agendaLegado.nfBackdrop&&!agendaLegado.nfBackdrop.dataset.bound){
+    agendaLegado.nfBackdrop.dataset.bound="1";
+    agendaLegado.nfBackdrop.addEventListener("click",ev=>{if(ev.target===agendaLegado.nfBackdrop)agendaLegadoFecharDialogNomeNaoEncontrado()});
+  }
+  if(agendaLegado.modalSala&&agendaLegado.modalSala.dataset.boundMin!=="1"){
+    agendaLegado.modalSala.dataset.boundMin="1";
+    agendaLegado.modalSala.min="1";
+    agendaLegado.modalSala.step="1";
+    const fixSala=()=>{const n=Math.max(1,parseInt(agendaLegado.modalSala.value||"1",10)||1);agendaLegado.modalSala.value=String(n)};
+    agendaLegado.modalSala.addEventListener("input",fixSala);
+    agendaLegado.modalSala.addEventListener("change",fixSala);
+    agendaLegado.modalSala.addEventListener("blur",fixSala);
+    fixSala();
+  }
+  if(agendaLegado.modalWa1)agendaLegado.modalWa1.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalTelefone));
+  if(agendaLegado.modalWa2)agendaLegado.modalWa2.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalFone2));
+  if(agendaLegado.modalWa3)agendaLegado.modalWa3.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(agendaLegado.modalFone3));
+  if(agendaLegado.modalNomeBtn&&!agendaLegado.modalNomeBtn.dataset.bound){
+    agendaLegado.modalNomeBtn.dataset.bound="1";
+    agendaLegado.modalNomeBtn.addEventListener("click",async()=>{
+      const prefill=String(agendaLegado?.modalNome?.value||"").trim();
+      await agendaLegadoAbrirMenuPacientesParaRetorno(prefill);
+    });
+  }
   if(agendaLegado.tabDados)agendaLegado.tabDados.addEventListener("click",()=>agendaLegadoSetModalTab("dados"));
   if(agendaLegado.tabRepete)agendaLegado.tabRepete.addEventListener("click",()=>agendaLegadoSetModalTab("repete"));
   agendaLegadoSetModalTab("dados");
@@ -7048,11 +7494,51 @@ function agendaLegadoFmtHora(ms){
   if(!hh&&!mm)return"";
   return `${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`;
 }
+function agendaLegadoFmtDataInput(valor){
+  if(!valor)return"";
+  const txt=String(valor).trim();
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(txt))return txt;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(txt)){
+    const [a,m,d]=txt.split("-");
+    return `${d}/${m}/${a}`;
+  }
+  const d=new Date(txt);
+  if(Number.isNaN(d.getTime()))return txt;
+  const dd=String(d.getDate()).padStart(2,"0");
+  const mm=String(d.getMonth()+1).padStart(2,"0");
+  const aa=String(d.getFullYear());
+  return `${dd}/${mm}/${aa}`;
+}
+function agendaLegadoParseDataInput(valor){
+  const txt=String(valor||"").trim();
+  if(!txt)return"";
+  if(/^\d{4}-\d{2}-\d{2}$/.test(txt))return txt;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(txt)){
+    const [d,m,a]=txt.split("/");
+    return `${a}-${m}-${d}`;
+  }
+  const d=new Date(txt);
+  if(Number.isNaN(d.getTime()))return"";
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function agendaLegadoFmtData(valor){
   if(!valor)return"";
   const d=new Date(String(valor));
   if(Number.isNaN(d.getTime()))return String(valor);
   return d.toLocaleDateString("pt-BR");
+}
+function agendaLegadoSyncMotivoOptions(valorAtual){
+  if(!agendaLegado?.modalMotivo)return;
+  const combo=agendaLegado.modalMotivo;
+  const atual=String(valorAtual??combo.value??"").trim();
+  const valores=new Set([""]);
+  (Array.isArray(agendaLegadoCache)?agendaLegadoCache:[]).forEach(item=>{
+    const txt=String(item?.motivo||"").trim();
+    if(txt)valores.add(txt);
+  });
+  if(atual)valores.add(atual);
+  combo.innerHTML=[...valores].map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+  combo.value=atual;
 }
 function agendaLegadoRender(items,keepSelection=false){
   agendaLegadoCache=Array.isArray(items)?items:[];
@@ -7069,29 +7555,45 @@ function agendaLegadoSelecionado(){
   return (agendaLegadoCache||[]).find(item=>item.id===agendaLegadoSelId)||null;
 }
 function agendaLegadoModalPreencher(item){
-  agendaLegado.modalData.value=item?.data||"";
+  agendaLegadoLimparPacienteVinculo();
+  agendaLegado.modalData.value=agendaLegadoFmtDataInput(item?.data||"");
   agendaLegado.modalInicio.value=agendaLegadoFmtHora(item?.hora_inicio||0);
   agendaLegado.modalFim.value=agendaLegadoFmtHora(item?.hora_fim||0);
   agendaLegado.modalNome.value=item?.nome||"";
   agendaLegado.modalTelefone.value=item?.fone1||"";
-  agendaLegado.modalMotivo.value=item?.motivo||"";
-  if(agendaLegado.modalSala)agendaLegado.modalSala.value=item?.sala??"";
-  if(agendaLegado.modalTipo)agendaLegado.modalTipo.value=String(item?.tipo??1);
+  agendaLegadoSyncMotivoOptions(item?.motivo||"");
+  if(agendaLegado.modalSala){
+    const salaNum=Math.max(1,parseInt(item?.sala??"1",10)||1);
+    agendaLegado.modalSala.value=String(salaNum);
+  }
+  if(agendaLegado.modalTipo){
+    const tipoNum=Number(item?.tipo??1);
+    agendaLegado.modalTipo.value=String(tipoNum===2?2:1);
+  }
+  const nroPacExistente=Number(item?.nro_pac||0)||0;
+  if(nroPacExistente>0){
+    agendaLegadoSetPacienteVinculo(nroPacExistente,String(item?.nome||"").trim());
+  }
   if(agendaLegado.modalStatus)agendaLegado.modalStatus.value=item?.status!=null?String(item.status):"";
-  if(agendaLegado.modalTipFone1)agendaLegado.modalTipFone1.value=item?.tip_fone1!=null?String(item.tip_fone1):"";
-  if(agendaLegado.modalTipFone2)agendaLegado.modalTipFone2.value=item?.tip_fone2!=null?String(item.tip_fone2):"";
-  if(agendaLegado.modalTipFone3)agendaLegado.modalTipFone3.value=item?.tip_fone3!=null?String(item.tip_fone3):"";
+  if(agendaLegado.modalTipFone1)agendaLegado.modalTipFone1.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone1);
+  if(agendaLegado.modalTipFone2)agendaLegado.modalTipFone2.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone2);
+  if(agendaLegado.modalTipFone3)agendaLegado.modalTipFone3.value=agendaLegadoTipoFoneCodigoParaTexto(item?.tip_fone3);
   if(agendaLegado.modalFone2)agendaLegado.modalFone2.value=item?.fone2||"";
   if(agendaLegado.modalFone3)agendaLegado.modalFone3.value=item?.fone3||"";
+  if(nroPacExistente>0&&typeof agendaLegadoAplicarContato==="function"){
+    agendaLegadoAplicarContato(String(item?.nome||""),nroPacExistente);
+  }
   if(agendaLegado.modalObserv)agendaLegado.modalObserv.value=item?.observ||"";
   if(agendaLegado.modalInclusao)agendaLegado.modalInclusao.value=agendaLegadoFmtStamp(item?.time_stamp_ins||"");
   if(agendaLegado.modalAlteracao)agendaLegado.modalAlteracao.value=agendaLegadoFmtStamp(item?.time_stamp_upd||"");
+  agendaLegadoAplicarBloqueioPorTipo();
   if(agendaLegado.modalDuracao){
     const ini=Number(item?.hora_inicio||0);
     const fim=Number(item?.hora_fim||0);
     const dur=(fim>ini)?Math.round((fim-ini)/60000):(Math.max(5,parseInt(agendaSemanaState?.step||5,10)));
     agendaLegado.modalDuracao.value=String(dur);
   }
+  agendaLegadoSincronizarFimPorDuracao();
 }
 function agendaLegadoParseHora(value){
   const base=String(value||"").trim();
@@ -7102,6 +7604,13 @@ function agendaLegadoParseHora(value){
   const mm=Math.max(0,Math.min(59,parts[1]||0));
   return (hh*3600+mm*60)*1000;
 }
+function agendaLegadoSincronizarFimPorDuracao(){
+  if(!agendaLegado?.modalInicio||!agendaLegado?.modalDuracao||!agendaLegado?.modalFim)return;
+  const inicio=agendaLegadoParseHora(agendaLegado.modalInicio.value);
+  const duracao=Math.max(5,parseInt(agendaLegado.modalDuracao.value||"0",10)||0);
+  if(inicio<=0||duracao<=0)return;
+  agendaLegado.modalFim.value=agendaLegadoFmtHora(inicio+(duracao*60*1000));
+}
 function agendaLegadoModalPayload(){
   const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
   const prestadorOrigem=Number(agendaLegado?.modalBackdrop?.dataset?.prestadorId||0)||0;
@@ -7110,38 +7619,47 @@ function agendaLegadoModalPayload(){
   const unidadeFiltro=Number(agendaLegado?.selectUnidade?.value||0)||0;
   const inicio=agendaLegadoParseHora(agendaLegado.modalInicio.value);
   let fim=agendaLegadoParseHora(agendaLegado.modalFim.value)||null;
-  const duracao=Math.max(0,parseInt(agendaLegado?.modalDuracao?.value||"0",10)||0);
-  if(duracao>0&&(!fim||fim<=inicio)){
+  const duracao=Math.max(5,parseInt(agendaLegado?.modalDuracao?.value||"0",10)||0);
+  if(duracao>0){
     fim=inicio+(duracao*60*1000);
   }
+  const salaValor=Math.max(1,parseInt(agendaLegado?.modalSala?.value||"1",10)||1);
+  const tipoValor=agendaLegadoNumOrNull(agendaLegado?.modalTipo?.value);
+  if(typeof agendaLegadoSincronizarVinculoComNome==="function"){
+    agendaLegadoSincronizarVinculoComNome(String(agendaLegado?.modalNome?.value||""));
+  }
+  const nroPacVinculado=Number(agendaLegado?.modalNroPac||0)||0;
+  const nroPacPayload=(tipoValor===2)?null:(nroPacVinculado>0?nroPacVinculado:null);
   return{
-    data:String(agendaLegado.modalData.value||"").trim(),
+    data:agendaLegadoParseDataInput(agendaLegado.modalData.value),
     hora_inicio:inicio,
     hora_fim:fim,
-    sala:agendaLegadoNumOrNull(agendaLegado?.modalSala?.value),
-    tipo:agendaLegadoNumOrNull(agendaLegado?.modalTipo?.value),
-    nro_pac:null,
+    sala:salaValor,
+    tipo:tipoValor,
+    nro_pac:nroPacPayload,
     nome:String(agendaLegado.modalNome.value||"").trim(),
     status:agendaLegadoNumOrNull(agendaLegado?.modalStatus?.value),
     observ:String(agendaLegado?.modalObserv?.value||"").trim(),
-    tip_fone1:agendaLegadoNumOrNull(agendaLegado?.modalTipFone1?.value),
+    tip_fone1:agendaLegadoTipoFoneTextoParaCodigo(agendaLegado?.modalTipFone1?.value),
     fone1:String(agendaLegado.modalTelefone.value||"").trim(),
-    tip_fone2:agendaLegadoNumOrNull(agendaLegado?.modalTipFone2?.value),
+    tip_fone2:agendaLegadoTipoFoneTextoParaCodigo(agendaLegado?.modalTipFone2?.value),
     fone2:String(agendaLegado?.modalFone2?.value||"").trim(),
-    tip_fone3:agendaLegadoNumOrNull(agendaLegado?.modalTipFone3?.value),
+    tip_fone3:agendaLegadoTipoFoneTextoParaCodigo(agendaLegado?.modalTipFone3?.value),
     fone3:String(agendaLegado?.modalFone3?.value||"").trim(),
     motivo:String(agendaLegado.modalMotivo.value||"").trim(),
     id_prestador:(origem==="agenda-semana"?prestadorOrigem:prestadorFiltro)||null,
     id_unidade:(origem==="agenda-semana"?unidadeOrigem:unidadeFiltro)||null
   };
 }
-function agendaLegadoAbrirModal(modo){
+async function agendaLegadoAbrirModal(modo){
   if(!agendaLegado)return;
+  agendaLegadoFecharDialogNomeNaoEncontrado();
   if(agendaLegado.modalBackdrop){
     delete agendaLegado.modalBackdrop.dataset.origem;
     delete agendaLegado.modalBackdrop.dataset.prestadorId;
     delete agendaLegado.modalBackdrop.dataset.unidadeId;
   }
+  await agendaLegadoRecarregarStatus();
   agendaLegado.modalBackdrop.classList.remove("hidden");
   if(modo==="editar"){
     const item=agendaLegadoSelecionado();
@@ -7154,9 +7672,12 @@ function agendaLegadoAbrirModal(modo){
   }
 }
 function agendaLegadoFecharModal(){
+  agendaLegadoFecharDialogNomeNaoEncontrado();
   if(agendaLegado?.modalBackdrop)agendaLegado.modalBackdrop.classList.add("hidden");
 }
 async function agendaLegadoSalvarModal(){
+  const nomeResolvido=await agendaLegadoResolverNomeModal();
+  if(!nomeResolvido)return;
   const origem=String(agendaLegado?.modalBackdrop?.dataset?.origem||"").trim();
   const forceNovo=String(agendaLegado?.modalBackdrop?.dataset?.forceNovo||"").trim()==="1";
   const payload=agendaLegadoModalPayload();
@@ -7216,7 +7737,7 @@ async function agendaLegadoCarregar(){
 async function agendaLegadoCarregarProximo(){
   const{res,data}=await requestJson("GET","/agenda-legado/next",undefined,true);
   if(!res.ok){
-    footerMsg.textContent=data.detail||"Falha ao buscar prÃ³ximo agendamento.";
+    footerMsg.textContent=data.detail||"Falha ao buscar prÃƒÂ³ximo agendamento.";
     return;
   }
   if(!data){
@@ -7228,37 +7749,100 @@ async function agendaLegadoCarregarProximo(){
 async function agendaLegadoCarregarCombos(){
   const{res:resPrest,data:prest}=await requestJson("GET","/agenda-legado/prestadores",undefined,true);
   const{res:resUnid,data:unids}=await requestJson("GET","/agenda-legado/unidades",undefined,true);
-  const{res:resStatus,data:statusData}=await requestJson("GET","/agenda-legado/status-agendamento",undefined,true);
   const{res:resTipoFone,data:tiposFoneData}=await requestJson("GET","/agenda-legado/tipos-fone",undefined,true);
   const prestadores=resPrest.ok&&Array.isArray(prest)?prest:[];
   const unidades=resUnid.ok&&Array.isArray(unids)?unids:[];
-  agendaLegadoStatusCache=resStatus.ok&&Array.isArray(statusData)?statusData:[];
+  agendaLegadoStatusCache=await agendaLegadoBuscarStatusAuxiliares();
   agendaLegadoTiposContatoCache=resTipoFone.ok&&Array.isArray(tiposFoneData)?tiposFoneData:[];
   agendaLegado.selectPrestador.innerHTML='<option value="">Todos</option>'+prestadores.map(p=>`<option value="${p.id}">${esc(p.nome||"")}</option>`).join("");
   agendaLegado.selectUnidade.innerHTML='<option value="">Todas</option>'+unidades.map(u=>`<option value="${u.id}">${esc(u.nome||"")}</option>`).join("");
-  agendaLegadoRenderAuxSelect(agendaLegado.modalStatus,agendaLegadoStatusCache,"(sem situação)");
-  agendaLegadoRenderAuxSelect(agendaLegado.modalTipFone1,agendaLegadoTiposContatoCache,"(tipo)");
-  agendaLegadoRenderAuxSelect(agendaLegado.modalTipFone2,agendaLegadoTiposContatoCache,"(tipo)");
-  agendaLegadoRenderAuxSelect(agendaLegado.modalTipFone3,agendaLegadoTiposContatoCache,"(tipo)");
+  agendaLegadoRenderAuxSelect(agendaLegado.modalStatus,agendaLegadoStatusCache,"");
+  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone1,"Residencial");
+  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone2,"Comercial");
+  agendaLegadoSetPhoneTypeOptions(agendaLegado.modalTipFone3,"Celular");
+}
+async function agendaLegadoBuscarStatusAuxiliares(){
+  const normalizar=(lista)=>{
+    if(!Array.isArray(lista))return [];
+    return lista.map(item=>{
+      const codigo=String(item?.codigo??"").trim();
+      const valorCodigo=Number.isFinite(Number(codigo))?Math.trunc(Number(codigo)):null;
+      const ordemNum=item?.ordem==null?null:Math.trunc(Number(item.ordem));
+      const valorInt=item?.valor_int!=null?Math.trunc(Number(item.valor_int)):(valorCodigo!=null?valorCodigo:ordemNum);
+      return {
+        id:Number(item?.id||0)||0,
+        codigo,
+        descricao:String(item?.descricao||item?.nome||codigo||"").trim(),
+        ordem:ordemNum,
+        valor_int:Number.isFinite(valorInt)?valorInt:null,
+        cor_apresentacao:agendaLegadoNormalizarHexCor(item?.cor_apresentacao||item?.cor||item?.color)
+      };
+    }).filter(item=>item.descricao&&(item.valor_int!=null||item.codigo));
+  };
+  try{
+    const{res,data}=await requestJson("GET","/agenda-legado/status-agendamento",undefined,true);
+    if(res.ok&&Array.isArray(data)&&data.length)return normalizar(data);
+  }catch{}
+  try{
+    const tipo=encodeURIComponent("Situação do agendamento");
+    const{res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${tipo}`,undefined,true);
+    if(res.ok&&Array.isArray(data)&&data.length)return normalizar(data);
+  }catch{}
+  return [];
+}
+function agendaLegadoNormalizarHexCor(value){
+  const raw=String(value??"").trim();
+  if(!raw)return"";
+  const hex=raw.replace(/^0x/i,"").replace(/^#/,"");
+  const withHash=`#${hex}`;
+  if(/^#[0-9a-fA-F]{6}$/.test(withHash))return withHash.toLowerCase();
+  if(typeof auxCorApresentacaoHexPorLabel==="function"){
+    const porLabel=auxCorApresentacaoHexPorLabel(raw);
+    if(porLabel)return porLabel;
+  }
+  return"";
+}
+function agendaLegadoCorPorStatusValor(statusValor){
+  const raw=String(statusValor??"").trim();
+  if(!raw)return"";
+  const alvoNum=Number(raw);
+  const alvoInt=Number.isFinite(alvoNum)?Math.trunc(alvoNum):null;
+  const item=(Array.isArray(agendaLegadoStatusCache)?agendaLegadoStatusCache:[]).find(st=>{
+    const idInt=Math.trunc(Number(st?.id));
+    if(alvoInt!=null&&Number.isFinite(idInt)&&idInt===alvoInt)return true;
+    const valorInt=Math.trunc(Number(st?.valor_int));
+    if(alvoInt!=null&&Number.isFinite(valorInt)&&valorInt===alvoInt)return true;
+    const codigoTxt=String(st?.codigo??"").trim();
+    if(codigoTxt&&codigoTxt===raw)return true;
+    const codigoInt=Math.trunc(Number(codigoTxt));
+    return alvoInt!=null&&Number.isFinite(codigoInt)&&codigoInt===alvoInt;
+  });
+  return agendaLegadoNormalizarHexCor(item?.cor_apresentacao);
+}
+async function agendaLegadoRecarregarStatus(){
+  const valorAtual=String(agendaLegado?.modalStatus?.value??"").trim();
+  agendaLegadoStatusCache=await agendaLegadoBuscarStatusAuxiliares();
+  agendaLegadoRenderAuxSelect(agendaLegado?.modalStatus,agendaLegadoStatusCache,"");
+  if(!agendaLegado?.modalStatus)return;
+  if(valorAtual&&agendaLegadoStatusCache.some(item=>String(item?.valor_int??"").trim()===valorAtual)){
+    agendaLegado.modalStatus.value=valorAtual;
+  }
 }
 let agendaLegadoPacientesCache=[];
 let agendaLegadoPacientesMap=new Map();
+let agendaLegadoPacientesByIdMap=new Map();
+let agendaLegadoContatosPacientesCarregados=false;
 async function agendaLegadoCarregarContatos(){
-  const agendaLegadoNomeKey=(nome)=>{
-    let t=String(nome||"").trim().toLowerCase();
-    if(!t)return"";
-    t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-    t=t.replace(/\s+/g," ");
-    return t;
-  };
   const{res,data}=await requestJson("GET","/agenda-contatos?limit=5000",undefined,true);
   const{res:resPac,data:pacData}=await requestJson("GET","/agenda-legado/pacientes?limit=5000",undefined,true);
   const contatos=res.ok&&Array.isArray(data)?data:[];
   const pacientes=resPac.ok&&Array.isArray(pacData)?pacData:[];
+  agendaLegadoContatosPacientesCarregados=!!(res.ok&&Array.isArray(data)&&resPac.ok&&Array.isArray(pacData));
   agendaLegadoContatosCache=contatos;
   agendaLegadoPacientesCache=pacientes;
   agendaLegadoContatosMap=new Map();
   agendaLegadoPacientesMap=new Map();
+  agendaLegadoPacientesByIdMap=new Map();
   const list=document.getElementById("agenda-legado-contatos");
   if(list){
     const datalist=[];
@@ -7274,21 +7858,31 @@ async function agendaLegadoCarregarContatos(){
       const key=agendaLegadoNomeKey(nome);
       if(!nome||!key)return;
       if(!agendaLegadoPacientesMap.has(key))agendaLegadoPacientesMap.set(key,p);
+      const nroPac=Number(p?.id||0)||0;
+      if(nroPac>0&&!agendaLegadoPacientesByIdMap.has(nroPac))agendaLegadoPacientesByIdMap.set(nroPac,p);
       datalist.push(`<option value="${esc(nome)}"></option>`);
     });
     list.innerHTML=[...new Set(datalist)].join("");
   }
 }
-function agendaLegadoAplicarContato(nome){
-  const nomeKey=((raw)=>{
-    let t=String(raw||"").trim().toLowerCase();
-    if(!t)return"";
-    t=t.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
-    t=t.replace(/\s+/g," ");
-    return t;
-  })(nome);
-  if(!nomeKey)return;
-  const item=agendaLegadoContatosMap.get(nomeKey)||agendaLegadoPacientesMap.get(nomeKey)||null;
+async function agendaLegadoGarantirContatosCarregados(){
+  if(agendaLegadoContatosPacientesCarregados)return;
+  await agendaLegadoCarregarContatos();
+}
+function agendaLegadoDadosTelefoneNormalizado(item,idx){
+  const sufixo=String(idx||"").trim();
+  const numero=String(item?.[`tel${sufixo}`]??item?.[`fone${sufixo}`]??"").trim();
+  const tipo=String(item?.[`tel${sufixo}_tipo`]??item?.[`tipo_fone${sufixo}`]??"").trim();
+  return {numero,tipo};
+}
+function agendaLegadoAplicarContato(nome,nroPac=null){
+  const nroPacNum=Number((nroPac??agendaLegado?.modalNroPac??0))||0;
+  let item=nroPacNum>0?(agendaLegadoPacientesByIdMap.get(nroPacNum)||null):null;
+  if(!item){
+    const nomeKey=agendaLegadoNomeKey(nome);
+    if(!nomeKey)return;
+    item=agendaLegadoContatosMap.get(nomeKey)||agendaLegadoPacientesMap.get(nomeKey)||null;
+  }
   if(!item)return;
   const normalizarTipoFone=(v)=>{
     let t=String(v||"").trim();
@@ -7308,15 +7902,18 @@ function agendaLegadoAplicarContato(nome){
     if(t.startsWith("recado")||t.startsWith("outro"))return"5";
     return"";
   };
-  if(item.tel1)agendaLegado.modalTelefone.value=item.tel1;
-  if(item.tel2&&agendaLegado.modalFone2)agendaLegado.modalFone2.value=item.tel2;
-  if(item.tel3&&agendaLegado.modalFone3)agendaLegado.modalFone3.value=item.tel3;
-  const tipo1=normalizarTipoFone(item.tel1_tipo);
-  const tipo2=normalizarTipoFone(item.tel2_tipo);
-  const tipo3=normalizarTipoFone(item.tel3_tipo);
-  if(tipo1&&agendaLegado.modalTipFone1)agendaLegado.modalTipFone1.value=tipo1;
-  if(tipo2&&agendaLegado.modalTipFone2)agendaLegado.modalTipFone2.value=tipo2;
-  if(tipo3&&agendaLegado.modalTipFone3)agendaLegado.modalTipFone3.value=tipo3;
+  const f1=agendaLegadoDadosTelefoneNormalizado(item,1);
+  const f2=agendaLegadoDadosTelefoneNormalizado(item,2);
+  const f3=agendaLegadoDadosTelefoneNormalizado(item,3);
+  if(agendaLegado.modalTelefone)agendaLegado.modalTelefone.value=f1.numero;
+  if(agendaLegado.modalFone2)agendaLegado.modalFone2.value=f2.numero;
+  if(agendaLegado.modalFone3)agendaLegado.modalFone3.value=f3.numero;
+  const tipo1=normalizarTipoFone(f1.tipo);
+  const tipo2=normalizarTipoFone(f2.tipo);
+  const tipo3=normalizarTipoFone(f3.tipo);
+  if(tipo1&&agendaLegado.modalTipFone1)agendaLegado.modalTipFone1.value=agendaLegadoTipoFoneCodigoParaTexto(tipo1);
+  if(tipo2&&agendaLegado.modalTipFone2)agendaLegado.modalTipFone2.value=agendaLegadoTipoFoneCodigoParaTexto(tipo2);
+  if(tipo3&&agendaLegado.modalTipFone3)agendaLegado.modalTipFone3.value=agendaLegadoTipoFoneCodigoParaTexto(tipo3);
 }
 function agendaLegadoVincularEventos(){
   if(!agendaLegado||agendaLegado.panel.dataset.bound==="1")return;
@@ -7337,9 +7934,53 @@ function agendaLegadoVincularEventos(){
   agendaLegado.modalOk.addEventListener("click",agendaLegadoSalvarModal);
   if(agendaLegado.modalNovo)agendaLegado.modalNovo.addEventListener("click",()=>agendaLegadoAbrirModal("novo"));
   if(agendaLegado.modalElimina)agendaLegado.modalElimina.addEventListener("click",agendaLegadoExcluir);
-  agendaLegado.modalNome.addEventListener("input",ev=>agendaLegadoAplicarContato(ev.target.value));
-  agendaLegado.modalNome.addEventListener("change",ev=>agendaLegadoAplicarContato(ev.target.value));
-  agendaLegado.modalNome.addEventListener("blur",ev=>agendaLegadoAplicarContato(ev.target.value));
+  if(agendaLegado.modalTipo)agendaLegado.modalTipo.addEventListener("change",agendaLegadoAplicarBloqueioPorTipo);
+  const syncFimFromDuracao=()=>{
+    if(agendaLegado?.modalDuracao){
+      const dur=Math.max(5,parseInt(agendaLegado.modalDuracao.value||"0",10)||0);
+      agendaLegado.modalDuracao.value=String(dur);
+    }
+    agendaLegadoSincronizarFimPorDuracao();
+  };
+  if(agendaLegado.modalDuracao){
+    agendaLegado.modalDuracao.addEventListener("input",syncFimFromDuracao);
+    agendaLegado.modalDuracao.addEventListener("change",syncFimFromDuracao);
+    agendaLegado.modalDuracao.addEventListener("blur",syncFimFromDuracao);
+  }
+  if(agendaLegado.modalInicio){
+    agendaLegado.modalInicio.addEventListener("input",syncFimFromDuracao);
+    agendaLegado.modalInicio.addEventListener("change",syncFimFromDuracao);
+    agendaLegado.modalInicio.addEventListener("blur",syncFimFromDuracao);
+  }
+  agendaLegado.modalNome.addEventListener("input",ev=>{
+    agendaLegadoAplicarContato(ev.target.value,agendaLegado?.modalNroPac);
+    agendaLegadoSincronizarVinculoComNome(ev.target.value);
+    const atual=String(ev?.target?.value||"").trim();
+    if(atual.toLowerCase()!==agendaLegadoNomeUltimoPrompt.toLowerCase())agendaLegadoNomeUltimoPrompt="";
+    const key=agendaLegadoNomeKey(atual);
+    if(key!==agendaLegadoNomeConfirmadoComoLivre)agendaLegadoNomeConfirmadoComoLivre="";
+  });
+  agendaLegado.modalNome.addEventListener("change",ev=>{
+    agendaLegadoAplicarContato(ev.target.value,agendaLegado?.modalNroPac);
+    agendaLegadoSincronizarVinculoComNome(ev.target.value);
+    agendaLegadoAvaliarNomeDigitadoParaDialogo(ev.target.value);
+  });
+  agendaLegado.modalNome.addEventListener("blur",ev=>{
+    agendaLegadoAplicarContato(ev.target.value,agendaLegado?.modalNroPac);
+    agendaLegadoSincronizarVinculoComNome(ev.target.value);
+    agendaLegadoAvaliarNomeDigitadoParaDialogo(ev.target.value);
+  });
+  agendaLegado.modalNome.addEventListener("keydown",async ev=>{
+    if(ev.key!=="Enter"&&ev.key!=="Tab")return;
+    const ok=await agendaLegadoResolverNomeModal();
+    if(!ok){
+      ev.preventDefault();
+      return;
+    }
+    if(ev.key==="Enter"){
+      ev.preventDefault();
+    }
+  });
   if(agendaLegado.modalBackdrop)agendaLegado.modalBackdrop.addEventListener("click",ev=>{if(ev.target===agendaLegado.modalBackdrop)agendaLegadoFecharModal()});
 }
 async function agendaLegadoAbrir(range){
@@ -7364,7 +8005,7 @@ function agendaSemanaEnsureUI(){
   if(agendaSemana)return;
   const style=document.createElement("style");
   style.textContent=`
-.agenda-semana-panel{width:min(1180px,100%);min-height:0;height:fit-content;align-self:start;padding:0;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif;position:relative;display:flex;flex-direction:column}
+.agenda-semana-panel{width:min(1180px,100%);height:auto;min-height:60vh;align-self:start;padding:0;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif;position:relative;display:flex;flex-direction:column}
 .agenda-semana-panel .panel-standard-header{display:flex;align-items:center;gap:8px;padding-right:6px}
 .agenda-semana-panel .panel-standard-title{flex:1}
 .agenda-semana-win-controls{display:flex;align-items:center;gap:4px;margin-left:auto}
@@ -7376,21 +8017,21 @@ function agendaSemanaEnsureUI(){
 .agenda-semana-panel.agenda-semana-max{width:calc(100% - 20px);height:calc(100% - 20px);max-width:none;max-height:none;align-self:stretch}
 .agenda-semana-panel.agenda-semana-max .agenda-semana-grid{flex:1;display:flex;flex-direction:column}
 .agenda-semana-panel.agenda-semana-max .agenda-semana-scroll{max-height:none;flex:1}
+.agenda-semana-panel .form-grid{display:grid;gap:6px 10px;align-items:end}
+.agenda-semana-panel .form-group{display:grid;grid-template-rows:auto 24px;align-items:end;min-width:0}
+.agenda-semana-panel .form-group label{display:block;line-height:16px;margin:0 0 2px;white-space:nowrap;font:12px Tahoma,sans-serif}
+.agenda-semana-panel .form-group select,.agenda-semana-panel .form-group input{height:24px;border:1px solid #bfc9d6;background:#fff;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif;min-width:0}
 .agenda-semana-toolbar{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;margin:0 0 6px;padding:2px 0 4px;border-bottom:1px solid #cfd8e3;overflow-x:auto;white-space:nowrap}
-.agenda-semana-navgroup{display:inline-flex;align-items:center;gap:2px}
+.agenda-semana-navgroup,.agenda-semana-navgroup.form-inline-group{display:inline-flex;align-items:center;gap:2px}
 .agenda-semana-navgroup button{height:20px;min-width:20px;border:1px solid #a8b8cd;border-radius:50%;background:#eaf3ff;color:#2d5d9a;cursor:pointer;font:11px Tahoma,sans-serif;line-height:18px;padding:0}
 .agenda-semana-navgroup button:hover{background:#dcecff}
 .agenda-semana-navlabel{padding:0 2px;font-weight:400;min-width:auto}
 .agenda-semana-cal-btn,.agenda-semana-actions .materiais-btn{height:22px;border:1px solid #b8c7da;border-radius:4px;background:#f7f8fb;cursor:pointer;padding:0 6px;display:inline-flex;align-items:center;gap:4px;font:12px Tahoma,sans-serif;white-space:nowrap}
 .agenda-semana-cal-btn img,.agenda-semana-actions .materiais-btn img{width:14px;height:14px}
-.agenda-semana-actions{display:inline-flex;gap:4px;align-items:center;flex-wrap:nowrap}
-.agenda-semana-filters{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;margin:2px 0 4px;padding:0}
-.agenda-semana-filter-item{display:flex;align-items:center;gap:4px;min-width:0}
-.agenda-semana-filter-item label{display:inline-block;margin:0;white-space:nowrap;font:12px Tahoma,sans-serif}
-.agenda-semana-filter-item select{height:22px;border:1px solid #bfc9d6;border-radius:2px;padding:0 4px;font:12px Tahoma,sans-serif;background:#fff}
-#agenda-semana-especialidade{width:210px;min-width:210px}
-#agenda-semana-prestador{width:230px;min-width:230px}
-#agenda-semana-unidade{width:250px;min-width:250px}
+.agenda-semana-actions,.agenda-semana-actions.form-actions{display:inline-flex;gap:4px;align-items:center;flex-wrap:nowrap}
+.agenda-semana-filters,.agenda-semana-filters.form-grid{grid-template-columns:210px 230px 250px;margin:2px 0 4px;padding:0}
+.agenda-semana-filter-item{min-width:0}
+#agenda-semana-especialidade,#agenda-semana-prestador,#agenda-semana-unidade{width:100%;min-width:0}
 .agenda-semana-tabs{display:flex;gap:0;margin:0 0 6px}
 .agenda-semana-tab{height:24px;border:1px solid #bfc9d6;border-bottom:none;border-radius:0;padding:0 12px;background:#f5f5f5;cursor:pointer;font:12px Tahoma,sans-serif;margin-right:2px}
 .agenda-semana-tab.active{background:#fff;font-weight:400}
@@ -7405,7 +8046,11 @@ function agendaSemanaEnsureUI(){
 .agenda-semana-days{flex:1;display:grid;grid-template-columns:repeat(6,minmax(0,1fr))}
 .agenda-semana-day{position:relative;border-left:1px solid #e3e7ee;background-image:linear-gradient(#edf1f6 1px,transparent 1px);background-size:100% var(--slot-height,22px)}
 .agenda-semana-day:last-child{border-right:1px solid #e3e7ee}
-.agenda-semana-event{position:absolute;left:2px;right:2px;border:1px solid rgba(0,0,0,.35);border-radius:3px;padding:2px 3px;box-sizing:border-box;white-space:pre-line;overflow:hidden}
+.agenda-semana-event{position:absolute;left:2px;right:2px;border:1px solid rgba(0,0,0,.4);border-radius:1px;padding:1px 2px;box-sizing:border-box;overflow:hidden;line-height:1.05}
+.agenda-semana-event .linha{display:block;margin:0;padding:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agenda-semana-event .linha-1{font-weight:700}
+.agenda-semana-event .linha-2{font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:break-word;line-height:1.08}
+.agenda-semana-event .linha-3,.agenda-semana-event .linha-4{font-size:.92em;opacity:.9}
 .agenda-semana-event small{display:block;font-size:10px}
 .agenda-semana-cal{position:absolute;top:60px;left:140px;min-width:220px;background:#f6f6f6;border:1px solid #bfc9d6;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:6px;z-index:1200}
 .agenda-semana-cal.hidden{display:none}
@@ -7422,7 +8067,7 @@ function agendaSemanaEnsureUI(){
 .agenda-semana-resizer:hover{opacity:1}
 `;
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-semana-panel" class="agenda-semana-panel hidden"><div class="panel-title">Agenda</div><div class="agenda-semana-body"><div class="agenda-semana-toolbar"><div class="agenda-semana-navgroup"><button id="agenda-semana-mes-prev" type="button">&lt;</button><div id="agenda-semana-mes-label" class="agenda-semana-navlabel">Mês</div><button id="agenda-semana-mes-next" type="button">&gt;</button></div><div class="agenda-semana-navgroup"><button id="agenda-semana-semana-prev" type="button">&lt;</button><div id="agenda-semana-semana-label" class="agenda-semana-navlabel">Semana</div><button id="agenda-semana-semana-next" type="button">&gt;</button></div><div class="agenda-semana-navgroup"><button id="agenda-semana-dia-prev" type="button">&lt;</button><div id="agenda-semana-dia-label" class="agenda-semana-navlabel">Dia</div><button id="agenda-semana-dia-next" type="button">&gt;</button></div><button id="agenda-semana-btn-cal" class="agenda-semana-cal-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">Calendário</button><div class="agenda-semana-actions"><button id="agenda-semana-btn-paciente" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Paciente...</button><button id="agenda-semana-btn-horario" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Horário...</button><button id="agenda-semana-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprimir agenda</button><button id="agenda-semana-btn-aviso" class="materiais-btn" type="button"><img src="/desktop-assets/whatsapp.png" alt="">Envio de aviso</button><button id="agenda-semana-btn-publicar" class="materiais-btn" type="button"><img src="/desktop-assets/backup.png" alt="">Publicação MyEasy</button><button id="agenda-semana-btn-config" class="materiais-btn" type="button"><img src="/desktop-assets/config.png" alt="">Configura...</button><button id="agenda-semana-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div id="agenda-semana-cal" class="agenda-semana-cal hidden"><div class="agenda-semana-cal-head"><button id="agenda-semana-cal-prev" type="button">&lt;</button><div id="agenda-semana-cal-title" class="agenda-semana-cal-title">abril de 2026</div><button id="agenda-semana-cal-next" type="button">&gt;</button></div><div id="agenda-semana-cal-grid" class="agenda-semana-cal-grid"></div></div><div class="agenda-semana-filters"><div class="agenda-semana-filter-item"><label for="agenda-semana-especialidade">Especialidade:</label><select id="agenda-semana-especialidade"></select></div><div class="agenda-semana-filter-item"><label for="agenda-semana-prestador">Cirurgião:</label><select id="agenda-semana-prestador"></select></div><div class="agenda-semana-filter-item"><label for="agenda-semana-unidade">Unidade:</label><select id="agenda-semana-unidade"></select></div></div><div class="agenda-semana-tabs"><button id="agenda-semana-tab-dia" class="agenda-semana-tab" type="button">Dia</button><button id="agenda-semana-tab-semana" class="agenda-semana-tab active" type="button">Semana</button><button id="agenda-semana-tab-clinica" class="agenda-semana-tab" type="button">Clínica</button></div><div class="agenda-semana-grid"><div class="agenda-semana-head"><div class="agenda-semana-time-head"></div><div id="agenda-semana-day-heads" class="agenda-semana-day-heads"></div></div><div class="agenda-semana-scroll"><div id="agenda-semana-time-col" class="agenda-semana-time-col"></div><div id="agenda-semana-days" class="agenda-semana-days"></div></div></div></div><div id="agenda-semana-resizer" class="agenda-semana-resizer" title="Redimensionar"></div></section>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="agenda-semana-panel" class="agenda-semana-panel hidden"><div class="panel-title">Agenda</div><div class="agenda-semana-body"><div class="agenda-semana-toolbar"><div class="agenda-semana-navgroup form-inline-group"><button id="agenda-semana-mes-prev" type="button">&lt;</button><div id="agenda-semana-mes-label" class="agenda-semana-navlabel">MÃªs</div><button id="agenda-semana-mes-next" type="button">&gt;</button></div><div class="agenda-semana-navgroup form-inline-group"><button id="agenda-semana-semana-prev" type="button">&lt;</button><div id="agenda-semana-semana-label" class="agenda-semana-navlabel">Semana</div><button id="agenda-semana-semana-next" type="button">&gt;</button></div><div class="agenda-semana-navgroup form-inline-group"><button id="agenda-semana-dia-prev" type="button">&lt;</button><div id="agenda-semana-dia-label" class="agenda-semana-navlabel">Dia</div><button id="agenda-semana-dia-next" type="button">&gt;</button></div><button id="agenda-semana-btn-cal" class="agenda-semana-cal-btn" type="button"><img src="/desktop-assets/tabela.png" alt="">CalendÃ¡rio</button><div class="agenda-semana-actions form-actions"><button id="agenda-semana-btn-paciente" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Paciente...</button><button id="agenda-semana-btn-horario" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">HorÃ¡rio...</button><button id="agenda-semana-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprimir agenda</button><button id="agenda-semana-btn-aviso" class="materiais-btn" type="button"><img src="/desktop-assets/whatsapp.png" alt="">Envio de aviso</button><button id="agenda-semana-btn-publicar" class="materiais-btn" type="button"><img src="/desktop-assets/backup.png" alt="">PublicaÃ§Ã£o MyEasy</button><button id="agenda-semana-btn-config" class="materiais-btn" type="button"><img src="/desktop-assets/config.png" alt="">Configura...</button><button id="agenda-semana-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div id="agenda-semana-cal" class="agenda-semana-cal hidden"><div class="agenda-semana-cal-head"><button id="agenda-semana-cal-prev" type="button">&lt;</button><div id="agenda-semana-cal-title" class="agenda-semana-cal-title">abril de 2026</div><button id="agenda-semana-cal-next" type="button">&gt;</button></div><div id="agenda-semana-cal-grid" class="agenda-semana-cal-grid"></div></div><div class="agenda-semana-filters form-grid"><div class="agenda-semana-filter-item form-group"><label for="agenda-semana-especialidade">Especialidade:</label><select id="agenda-semana-especialidade"></select></div><div class="agenda-semana-filter-item form-group"><label for="agenda-semana-prestador">CirurgiÃ£o:</label><select id="agenda-semana-prestador"></select></div><div class="agenda-semana-filter-item form-group"><label for="agenda-semana-unidade">Unidade:</label><select id="agenda-semana-unidade"></select></div></div><div class="agenda-semana-tabs"><button id="agenda-semana-tab-dia" class="agenda-semana-tab" type="button">Dia</button><button id="agenda-semana-tab-semana" class="agenda-semana-tab active" type="button">Semana</button><button id="agenda-semana-tab-clinica" class="agenda-semana-tab" type="button">ClÃ­nica</button></div><div class="agenda-semana-grid"><div class="agenda-semana-head"><div class="agenda-semana-time-head"></div><div id="agenda-semana-day-heads" class="agenda-semana-day-heads"></div></div><div class="agenda-semana-scroll"><div id="agenda-semana-time-col" class="agenda-semana-time-col"></div><div id="agenda-semana-days" class="agenda-semana-days"></div></div></div></div><div id="agenda-semana-resizer" class="agenda-semana-resizer" title="Redimensionar"></div></section>`);
   agendaSemana={
     panel:document.getElementById("agenda-semana-panel"),
     body:document.querySelector("#agenda-semana-panel .agenda-semana-body"),
@@ -7640,6 +8285,178 @@ function agendaSemanaTabAtivar(tab){
   if(!agendaSemana)return;
   const map={dia:agendaSemana.tabDia,semana:agendaSemana.tabSemana,clinica:agendaSemana.tabClinica};
   Object.entries(map).forEach(([key,btn])=>{if(btn)btn.classList.toggle("active",key===tab)});
+  agendaSemanaAplicarAlturaScroll();
+}
+// AGENDA_DIAG_TEMP: logs temporarios para diagnostico da primeira abertura.
+function agendaSemanaDiagAtivo(){
+  return !!agendaSemanaState?._diagEnabled;
+}
+function agendaSemanaDiagIniciarSeNecessario(){
+  if(agendaSemanaState?._diagInitialized)return;
+  agendaSemanaState._diagInitialized=true;
+  agendaSemanaState._diagEnabled=true;
+  agendaSemanaState._diagStartTs=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+}
+function agendaSemanaDiagSnapshot(){
+  const panelHidden=!!agendaSemana?.panel?.classList?.contains("hidden");
+  const panelRect=agendaSemana?.panel?.getBoundingClientRect?.();
+  const bodyRect=agendaSemana?.body?.getBoundingClientRect?.();
+  const scrollRect=agendaSemana?.scroll?.getBoundingClientRect?.();
+  let qtdVisivel=null;
+  try{
+    const cfg=agendaSemanaState?.config||agendaSemanaConfigAtual?.();
+    qtdVisivel=agendaSemanaQtdHorariosVisiveis(cfg);
+  }catch{qtdVisivel=null}
+  return{
+    panel_hidden:panelHidden,
+    panel_h:Math.round(Number(panelRect?.height||0)),
+    body_h:Math.round(Number(bodyRect?.height||0)),
+    scroll_h:Math.round(Number(scrollRect?.height||0)),
+    altura_util:Number(agendaSemanaState?._lastAlturaUtil||0),
+    slot_h:Number(agendaSemanaState?.slotHeight||0),
+    qtd_horarios_visiveis:Number(qtdVisivel||0),
+    linhas_timecol:Number(agendaSemana?.timeCol?.children?.length||0),
+    assinatura_tamanho:typeof agendaSemanaResizeSignature==="function"?agendaSemanaResizeSignature():"",
+  };
+}
+function agendaSemanaDiagLog(funcao,etapa,extra={}){
+  if(!agendaSemanaDiagAtivo())return;
+  const now=(typeof performance!=="undefined"&&performance.now)?performance.now():Date.now();
+  const start=Number(agendaSemanaState?._diagStartTs||now);
+  const t_rel_ms=Math.round(now-start);
+  const payload={t_rel_ms,funcao,etapa,...agendaSemanaDiagSnapshot(),...extra};
+  try{console.log("[AGENDA_DIAG_TEMP]",payload)}catch{}
+}
+function agendaSemanaQtdHorariosVisiveis(cfg){
+  const totalSlots=Math.max(1,Array.isArray(agendaSemanaSlots)?agendaSemanaSlots.length:1);
+  const toInt=(value,def)=>{
+    const n=Number(value);
+    if(!Number.isFinite(n))return def;
+    return Math.max(1,Math.trunc(n));
+  };
+  const semana=toInt(cfg?.semana_horarios,12);
+  const dia=toInt(cfg?.dia_horarios,12);
+  const tabDiaAtiva=!!agendaSemana?.tabDia?.classList?.contains("active");
+  const alvo=tabDiaAtiva?dia:semana;
+  return Math.max(1,Math.min(totalSlots,alvo));
+}
+function agendaSemanaAlturaDisponivelUtil(minHeight){
+  const minH=Math.max(1,Number(minHeight||1)||1);
+  if(!agendaSemana?.panel||!agendaSemana?.scroll)return minH;
+  const panelRect=agendaSemana.panel.getBoundingClientRect();
+  const scrollRect=agendaSemana.scroll.getBoundingClientRect();
+  const FOLGA_VISUAL=8;
+  const disponivel=Math.floor(panelRect.bottom-scrollRect.top-FOLGA_VISUAL);
+  agendaSemanaState._lastAlturaUtil=Math.max(minH,disponivel);
+  return Math.max(minH,disponivel);
+}
+function agendaSemanaAplicarAlturaScroll(){
+  agendaSemanaDiagLog("agendaSemanaAplicarAlturaScroll","before");
+  if(!agendaSemana?.scroll)return;
+  if(agendaSemana.panel?.classList?.contains("agenda-semana-max")){
+    agendaSemana.scroll.style.height="";
+    agendaSemana.scroll.style.maxHeight="";
+    agendaSemanaDiagLog("agendaSemanaAplicarAlturaScroll","after:max");
+    return;
+  }
+  const slotHeight=Math.max(1,Number(agendaSemanaState?.slotHeight||AGENDA_SEMANA_SLOT_HEIGHT)||AGENDA_SEMANA_SLOT_HEIGHT);
+  const cfg=agendaSemanaState?.config||agendaSemanaConfigAtual();
+  const qtdVisivel=agendaSemanaQtdHorariosVisiveis(cfg);
+  const alvoPorConfig=Math.max(slotHeight*3,Math.round(qtdVisivel*slotHeight));
+  const disponivelUtil=agendaSemanaAlturaDisponivelUtil(slotHeight*3);
+  const alturaFinal=Math.max(slotHeight*3,Math.min(disponivelUtil,alvoPorConfig));
+  agendaSemana.scroll.style.height=`${alturaFinal}px`;
+  agendaSemana.scroll.style.maxHeight=`${alturaFinal}px`;
+  agendaSemanaDiagLog("agendaSemanaAplicarAlturaScroll","after",{altura_final:alturaFinal,alvo_por_config:alvoPorConfig});
+}
+function agendaSemanaResizeSignature(){
+  if(!agendaSemana?.panel)return"";
+  const panel=agendaSemana.panel.getBoundingClientRect();
+  const body=agendaSemana?.body?.getBoundingClientRect?.();
+  const scroll=agendaSemana?.scroll?.getBoundingClientRect?.();
+  const pW=Math.round(Number(panel.width||0));
+  const pH=Math.round(Number(panel.height||0));
+  const bW=Math.round(Number(body?.width||0));
+  const bH=Math.round(Number(body?.height||0));
+  const sW=Math.round(Number(scroll?.width||0));
+  const sH=Math.round(Number(scroll?.height||0));
+  const tab=agendaSemana?.tabDia?.classList?.contains("active")?"dia":"semana";
+  return `${pW}x${pH}|${bW}x${bH}|${sW}x${sH}|${tab}`;
+}
+function agendaSemanaSincronizarRenderEstrutural(force=false){
+  agendaSemanaDiagLog("agendaSemanaSincronizarRenderEstrutural","call",{force});
+  if(!agendaSemana?.panel||agendaSemana.panel.classList.contains("hidden"))return;
+  const signature=agendaSemanaResizeSignature();
+  if(!force&&signature&&agendaSemanaState._lastResizeSignature===signature){
+    agendaSemanaDiagLog("agendaSemanaSincronizarRenderEstrutural","skip:signature",{force,signature});
+    return;
+  }
+  if(agendaSemanaState._resizeSyncRunning){
+    agendaSemanaState._resizeSyncPending=true;
+    agendaSemanaState._resizeSyncForce=!!(agendaSemanaState._resizeSyncForce||force);
+    agendaSemanaDiagLog("agendaSemanaSincronizarRenderEstrutural","pending",{force,signature});
+    return;
+  }
+  agendaSemanaState._resizeSyncRunning=true;
+  agendaSemanaState._resizeSyncPending=false;
+  agendaSemanaState._resizeSyncForce=false;
+  try{
+    agendaSemanaDiagLog("agendaSemanaSincronizarRenderEstrutural","before_render",{force,signature});
+    agendaSemanaRenderEstrutura(true);
+    agendaSemanaRenderEventos();
+    agendaSemanaState._lastResizeSignature=agendaSemanaResizeSignature();
+    agendaSemanaDiagLog("agendaSemanaSincronizarRenderEstrutural","after_render",{force,signature_final:agendaSemanaState._lastResizeSignature});
+  }finally{
+    agendaSemanaState._resizeSyncRunning=false;
+    if(agendaSemanaState._resizeSyncPending){
+      const nextForce=!!agendaSemanaState._resizeSyncForce;
+      agendaSemanaState._resizeSyncPending=false;
+      agendaSemanaState._resizeSyncForce=false;
+      agendaSemanaSincronizarRenderEstrutural(nextForce);
+    }
+  }
+}
+function agendaSemanaDesconectarResizeObserver(){
+  if(agendaSemanaState._resizeObserver){
+    try{agendaSemanaState._resizeObserver.disconnect()}catch{}
+    agendaSemanaState._resizeObserver=null;
+  }
+}
+function agendaSemanaConectarResizeObserver(){
+  if(typeof ResizeObserver==="undefined"||!agendaSemana?.panel)return;
+  agendaSemanaDesconectarResizeObserver();
+  const onResize=()=>{
+    agendaSemanaDiagLog("ResizeObserver","callback");
+    if(!agendaSemana?.panel||agendaSemana.panel.classList.contains("hidden")){
+      agendaSemanaDesconectarResizeObserver();
+      return;
+    }
+    agendaSemanaAgendarRecalculoVisual();
+  };
+  const observer=new ResizeObserver(onResize);
+  observer.observe(agendaSemana.panel);
+  if(agendaSemana.body)observer.observe(agendaSemana.body);
+  if(agendaSemana.scroll)observer.observe(agendaSemana.scroll);
+  agendaSemanaState._resizeObserver=observer;
+}
+function agendaSemanaAgendarRecalculoVisual(){
+  agendaSemanaDiagLog("agendaSemanaAgendarRecalculoVisual","call");
+  if(!agendaSemana?.panel||agendaSemana.panel.classList.contains("hidden"))return;
+  if(agendaSemanaState._alturaStableScheduled)return;
+  agendaSemanaState._alturaStableScheduled=true;
+  const token=Number(agendaSemanaState._alturaStableToken||0)+1;
+  agendaSemanaState._alturaStableToken=token;
+  window.requestAnimationFrame(()=>{
+    window.requestAnimationFrame(()=>{
+      if(Number(agendaSemanaState._alturaStableToken||0)!==token){
+        agendaSemanaState._alturaStableScheduled=false;
+        return;
+      }
+      agendaSemanaDiagLog("agendaSemanaAgendarRecalculoVisual","raf:execute",{token});
+      agendaSemanaSincronizarRenderEstrutural(false);
+      agendaSemanaState._alturaStableScheduled=false;
+    });
+  });
 }
 function agendaSemanaAtualizarTabs(){
   if(!agendaSemana)return;
@@ -7666,7 +8483,7 @@ function agendaSemanaCalendarioRender(){
   const offset=first.getDay();
   start.setDate(start.getDate()-offset);
   const cells=[];
-  const weekdays=["dom","seg","ter","qua","qui","sex","sÃ¡b"];
+  const weekdays=["dom","seg","ter","qua","qui","sex","sÃƒÂ¡b"];
   weekdays.forEach(w=>cells.push(`<div class="agenda-semana-cal-cell agenda-semana-cal-weekday">${w}</div>`));
   for(let i=0;i<42;i++){
     const d=new Date(start);
@@ -7833,6 +8650,22 @@ function agendaSemanaToIsoDate(dateObj){
   if(Number.isNaN(d.getTime()))return"";
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
+function agendaSemanaParseDataCivil(value){
+  const txt=String(value||"").trim();
+  if(!txt)return null;
+  const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(txt);
+  if(match){
+    const y=Number(match[1]);
+    const m=Number(match[2]);
+    const d=Number(match[3]);
+    if(!Number.isInteger(y)||!Number.isInteger(m)||!Number.isInteger(d))return null;
+    const localDate=new Date(y,m-1,d);
+    if(localDate.getFullYear()!==y||localDate.getMonth()!==(m-1)||localDate.getDate()!==d)return null;
+    return localDate;
+  }
+  const parsed=new Date(txt);
+  return Number.isNaN(parsed.getTime())?null:parsed;
+}
 function agendaSemanaMinToHHMM(totalMin){
   const n=Math.max(0,parseInt(totalMin||0,10));
   const hh=Math.floor(n/60);
@@ -7842,17 +8675,20 @@ function agendaSemanaMinToHHMM(totalMin){
 async function agendaSemanaAbrirModalNovo(dataIso,horaHHMM){
   agendaLegadoEnsureUI();
   agendaLegadoVincularEventos();
-  if(!Array.isArray(agendaLegadoContatosCache)||!agendaLegadoContatosCache.length){
-    try{await agendaLegadoCarregarContatos()}catch{}
-  }
+  try{
+    await agendaLegadoCarregarCombos();
+  }catch{}
+  try{await agendaLegadoGarantirContatosCarregados()}catch{}
   agendaLegadoSelId=null;
   agendaLegado.modalTitle.textContent="Novo agendamento";
   agendaLegadoModalPreencher({});
-  agendaLegado.modalData.value=String(dataIso||"");
+  agendaLegado.modalData.value=agendaLegadoFmtDataInput(String(dataIso||""));
   agendaLegado.modalInicio.value=String(horaHHMM||"");
   const passo=Math.max(5,parseInt(agendaSemanaState?.step||5,10));
   const [h,m]=String(horaHHMM||"00:00").split(":").map(v=>parseInt(v,10)||0);
+  if(agendaLegado.modalDuracao)agendaLegado.modalDuracao.value=String(passo);
   agendaLegado.modalFim.value=agendaSemanaMinToHHMM(h*60+m+passo);
+  agendaLegadoSincronizarFimPorDuracao();
   if(agendaLegado.modalBackdrop){
     agendaLegado.modalBackdrop.dataset.origem="agenda-semana";
     agendaLegado.modalBackdrop.dataset.forceNovo="1";
@@ -7869,8 +8705,32 @@ function agendaSemanaPrestadorSelecionado(){
 }
 function agendaSemanaConfigAtual(){
   const prest=agendaSemanaPrestadorSelecionado();
-  return agendaSemanaNormalizaConfig(prest?.agenda_config||{});
+  const cfg=agendaSemanaNormalizaConfig(prest?.agenda_config||{});
+  const coerceInt=(value,defaultValue,minValue)=>{
+    const n=Number(value);
+    if(!Number.isFinite(n))return defaultValue;
+    return Math.max(minValue,Math.trunc(n));
+  };
+  cfg.duracao=coerceInt(cfg.duracao,5,5);
+  cfg.semana_horarios=coerceInt(cfg.semana_horarios,12,1);
+  cfg.dia_horarios=coerceInt(cfg.dia_horarios,12,1);
+  return cfg;
 }
+async function agendaSemanaAplicarConfigPrestador(prestadorId,agendaConfig){
+  const id=Number(prestadorId||0)||0;
+  if(!id)return;
+  const lista=Array.isArray(agendaSemanaState?.prestadores)?agendaSemanaState.prestadores:[];
+  const idx=lista.findIndex(item=>Number(item?.id||0)===id);
+  if(idx>=0){
+    lista[idx]={...lista[idx],agenda_config:agendaSemanaNormalizaConfig(agendaConfig&&typeof agendaConfig==="object"?agendaConfig:{})};
+  }
+  const aberto=!!agendaSemana?.panel&&!agendaSemana.panel.classList.contains("hidden");
+  const selecionado=Number(agendaSemana?.selectPrestador?.value||0)||0;
+  if(!aberto||selecionado!==id)return;
+  agendaSemanaRenderEstrutura();
+  await agendaSemanaCarregarEventos();
+}
+window.agendaSemanaAplicarConfigPrestador=agendaSemanaAplicarConfigPrestador;
 function agendaSemanaAtualizarSlots(){
   const cfg=agendaSemanaConfigAtual();
   const{slots,startMin,endMin,step}=agendaSemanaBuildSlots(cfg);
@@ -7880,14 +8740,21 @@ function agendaSemanaAtualizarSlots(){
   agendaSemanaState.step=step;
   agendaSemanaState.config=cfg;
 }
-function agendaSemanaRenderEstrutura(){
+function agendaSemanaRenderEstrutura(skipStablePass=false){
+  agendaSemanaDiagLog("agendaSemanaRenderEstrutura","before",{skipStablePass});
   if(!agendaSemana)return;
   agendaSemanaAtualizarSlots();
   const sbWidth=Math.max(0,Number((agendaSemana.scroll?.offsetWidth||0)-(agendaSemana.scroll?.clientWidth||0))||0);
   if(agendaSemana.panel)agendaSemana.panel.style.setProperty("--agenda-scrollbar",`${sbWidth}px`);
-  const slotHeight=AGENDA_SEMANA_SLOT_HEIGHT;
+  const cfgAtual=agendaSemanaState?.config||agendaSemanaConfigAtual();
+  const qtdVisivel=Math.max(1,agendaSemanaQtdHorariosVisiveis(cfgAtual));
+  const slotBase=AGENDA_SEMANA_SLOT_HEIGHT;
+  const disponivelUtil=agendaSemanaAlturaDisponivelUtil(slotBase*3);
+  const slotHeight=Math.max(slotBase,Math.floor(disponivelUtil/qtdVisivel));
+  agendaSemanaState.slotHeight=slotHeight;
   const height=agendaSemanaSlots.length*slotHeight;
   if(agendaSemana.panel)agendaSemana.panel.style.setProperty("--slot-height",`${slotHeight}px`);
+  agendaSemanaAplicarAlturaScroll();
   agendaSemana.timeCol.innerHTML=agendaSemanaSlots.map(slot=>`<div class="agenda-semana-time">${slot.label}</div>`).join("");
   agendaSemana.timeCol.style.height=`${height}px`;
   const foco=agendaSemanaState.focusDate||new Date();
@@ -7914,19 +8781,26 @@ function agendaSemanaRenderEstrutura(){
   const sbWidthFinal=Math.max(0,Number((agendaSemana.scroll?.offsetWidth||0)-(agendaSemana.scroll?.clientWidth||0))||0);
   if(agendaSemana.panel)agendaSemana.panel.style.setProperty("--agenda-scrollbar",`${sbWidthFinal}px`);
   agendaSemanaAtualizarTabs();
+  if(!skipStablePass)agendaSemanaAgendarRecalculoVisual();
+  agendaSemanaDiagLog("agendaSemanaRenderEstrutura","after",{skipStablePass,height});
 }
 function agendaSemanaEventoTipo(item){
   const tipo=Number(item?.tipo);
+  const nroPac=Number(item?.nro_pac||0)||0;
   if(Number.isFinite(tipo)){
     if(tipo===1)return"particular";
-    if(tipo===2)return"convenio";
+    if(tipo===2)return"compromisso";
+    if(tipo===0)return nroPac>0?"particular":"compromisso";
   }
   const motivo=String(item?.motivo||"").toLowerCase();
-  if(motivo.includes("convÃªnio")||motivo.includes("convenio"))return"convenio";
+  if(nroPac>0)return"particular";
+  if(motivo.includes("convênio")||motivo.includes("convenio"))return"convenio";
   if(motivo.includes("compromisso")||motivo.includes("bloqueio"))return"compromisso";
   return"compromisso";
 }
 function agendaSemanaCorEvento(item,cfg){
+  const corStatus=agendaLegadoCorPorStatusValor(item?.status);
+  if(corStatus)return corStatus;
   const tipo=agendaSemanaEventoTipo(item);
   if(tipo==="particular")return cfg.apresentacao_particular_cor||"#ffff00";
   if(tipo==="convenio")return cfg.apresentacao_convenio_cor||"#0000ff";
@@ -7941,34 +8815,28 @@ function agendaSemanaFontStyle(cfg){
   return`font-family:${f.family||"MS Sans Serif"};font-size:${size}px;font-weight:${weight};font-style:${style};text-decoration:${deco};color:${f.color||"#000000"}`;
 }
 function agendaSemanaEventoTexto(item,cfg){
-  const campos=Array.isArray(cfg.visualizacao_campos)?cfg.visualizacao_campos:[];
-  const valores=[];
-  const pushValor=(v)=>{const t=String(v||"").trim();if(t)valores.push(t)};
-  campos.forEach(campo=>{
-    switch(campo){
-      case "NÃºmero do paciente":pushValor(item?.nro_pac);break;
-      case "NÃºmero do prontuÃ¡rio":pushValor(item?.nro_pac);break;
-      case "Nome do paciente":pushValor(item?.nome);break;
-      case "MatrÃ­cula":pushValor(item?.nro_pac);break;
-      case "ConvÃªnio":pushValor(item?.convenio);break;
-      case "Tabela":pushValor(item?.tabela);break;
-      case "Fone 1":pushValor(item?.fone1);break;
-      case "Fone 2":pushValor(item?.fone2);break;
-      case "Fone 3":pushValor(item?.fone3);break;
-      case "Sala":if(item?.sala!=null)pushValor(`Sala: ${item.sala}`);break;
-      default:break;
-    }
-  });
-  if(!valores.length){
-    pushValor(item?.nome||item?.motivo||"");
-  }
+  const _cfg=cfg;
   const hora=agendaLegadoFmtHora(item?.hora_inicio||0);
-  let linha1=hora;
-  if(valores.length){
-    linha1=hora?`${hora} - ${valores.shift()}`:valores.shift();
-  }
-  const linhas=[linha1,...valores];
-  return linhas.filter(Boolean).join("\n");
+  const codigoTxt=String(item?.nro_pac??"").trim();
+  const nome=String(item?.nome||item?.motivo||"").trim();
+  const fones=[item?.fone1,item?.fone2,item?.fone3].map(v=>String(v||"").trim()).filter(Boolean);
+  const telefone=fones[0]||"";
+  const sala=item?.sala!=null?`Sala: ${String(item.sala).trim()}`:"";
+
+  const linha1Partes=[];
+  if(hora)linha1Partes.push(hora);
+  if(codigoTxt)linha1Partes.push(codigoTxt);
+  const linha1=linha1Partes.join(" - ");
+
+  const linhas=[
+    {classe:"linha linha-1",texto:linha1},
+    {classe:"linha linha-2",texto:nome},
+    {classe:"linha linha-3",texto:telefone},
+    {classe:"linha linha-4",texto:sala},
+  ].filter(l=>l.texto);
+
+  void _cfg;
+  return linhas.map(l=>`<div class="${l.classe}">${esc(l.texto)}</div>`).join("");
 }
 function agendaSemanaAdicionarBloqueios(eventos,cfg){
   const bloqueios=Array.isArray(cfg.bloqueios_itens)?cfg.bloqueios_itens:[];
@@ -8003,12 +8871,13 @@ function agendaSemanaAdicionarBloqueios(eventos,cfg){
   return novos;
 }
 function agendaSemanaRenderEventos(){
+  agendaSemanaDiagLog("agendaSemanaRenderEventos","before");
   if(!agendaSemana)return;
   const cfg=agendaSemanaState.config||agendaSemanaConfigPadrao();
   const startMin=agendaSemanaState.startMin||420;
   const endMin=agendaSemanaState.endMin||1200;
   const step=agendaSemanaState.step||5;
-  const slotHeight=AGENDA_SEMANA_SLOT_HEIGHT;
+  const slotHeight=Math.max(1,Number(agendaSemanaState?.slotHeight||AGENDA_SEMANA_SLOT_HEIGHT)||AGENDA_SEMANA_SLOT_HEIGHT);
   const cols=[...agendaSemana.daysWrap.children];
   cols.forEach(col=>col.innerHTML="");
   let eventos=Array.isArray(agendaSemanaCache)?agendaSemanaCache:[];
@@ -8022,8 +8891,8 @@ function agendaSemanaRenderEventos(){
   eventos.forEach(item=>{
     const dataStr=String(item?.data||"").trim();
     if(!dataStr)return;
-    const d=new Date(dataStr);
-    if(Number.isNaN(d.getTime()))return;
+    const d=agendaSemanaParseDataCivil(dataStr);
+    if(!d)return;
     const idx=agendaSemanaDayIndex(d);
     if(idx<0||idx>5)return;
     const col=cols[idx];
@@ -8038,9 +8907,12 @@ function agendaSemanaRenderEventos(){
     const height=Math.max(slotHeight,(endMinReal-topMin)/step*slotHeight);
     const bg=agendaSemanaCorEvento(item,cfg);
     const fontStyle=agendaSemanaFontStyle(cfg);
-    const texto=agendaSemanaEventoTexto(item,cfg);
-    col.insertAdjacentHTML("beforeend",`<div class="agenda-semana-event" style="top:${top}px;height:${height}px;background:${bg};${fontStyle}">${esc(texto)}</div>`);
+    const htmlEvento=agendaSemanaEventoTexto(item,cfg);
+    const eventoIdNum=Number(item?.id||0)||0;
+    const dataIdAttr=eventoIdNum>0?` data-id="${eventoIdNum}"`:"";
+    col.insertAdjacentHTML("beforeend",`<div class="agenda-semana-event"${dataIdAttr} style="top:${top}px;height:${height}px;background:${bg};${fontStyle}">${htmlEvento}</div>`);
   });
+  agendaSemanaDiagLog("agendaSemanaRenderEventos","after",{eventos_cache:Array.isArray(agendaSemanaCache)?agendaSemanaCache.length:0});
 }
 async function agendaSemanaCarregarEventos(){
   const start=agendaSemanaState.weekStart||agendaSemanaStartOfWeek(new Date());
@@ -8071,7 +8943,11 @@ function agendaSemanaAtualizarSemana(deltaDias){
 function agendaSemanaVincularEventos(){
   if(!agendaSemana||agendaSemana.panel.dataset.bound==="1")return;
   agendaSemana.panel.dataset.bound="1";
-  agendaSemana.btnFechar.addEventListener("click",()=>{agendaSemana.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});
+  if(!agendaSemanaState._resizeBound){
+    agendaSemanaState._resizeBound=true;
+    window.addEventListener("resize",()=>agendaSemanaAgendarRecalculoVisual());
+  }
+  agendaSemana.btnFechar.addEventListener("click",()=>{agendaSemanaDesconectarResizeObserver();agendaSemana.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});
   agendaSemana.mesPrev.addEventListener("click",()=>agendaSemanaShiftMonths(-1));
   agendaSemana.mesNext.addEventListener("click",()=>agendaSemanaShiftMonths(1));
   agendaSemana.semanaPrev.addEventListener("click",()=>agendaSemanaShiftDays(-7));
@@ -8080,11 +8956,42 @@ function agendaSemanaVincularEventos(){
   agendaSemana.diaNext.addEventListener("click",()=>agendaSemanaShiftDays(1));
   agendaSemana.btnCal.addEventListener("click",ev=>{ev.stopPropagation();if(agendaSemana.cal.classList.contains("hidden")){agendaSemanaCalendarioAbrir()}else{agendaSemanaCalendarioFechar()}});
   agendaSemana.btnPaciente.addEventListener("click",()=>{footerMsg.textContent="Paciente: em planejamento."});
-  agendaSemana.btnHorario.addEventListener("click",()=>{footerMsg.textContent="HorÃ¡rio: em planejamento."});
-  agendaSemana.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃ£o da agenda: em planejamento."});
+  agendaSemana.btnHorario.addEventListener("click",()=>{footerMsg.textContent="HorÃƒÂ¡rio: em planejamento."});
+  agendaSemana.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃƒÂ£o da agenda: em planejamento."});
   agendaSemana.btnAviso.addEventListener("click",()=>{footerMsg.textContent="Envio de aviso: em planejamento."});
-  agendaSemana.btnPublicar.addEventListener("click",()=>{footerMsg.textContent="PublicaÃ§Ã£o da agenda no MyEasy: em planejamento."});
-  agendaSemana.btnConfig.addEventListener("click",()=>{if(typeof prestAgendaAbrir==="function"){prestAgendaAbrir();return}footerMsg.textContent="ConfiguraÃ§Ã£o de agenda: em planejamento."});
+  agendaSemana.btnPublicar.addEventListener("click",()=>{footerMsg.textContent="PublicaÃƒÂ§ÃƒÂ£o da agenda no MyEasy: em planejamento."});
+  agendaSemana.btnConfig.addEventListener("click",async()=>{
+    if(typeof prestAgendaAbrir==="function"){
+      try{
+        if(typeof prestEnsureUI==="function")prestEnsureUI();
+        if(typeof prestCarregar==="function")await prestCarregar();
+        const cache=(typeof prestadoresCache!=="undefined"&&Array.isArray(prestadoresCache))
+          ?prestadoresCache
+          :(Array.isArray(window.prestadoresCache)?window.prestadoresCache:[]);
+        const sessaoPrestId=Number(sessaoAtual?.prestador_id||0)||0;
+        const sessaoUserId=Number(sessaoAtual?.user_id||sessaoAtual?.id||0)||0;
+        const filtroPrestId=Number(agendaSemana?.selectPrestador?.value||0)||0;
+        if(cache.length){
+          let alvo=null;
+          if(filtroPrestId)alvo=cache.find(item=>Number(item?.id||0)===filtroPrestId)||null;
+          if(!alvo&&sessaoPrestId)alvo=cache.find(item=>Number(item?.id||0)===sessaoPrestId)||null;
+          if(!alvo&&sessaoUserId)alvo=cache.find(item=>Number(item?.usuario_id||0)===sessaoUserId)||null;
+          if(!alvo&&sessaoUserId)alvo=cache.find(item=>Number(item?.source_id||0)===sessaoUserId)||null;
+          if(!alvo)alvo=cache[0];
+          if(alvo){
+            if(typeof prestadorSelId!=="undefined")prestadorSelId=Number(alvo.id||0)||null;
+            else window.prestadorSelId=Number(alvo.id||0)||null;
+            if(typeof prestRender==="function")prestRender();
+          }
+        }
+        await prestAgendaAbrir();
+        return;
+      }catch(err){
+        console.error(err);
+      }
+    }
+    footerMsg.textContent="ConfiguraÃƒÂ§ÃƒÂ£o de agenda: em planejamento.";
+  });
   agendaSemana.tabDia.addEventListener("click",()=>{agendaSemanaTabAtivar("dia");footerMsg.textContent="Agenda do dia: em planejamento."});
   agendaSemana.tabSemana.addEventListener("click",()=>{agendaSemanaTabAtivar("semana")});
   agendaSemana.tabClinica.addEventListener("click",()=>{agendaSemanaTabAtivar("clinica");footerMsg.textContent="Agenda da cl\u00ednica: em planejamento."});
@@ -8109,15 +9016,25 @@ function agendaSemanaVincularEventos(){
   document.addEventListener("click",ev=>{if(!agendaSemana?.cal||agendaSemana.cal.classList.contains("hidden"))return;const isInside=agendaSemana.cal.contains(ev.target)||agendaSemana.btnCal.contains(ev.target);if(!isInside)agendaSemanaCalendarioFechar()});
 }
 async function agendaSemanaAbrir(){
+  agendaSemanaDiagIniciarSeNecessario();
+  agendaSemanaDiagLog("agendaSemanaAbrir","entry");
   agendaSemanaEnsureUI();
   agendaSemanaVincularEventos();
   hideAllPanels();
+  agendaSemanaDiagLog("agendaSemanaAbrir","after_hideAllPanels");
   ensurePanelChrome(agendaSemana.panel);
   agendaSemanaEnsureWindowControls();
   agendaSemana.panel.classList.remove("hidden");
+  agendaSemanaDiagLog("agendaSemanaAbrir","after_unhide_panel");
+  agendaSemanaConectarResizeObserver();
   workspaceEmpty.classList.add("hidden");
   if(!agendaSemanaState.focusDate)agendaSemanaSetFocusDate(agendaSemanaResolveDataInicial());
   else if(!agendaSemanaState.weekStart)agendaSemanaState.weekStart=agendaSemanaStartOfWeek(agendaSemanaState.focusDate);
+  try{
+    if(typeof agendaLegadoBuscarStatusAuxiliares==="function"){
+      agendaLegadoStatusCache=await agendaLegadoBuscarStatusAuxiliares();
+    }
+  }catch{}
   await agendaSemanaCarregarPrestadores();
   await agendaSemanaCarregarUnidades();
   await agendaSemanaCarregarEspecialidades();
@@ -8125,8 +9042,17 @@ async function agendaSemanaAbrir(){
   agendaSemanaPreencherPrestadores();
   agendaSemanaPreencherUnidades();
   agendaSemanaTabAtivar("semana");
+  agendaSemanaDiagLog("agendaSemanaAbrir","before_render_estrutura");
   agendaSemanaRenderEstrutura();
+  agendaSemanaDiagLog("agendaSemanaAbrir","after_render_estrutura");
   await agendaSemanaCarregarEventos();
+  window.requestAnimationFrame(()=>{
+    window.requestAnimationFrame(()=>{
+      agendaSemanaRenderEstrutura(true);
+      agendaSemanaAplicarAlturaScroll();
+      agendaSemanaRenderEventos();
+    });
+  });
   footerMsg.textContent="Agenda da semana aberta.";
 }
 function cidEnsureUI(){
@@ -8134,7 +9060,7 @@ function cidEnsureUI(){
   const style=document.createElement("style");
   style.textContent=".cid-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.cid-toolbar{display:flex;gap:8px;align-items:center;margin:8px 0 6px;flex-wrap:wrap}.cid-divider{border-top:1px solid #d3dbe5;margin:8px 0 6px}.cid-search{display:flex;align-items:center;gap:8px;margin-bottom:6px}.cid-search label{white-space:nowrap}.cid-search input{flex:1;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.cid-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.cid-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.cid-grid th,.cid-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cid-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.cid-grid tr.selected{background:#d9e8fb}.cid-total{margin-top:6px;color:#5b6b7e}.cid-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1300}.cid-modal{width:min(520px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:6px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cid-modal-body{display:grid;grid-template-columns:90px 1fr;gap:8px 10px}.cid-modal-body label{display:block;margin-bottom:2px}.cid-modal-body input,.cid-modal-body textarea{width:100%;border:1px solid #bfc9d6;padding:4px 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif}.cid-modal-body input{height:24px}.cid-modal-body textarea{height:120px;resize:vertical}.cid-modal-full{grid-column:1/-1}.cid-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}";
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="cid-panel" class="cid-panel hidden"><div class="panel-title">Tabela de doenÃ§as (CID)</div><div class="cid-toolbar"><button id="cid-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova doenÃ§a...</button><button id="cid-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="cid-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="cid-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="cid-divider"></div><div class="cid-search"><label for="cid-busca">Pesquisar doenÃ§a:</label><input id="cid-busca" type="text"></div><div class="cid-grid"><table><colgroup><col style="width:80px"><col></colgroup><thead><tr><th>CÃ³digo</th><th>DoenÃ§a</th></tr></thead><tbody id="cid-tbody"></tbody></table></div><div id="cid-total" class="cid-total">0 itens</div></section><div id="cid-modal-backdrop" class="cid-modal-backdrop hidden"><div class="cid-modal"><div class="modal-header"><div id="cid-modal-title" class="modal-title">Nova doenÃ§a</div></div><div class="cid-modal-body"><div><label for="cid-modal-codigo">CÃ³digo:</label><input id="cid-modal-codigo" type="text"></div><div><label for="cid-modal-doenca">DoenÃ§a:</label><input id="cid-modal-doenca" type="text"></div><div class="cid-modal-full"><label for="cid-modal-observacoes">ObservaÃ§Ãµes:</label><textarea id="cid-modal-observacoes"></textarea></div><div class="cid-modal-full"><label><input id="cid-modal-preferidos" type="checkbox"> Incluir na lista de preferidos</label></div></div><div class="cid-modal-actions"><button id="cid-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="cid-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="cid-panel" class="cid-panel hidden"><div class="panel-title">Tabela de doenÃƒÂ§as (CID)</div><div class="cid-toolbar"><button id="cid-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova doenÃƒÂ§a...</button><button id="cid-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="cid-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="cid-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="cid-divider"></div><div class="cid-search"><label for="cid-busca">Pesquisar doenÃƒÂ§a:</label><input id="cid-busca" type="text"></div><div class="cid-grid"><table><colgroup><col style="width:80px"><col></colgroup><thead><tr><th>CÃƒÂ³digo</th><th>DoenÃƒÂ§a</th></tr></thead><tbody id="cid-tbody"></tbody></table></div><div id="cid-total" class="cid-total">0 itens</div></section><div id="cid-modal-backdrop" class="cid-modal-backdrop hidden"><div class="cid-modal"><div class="modal-header"><div id="cid-modal-title" class="modal-title">Nova doenÃƒÂ§a</div></div><div class="cid-modal-body"><div><label for="cid-modal-codigo">CÃƒÂ³digo:</label><input id="cid-modal-codigo" type="text"></div><div><label for="cid-modal-doenca">DoenÃƒÂ§a:</label><input id="cid-modal-doenca" type="text"></div><div class="cid-modal-full"><label for="cid-modal-observacoes">ObservaÃƒÂ§ÃƒÂµes:</label><textarea id="cid-modal-observacoes"></textarea></div><div class="cid-modal-full"><label><input id="cid-modal-preferidos" type="checkbox"> Incluir na lista de preferidos</label></div></div><div class="cid-modal-actions"><button id="cid-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="cid-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);
   cid={
     panel:document.getElementById("cid-panel"),
     busca:document.getElementById("cid-busca"),
@@ -8210,7 +9136,7 @@ function cidMontarPayload(){
 }
 async function cidSalvarModal(){
   const payload=cidMontarPayload();
-  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃ³digo e doenÃ§a.");return}
+  if(!payload.codigo||!payload.descricao){window.alert("Informe cÃƒÂ³digo e doenÃƒÂ§a.");return}
   const editId=Number(cid.modalBackdrop.dataset.editId||0);
   const method=editId?"PUT":"POST";
   const path=editId?`/cid/${editId}`:"/cid";
@@ -8222,7 +9148,7 @@ async function cidSalvarModal(){
 }
 async function cidExcluirSelecionado(){
   const item=cidSelecionado();
-  if(!item){window.alert("Selecione uma doenÃ§a.");return}
+  if(!item){window.alert("Selecione uma doenÃƒÂ§a.");return}
   if(!window.confirm(`Deseja eliminar o CID '${item.codigo} - ${item.descricao}'?`))return;
   const{res,data}=await requestJson("DELETE",`/cid/${item.id}`,undefined,true);
   if(!res.ok){window.alert(data.detail||"Falha ao eliminar CID.");return}
@@ -8232,7 +9158,7 @@ async function cidExcluirSelecionado(){
 function cidAbrirModal(modo){
   if(!cid)return;
   const editar=modo==="editar";
-  cid.modalTitle.textContent=editar?"Alterar doenÃ§a":"Nova doenÃ§a";
+  cid.modalTitle.textContent=editar?"Alterar doenÃƒÂ§a":"Nova doenÃƒÂ§a";
   const item=editar?cidSelecionado():null;
   cid.modalBackdrop.dataset.editId=editar&&item?String(item.id):"";
   cidPreencherModal(item);
@@ -8253,7 +9179,7 @@ function cidVincularEventos(){
     cidRender();
   });
   cid.btnNovo.addEventListener("click",()=>cidAbrirModal("novo"));
-  cid.btnEditar.addEventListener("click",()=>{if(!cidSelId){window.alert("Selecione uma doenÃ§a.");return}cidAbrirModal("editar")});
+  cid.btnEditar.addEventListener("click",()=>{if(!cidSelId){window.alert("Selecione uma doenÃƒÂ§a.");return}cidAbrirModal("editar")});
   cid.btnExcluir.addEventListener("click",cidExcluirSelecionado);
   cid.btnFechar.addEventListener("click",()=>{cid.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});
   cid.modalCancelar.addEventListener("click",cidFecharModal);
@@ -8268,14 +9194,14 @@ async function cidAbrir(){
   cid.panel.classList.remove("hidden");
   workspaceEmpty.classList.add("hidden");
   await cidCarregar();
-  footerMsg.textContent="Tabela de doenÃ§as (CID) aberta.";
+  footerMsg.textContent="Tabela de doenÃƒÂ§as (CID) aberta.";
 }
 function simbolosEnsureUI(){
   if(simbolosCfg)return;
   const style=document.createElement("style");
   style.textContent=".simbolos-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.simbolos-toolbar{display:flex;gap:8px;align-items:center;margin:8px 0 6px;flex-wrap:wrap}.simbolos-divider{border-top:1px solid #d3dbe5;margin:8px 0 6px}.simbolos-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.simbolos-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.simbolos-grid th,.simbolos-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.simbolos-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.simbolos-grid tr.selected{background:#d9e8fb}.simbolos-total{margin-top:6px;color:#5b6b7e}.simbolos-modal{width:min(456px,96vw)}.simbolos-form{display:grid;grid-template-columns:1fr 132px;column-gap:14px;row-gap:8px;align-items:start}.simbolos-col-main,.simbolos-col-side{display:flex;flex-direction:column;gap:8px}.simbolos-field label{display:block;margin-bottom:2px}.simbolos-field input,.simbolos-field select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.simbolos-tipo legend,.simbolos-desenho-title,.simbolos-biblioteca-title{font:12px Tahoma,sans-serif}.simbolos-tipo{border:0;padding:0;margin:0}.simbolos-tipo label{display:block;line-height:18px}.simbolos-desenho-wrap{display:grid;grid-template-columns:78px 30px;gap:8px;align-items:center}.simbolos-canvas{border:1px solid #bfc9d6;background:#f7f7f7;height:68px;width:78px}.simbolos-desenho-btns{display:flex;flex-direction:column;gap:8px}.simbolos-desenho-btns .materiais-btn{width:30px;height:26px;padding:0;min-width:0}.simbolos-biblioteca-shell{border:1px solid #cfd8e3;padding:4px;background:#fff;height:98px;overflow:hidden}.simbolos-biblioteca{height:88px;overflow-x:hidden;overflow-y:scroll;padding-right:4px;display:grid;grid-template-columns:repeat(10,18px);grid-auto-rows:18px;gap:4px;align-content:start}.simbolos-biblioteca button{width:18px;height:18px;border:1px solid #444;background:#fff;cursor:pointer;line-height:1;padding:0;display:flex;align-items:center;justify-content:center}.simbolos-biblioteca button.selected{outline:1px solid #4b83d1;background:#e8f1ff}.simbolos-biblioteca img{width:14px;height:14px;display:block;object-fit:contain;pointer-events:none}.simbolos-biblioteca-fallback{font:700 9px Tahoma,sans-serif;color:#222}.simbolos-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.simbolos-actions .materiais-btn{min-width:86px;justify-content:center}.simbolos-msg-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1600}.simbolos-msg-modal{width:min(520px,96vw);background:#f6f6f6;border:1px solid #bfc9d6;border-radius:10px;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif}.simbolos-msg-body{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start;min-height:92px}.simbolos-msg-icon{width:54px;height:54px;border-radius:50%;border:3px solid #8fd1ff;background:linear-gradient(#e9f8ff,#b7e2ff);display:flex;align-items:center;justify-content:center;color:#fff;font:700 34px Tahoma,sans-serif;text-shadow:0 1px 1px rgba(0,0,0,.25);margin-top:4px}.simbolos-msg-text{white-space:pre-wrap;color:#222;line-height:1.4;padding-top:10px}.simbolos-msg-divider{border-top:1px solid #d0d7df;margin:10px 0}.simbolos-msg-actions{display:flex;justify-content:flex-end;gap:8px}.simbolos-msg-actions .materiais-btn{min-width:86px;justify-content:center}.simbolos-editor-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.34);display:grid;place-items:center;z-index:1650}.simbolos-editor-shell{width:min(1180px,96vw);height:min(860px,94vh);background:#fff;border:1px solid #bfc9d6;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(31,52,73,.24)}.simbolos-editor-frame{width:100%;height:100%;border:0;display:block;background:#eef3f7}";
   document.head.appendChild(style);
-  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="simbolos-panel" class="simbolos-panel hidden"><div class="panel-title">Configura sÃ­mbolos</div><div class="simbolos-toolbar"><button id="simbolos-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="simbolos-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="simbolos-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="simbolos-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="simbolos-divider"></div><div class="simbolos-grid"><table><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th>Nome</th><th>Especialidade</th></tr></thead><tbody id="simbolos-tbody"></tbody></table></div><div id="simbolos-total" class="simbolos-total">0 sÃ­mbolos</div></section><div id="simbolos-modal-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal simbolos-modal"><div class="modal-header"><div id="simbolos-modal-title" class="modal-title">Edita sÃ­mbolo grÃ¡fico</div></div><div class="simbolos-form"><div class="simbolos-col-main"><div class="simbolos-field"><label for="simbolos-nome">Nome do sÃ­mbolo:</label><input id="simbolos-nome" type="text"></div><div class="simbolos-field"><label for="simbolos-especialidade">Especialidade (botÃ£o)</label><select id="simbolos-especialidade"></select></div><div class="simbolos-field"><label for="simbolos-forma">Forma de marcaÃ§Ã£o no odontograma:</label><select id="simbolos-forma"><option>Dente (ex: Coroa)</option><option>Grupo de dentes</option><option>Arcada</option><option>Raiz</option><option>Face</option></select></div><div class="simbolos-biblioteca-title">Biblioteca de sÃ­mbolos:</div><div class="simbolos-biblioteca-shell"><div class="simbolos-biblioteca" id="simbolos-biblioteca"></div></div></div><div class="simbolos-col-side"><fieldset class="simbolos-tipo"><legend>Tipo do sÃ­mbolo:</legend><label><input type="radio" name="simbolos-tipo" value="sistema"> Sistema</label><label><input type="radio" name="simbolos-tipo" value="usuario" checked> Definido pelo usuÃ¡rio</label></fieldset><div><div class="simbolos-desenho-title">Desenho</div><div class="simbolos-desenho-wrap"><div class="simbolos-canvas"></div><div class="simbolos-desenho-btns"><button id="simbolos-desenho-clear" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt=""></button><button id="simbolos-desenho-edit" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt=""></button></div></div></div></div></div><div class="simbolos-actions"><button id="simbolos-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="simbolos-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><div id="simbolos-msg-backdrop" class="simbolos-msg-backdrop hidden"><div class="simbolos-msg-modal"><div class="simbolos-msg-body"><div class="simbolos-msg-icon">?</div><div id="simbolos-msg-text" class="simbolos-msg-text"></div></div><div class="simbolos-msg-divider"></div><div class="simbolos-msg-actions"><button id="simbolos-msg-sim" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Sim</button><button id="simbolos-msg-nao" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">NÃ£o</button></div></div></div><div id="simbolos-editor-backdrop" class="simbolos-editor-backdrop hidden"><div class="simbolos-editor-shell"><iframe id="simbolos-editor-frame" class="simbolos-editor-frame" title="Editor de sÃ­mbolo"></iframe></div></div>`);
+  workspaceEmpty.insertAdjacentHTML("afterend",`<section id="simbolos-panel" class="simbolos-panel hidden"><div class="panel-title">Configura sÃƒÂ­mbolos</div><div class="simbolos-toolbar"><button id="simbolos-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="simbolos-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="simbolos-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="simbolos-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="simbolos-divider"></div><div class="simbolos-grid"><table><colgroup><col style="width:60%"><col style="width:40%"></colgroup><thead><tr><th>Nome</th><th>Especialidade</th></tr></thead><tbody id="simbolos-tbody"></tbody></table></div><div id="simbolos-total" class="simbolos-total">0 sÃƒÂ­mbolos</div></section><div id="simbolos-modal-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal simbolos-modal"><div class="modal-header"><div id="simbolos-modal-title" class="modal-title">Edita sÃƒÂ­mbolo grÃƒÂ¡fico</div></div><div class="simbolos-form"><div class="simbolos-col-main"><div class="simbolos-field"><label for="simbolos-nome">Nome do sÃƒÂ­mbolo:</label><input id="simbolos-nome" type="text"></div><div class="simbolos-field"><label for="simbolos-especialidade">Especialidade (botÃƒÂ£o)</label><select id="simbolos-especialidade"></select></div><div class="simbolos-field"><label for="simbolos-forma">Forma de marcaÃƒÂ§ÃƒÂ£o no odontograma:</label><select id="simbolos-forma"><option>Dente (ex: Coroa)</option><option>Grupo de dentes</option><option>Arcada</option><option>Raiz</option><option>Face</option></select></div><div class="simbolos-biblioteca-title">Biblioteca de sÃƒÂ­mbolos:</div><div class="simbolos-biblioteca-shell"><div class="simbolos-biblioteca" id="simbolos-biblioteca"></div></div></div><div class="simbolos-col-side"><fieldset class="simbolos-tipo"><legend>Tipo do sÃƒÂ­mbolo:</legend><label><input type="radio" name="simbolos-tipo" value="sistema"> Sistema</label><label><input type="radio" name="simbolos-tipo" value="usuario" checked> Definido pelo usuÃƒÂ¡rio</label></fieldset><div><div class="simbolos-desenho-title">Desenho</div><div class="simbolos-desenho-wrap"><div class="simbolos-canvas"></div><div class="simbolos-desenho-btns"><button id="simbolos-desenho-clear" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt=""></button><button id="simbolos-desenho-edit" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt=""></button></div></div></div></div></div><div class="simbolos-actions"><button id="simbolos-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="simbolos-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><div id="simbolos-msg-backdrop" class="simbolos-msg-backdrop hidden"><div class="simbolos-msg-modal"><div class="simbolos-msg-body"><div class="simbolos-msg-icon">?</div><div id="simbolos-msg-text" class="simbolos-msg-text"></div></div><div class="simbolos-msg-divider"></div><div class="simbolos-msg-actions"><button id="simbolos-msg-sim" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Sim</button><button id="simbolos-msg-nao" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">NÃƒÂ£o</button></div></div></div><div id="simbolos-editor-backdrop" class="simbolos-editor-backdrop hidden"><div class="simbolos-editor-shell"><iframe id="simbolos-editor-frame" class="simbolos-editor-frame" title="Editor de sÃƒÂ­mbolo"></iframe></div></div>`);
   simbolosCfg={panel:document.getElementById("simbolos-panel"),tbody:document.getElementById("simbolos-tbody"),total:document.getElementById("simbolos-total"),btnNovo:document.getElementById("simbolos-btn-novo"),btnEditar:document.getElementById("simbolos-btn-editar"),btnExcluir:document.getElementById("simbolos-btn-excluir"),btnFechar:document.getElementById("simbolos-btn-fechar"),modalBackdrop:document.getElementById("simbolos-modal-backdrop"),modalTitle:document.getElementById("simbolos-modal-title"),modalNome:document.getElementById("simbolos-nome"),modalEspecialidade:document.getElementById("simbolos-especialidade"),modalForma:document.getElementById("simbolos-forma"),modalOk:document.getElementById("simbolos-modal-ok"),modalCancelar:document.getElementById("simbolos-modal-cancelar"),biblioteca:document.getElementById("simbolos-biblioteca"),msgBackdrop:document.getElementById("simbolos-msg-backdrop"),msgText:document.getElementById("simbolos-msg-text"),msgSim:document.getElementById("simbolos-msg-sim"),msgNao:document.getElementById("simbolos-msg-nao"),editorBackdrop:document.getElementById("simbolos-editor-backdrop"),editorFrame:document.getElementById("simbolos-editor-frame")};
   ensureModalChrome(simbolosCfg.modalBackdrop.querySelector(".cad-modal"));
 }
@@ -8298,7 +9224,7 @@ async function simbolosCarregarEspecialidades(){
 function simbolosRender(){
   if(!simbolosCfg)return;
   simbolosCfg.tbody.innerHTML=simbolosCache.map(x=>{const esp=simbolosEspecialidadeNome(x.especialidade);return`<tr data-id="${x.id}" class="${x.id===simbolosSelId?"selected":""}"><td>${esc(x.descricao||"")}</td><td>${esc(esp)}</td></tr>`}).join("");
-  simbolosCfg.total.textContent=`${simbolosCache.length} sÃ­mbolos`;
+  simbolosCfg.total.textContent=`${simbolosCache.length} sÃƒÂ­mbolos`;
 }
 function simbolosRenderBiblioteca(){
   if(!simbolosCfg?.biblioteca)return;
@@ -8333,7 +9259,7 @@ function simbolosSelecionarLinha(tr){
 }
 async function simbolosCarregar(){
   const{res,data}=await requestJson("GET","/cadastros/simbolos-graficos",undefined,true);
-  if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar sÃ­mbolos.";return}
+  if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar sÃƒÂ­mbolos.";return}
   simbolosCache=Array.isArray(data)?data:[];
   simbolosSelId=simbolosCache.some(x=>x.id===simbolosSelId)?simbolosSelId:(simbolosCache[0]?.id||null);
   simbolosRender();
@@ -8348,7 +9274,7 @@ function simbolosPreencherEspecialidades(){
 function simbolosAbrirModal(modo){
   if(!simbolosCfg)return;
   const editar=modo==="editar";
-  simbolosCfg.modalTitle.textContent="Edita sÃ­mbolo grÃ¡fico";
+  simbolosCfg.modalTitle.textContent="Edita sÃƒÂ­mbolo grÃƒÂ¡fico";
   const item=editar?simbolosSelecionado():null;
   simbolosCfg.modalBackdrop.dataset.editId=editar&&item?String(item.id):"";
   simbolosCfg.modalNome.value=item?.descricao||"";
@@ -8365,11 +9291,11 @@ function simbolosVincularEventos(){
   simbolosCfg.panel.dataset.bound="1";
   simbolosCfg.tbody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-id]");if(!tr)return;simbolosSelId=Number(tr.dataset.id||0)||null;simbolosRender()});
   simbolosCfg.btnNovo.addEventListener("click",()=>simbolosAbrirModal("novo"));
-  simbolosCfg.btnEditar.addEventListener("click",()=>{if(!simbolosSelecionado()){window.alert("Selecione um sÃ­mbolo.");return}simbolosAbrirModal("editar")});
-  simbolosCfg.btnExcluir.addEventListener("click",()=>{if(!simbolosSelecionado()){window.alert("Selecione um sÃ­mbolo.");return}window.alert("Excluir sÃ­mbolo: em planejamento.")});
+  simbolosCfg.btnEditar.addEventListener("click",()=>{if(!simbolosSelecionado()){window.alert("Selecione um sÃƒÂ­mbolo.");return}simbolosAbrirModal("editar")});
+  simbolosCfg.btnExcluir.addEventListener("click",()=>{if(!simbolosSelecionado()){window.alert("Selecione um sÃƒÂ­mbolo.");return}window.alert("Excluir sÃƒÂ­mbolo: em planejamento.")});
   simbolosCfg.btnFechar.addEventListener("click",()=>{simbolosCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});
   if(simbolosCfg.modalCancelar)simbolosCfg.modalCancelar.addEventListener("click",simbolosFecharModal);
-  if(simbolosCfg.modalOk)simbolosCfg.modalOk.addEventListener("click",()=>{window.alert("Salvar sÃ­mbolo: em planejamento.");simbolosFecharModal()});
+  if(simbolosCfg.modalOk)simbolosCfg.modalOk.addEventListener("click",()=>{window.alert("Salvar sÃƒÂ­mbolo: em planejamento.");simbolosFecharModal()});
   if(simbolosCfg.modalBackdrop)simbolosCfg.modalBackdrop.addEventListener("click",ev=>{if(ev.target===simbolosCfg.modalBackdrop)simbolosFecharModal()});
 }
 async function simbolosAbrir(){
@@ -8383,15 +9309,15 @@ async function simbolosAbrir(){
   simbolosPreencherEspecialidades();
   simbolosPreencherFormas();
   await simbolosCarregar();
-  footerMsg.textContent="ConfiguraÃ§Ã£o de sÃ­mbolos aberta.";
+  footerMsg.textContent="ConfiguraÃƒÂ§ÃƒÂ£o de sÃƒÂ­mbolos aberta.";
 }
-function anamneseEnsureUI(){if(anamneseCfg)return;const style=document.createElement("style");style.textContent=".anamnese-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.anamnese-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-toolbar .sep{width:1px;height:26px;background:#cfd8e3;margin:0 4px}.anamnese-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.anamnese-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.anamnese-grid th,.anamnese-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.anamnese-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.anamnese-grid tr.selected{background:#d9e8fb}.anamnese-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.anamnese-top label{white-space:nowrap}.anamnese-top select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.anamnese-subtoolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-total{margin-top:6px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="anamnese-panel" class="anamnese-panel hidden"><div class="panel-title">Configura questionÃ¡rios de anamnese</div><div class="anamnese-top"><label for="anamnese-questionario">QuestionÃ¡rio:</label><select id="anamnese-questionario"><option>Principal</option></select><div class="anamnese-toolbar"><button id="anamnese-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="anamnese-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprime.png" alt="">Imprime...</button><button id="anamnese-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div class="anamnese-subtoolbar"><button id="anamnese-btn-nova-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova pergunta...</button><button id="anamnese-btn-alterar-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-renumerar" class="materiais-btn" type="button">1,2... Renumera perguntas</button></div><div class="anamnese-grid"><table><colgroup><col style="width:46px"><col></colgroup><thead><tr><th>NÂº</th><th>Texto da pergunta</th></tr></thead><tbody id="anamnese-tbody"></tbody></table></div><div id="anamnese-total" class="anamnese-total">0 perguntas</div></section>`);anamneseCfg={panel:document.getElementById("anamnese-panel"),tbody:document.getElementById("anamnese-tbody"),total:document.getElementById("anamnese-total"),btnNovo:document.getElementById("anamnese-btn-novo"),btnEditar:document.getElementById("anamnese-btn-editar"),btnExcluir:document.getElementById("anamnese-btn-excluir"),btnImprimir:document.getElementById("anamnese-btn-imprimir"),btnFechar:document.getElementById("anamnese-btn-fechar"),btnNovaPergunta:document.getElementById("anamnese-btn-nova-pergunta"),btnAlterarPergunta:document.getElementById("anamnese-btn-alterar-pergunta"),btnExcluirPergunta:document.getElementById("anamnese-btn-excluir-pergunta"),btnRenumera:document.getElementById("anamnese-btn-renumerar")}}
+function anamneseEnsureUI(){if(anamneseCfg)return;const style=document.createElement("style");style.textContent=".anamnese-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.anamnese-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-toolbar .sep{width:1px;height:26px;background:#cfd8e3;margin:0 4px}.anamnese-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.anamnese-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.anamnese-grid th,.anamnese-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.anamnese-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.anamnese-grid tr.selected{background:#d9e8fb}.anamnese-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.anamnese-top label{white-space:nowrap}.anamnese-top select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.anamnese-subtoolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-total{margin-top:6px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="anamnese-panel" class="anamnese-panel hidden"><div class="panel-title">Configura questionÃƒÂ¡rios de anamnese</div><div class="anamnese-top"><label for="anamnese-questionario">QuestionÃƒÂ¡rio:</label><select id="anamnese-questionario"><option>Principal</option></select><div class="anamnese-toolbar"><button id="anamnese-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="anamnese-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprime.png" alt="">Imprime...</button><button id="anamnese-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div class="anamnese-subtoolbar"><button id="anamnese-btn-nova-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova pergunta...</button><button id="anamnese-btn-alterar-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-renumerar" class="materiais-btn" type="button">1,2... Renumera perguntas</button></div><div class="anamnese-grid"><table><colgroup><col style="width:46px"><col></colgroup><thead><tr><th>NÃ‚Âº</th><th>Texto da pergunta</th></tr></thead><tbody id="anamnese-tbody"></tbody></table></div><div id="anamnese-total" class="anamnese-total">0 perguntas</div></section>`);anamneseCfg={panel:document.getElementById("anamnese-panel"),tbody:document.getElementById("anamnese-tbody"),total:document.getElementById("anamnese-total"),btnNovo:document.getElementById("anamnese-btn-novo"),btnEditar:document.getElementById("anamnese-btn-editar"),btnExcluir:document.getElementById("anamnese-btn-excluir"),btnImprimir:document.getElementById("anamnese-btn-imprimir"),btnFechar:document.getElementById("anamnese-btn-fechar"),btnNovaPergunta:document.getElementById("anamnese-btn-nova-pergunta"),btnAlterarPergunta:document.getElementById("anamnese-btn-alterar-pergunta"),btnExcluirPergunta:document.getElementById("anamnese-btn-excluir-pergunta"),btnRenumera:document.getElementById("anamnese-btn-renumerar")}}
 function anamneseRender(){if(!anamneseCfg)return;anamneseCfg.tbody.innerHTML=anamneseCache.map(x=>`<tr data-id="${x.id}" class="${x.id===anamneseSelId?"selected":""}"><td>${x.numero}</td><td>${esc(x.texto)}</td></tr>`).join("");anamneseCfg.total.textContent=`${anamneseCache.length} perguntas`}
 function anamneseSelecionado(){return anamneseCache.find(x=>x.id===anamneseSelId)||null}
-function anamneseCarregarLocal(){anamneseCache=[{id:1,numero:1,texto:"EstÃ¡ bem de saÃºde no momento?"},{id:2,numero:2,texto:"Quando fez seu Ãºltimo tratamento mÃ©dico?"},{id:3,numero:3,texto:"EstÃ¡ atualmente em tratamento mÃ©dico?"},{id:4,numero:4,texto:"Apresenta alergia a medicamentos? Quais?"},{id:5,numero:5,texto:"Possui alguma doenÃ§a grave? Qual?"},{id:6,numero:6,texto:"EstÃ¡ tomando algum medicamento? Qual?"},{id:7,numero:7,texto:"Quando fez seu Ãºltimo tratamento dentÃ¡rio?"},{id:8,numero:8,texto:"Sente dificuldade em abrir a boca"},{id:9,numero:9,texto:"Range os dentes Ã  noite?"},{id:10,numero:10,texto:"Aperta os dentes costumeiramente?"},{id:11,numero:11,texto:"Alguma complicaÃ§Ã£o durante tratamento odontolÃ³gico?"},{id:12,numero:12,texto:"Tem sinusite?"},{id:13,numero:13,texto:"Tem perdido peso nos Ãºltimos meses?"},{id:14,numero:14,texto:"Tem ganho peso nos Ãºltimos meses?"},{id:15,numero:15,texto:"JÃ¡ foi hospitalizado(a) alguma vez?"},{id:16,numero:16,texto:"Foi submetido(a) Ã  cirurgia?"},{id:17,numero:17,texto:"JÃ¡ recebeu transfusÃ£o de sangue?"}];anamneseSelId=anamneseCache[0]?.id||null;anamneseRender()}
-function anamneseVincularEventos(){if(!anamneseCfg||anamneseCfg.panel.dataset.bound==="1")return;anamneseCfg.panel.dataset.bound="1";bindStandardGridActivation(anamneseCfg.tbody,tr=>{anamneseSelId=Number(tr.dataset.id||0)||null;anamneseRender()},()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}anamneseAbrirModalPergunta("editar")});anamneseCfg.btnNovo.addEventListener("click",()=>window.alert("Novo questionÃ¡rio: em planejamento."));anamneseCfg.btnEditar.addEventListener("click",()=>window.alert("Alterar questionÃ¡rio: em planejamento."));anamneseCfg.btnExcluir.addEventListener("click",()=>window.alert("Eliminar questionÃ¡rio: em planejamento."));anamneseCfg.btnImprimir.addEventListener("click",()=>window.alert("Imprimir questionÃ¡rio: em planejamento."));anamneseCfg.btnFechar.addEventListener("click",()=>{anamneseCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});anamneseCfg.btnNovaPergunta.addEventListener("click",()=>window.alert("Nova pergunta: em planejamento."));anamneseCfg.btnAlterarPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}window.alert("Alterar pergunta: em planejamento.")});anamneseCfg.btnExcluirPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}window.alert("Eliminar pergunta: em planejamento.")});anamneseCfg.btnRenumera.addEventListener("click",()=>window.alert("Renumerar perguntas: em planejamento."))}
-async function anamneseAbrir(){anamneseEnsureUI();anamneseVincularEventos();hideAllPanels();ensurePanelChrome(anamneseCfg.panel);anamneseCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");anamneseCarregarLocal();footerMsg.textContent="ConfiguraÃ§Ã£o de anamnese aberta."}
-function planoEnsureUI(){if(plano)return;const style=document.createElement("style");style.textContent=".plano-panel{width:381px;max-width:100%;min-height:483px;margin:0 auto;background:#fff;border:1px solid #cfd8e3;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.plano-sec{border:1px solid #cfd8e3;margin-bottom:8px}.plano-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.plano-grid{height:140px;overflow:auto}.plano-grid table{width:100%;border-collapse:collapse}.plano-grid td{height:20px;border-bottom:1px solid #edf1f6;padding:2px 4px}.plano-grid tr.selected{background:#d9e8fb}.plano-toolbar{display:flex;gap:6px;border:1px solid #cfd8e3;padding:4px;margin-bottom:6px}.aux-panel{width:556px;max-width:100%;min-height:401px;margin:0 auto;background:#fff;border:1px solid #cfd8e3;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.aux-wrap{display:grid;grid-template-columns:220px 1fr;gap:8px}.aux-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.aux-list,.aux-cont{border:1px solid #cfd8e3;overflow:auto;height:260px}.aux-list table,.aux-cont table{width:100%;border-collapse:collapse}.aux-list td,.aux-cont td{height:18px;border-bottom:1px solid #edf1f6;padding:1px 4px}.aux-list tr.selected,.aux-cont tr.selected{background:#d9e8fb}.aux-toolbar{display:flex;gap:6px;border:1px solid #cfd8e3;padding:4px;margin:8px 0}.cad-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1200}.cad-modal{width:320px;max-width:96vw;background:#fff;border:1px solid #bfc9d6;padding:8px;box-sizing:border-box}.cad-modal .f{margin-bottom:6px}.cad-modal label{display:block;font:12px Tahoma,sans-serif}.cad-modal input,.cad-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.cad-modal-actions{display:flex;justify-content:flex-end;gap:6px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="plano-panel" class="plano-panel hidden"><div class="plano-toolbar"><button id="plano-btn-novo-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo grupo</button><button id="plano-btn-altera-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="plano-btn-elimina-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="plano-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button></div><div class="plano-sec"><div class="plano-title">Grupo de contas</div><div class="plano-grid"><table><tbody id="plano-grupos"></tbody></table></div></div><div class="plano-sec"><div class="plano-title">Categorias do grupo</div><div class="plano-toolbar"><button id="plano-btn-nova-cat" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova categoria</button><button id="plano-btn-altera-cat" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="plano-btn-elimina-cat" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button></div><div class="plano-grid"><table><tbody id="plano-cats"></tbody></table></div></div></section><section id="aux-panel" class="aux-panel hidden"><div class="aux-wrap"><div><div class="aux-title">Itens configuraveis</div><div class="aux-list"><table><tbody id="aux-tipos"></tbody></table></div></div><div><div class="aux-title">Conteudo da tabela</div><div class="aux-toolbar"><button id="aux-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo</button><button id="aux-btn-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="aux-btn-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="aux-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button></div><div class="aux-cont"><table><tbody id="aux-itens"></tbody></table></div></div></div></section><div id="cad-modal-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal"><div id="cad-modal-body"></div><div class="cad-modal-actions"><button id="cad-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="cad-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);plano={btnOpen:document.getElementById("btn-open-plano"),panel:document.getElementById("plano-panel"),tbGrupos:document.getElementById("plano-grupos"),tbCats:document.getElementById("plano-cats"),btnNovoGrupo:document.getElementById("plano-btn-novo-grupo"),btnAlteraGrupo:document.getElementById("plano-btn-altera-grupo"),btnEliminaGrupo:document.getElementById("plano-btn-elimina-grupo"),btnFechar:document.getElementById("plano-btn-fechar"),btnNovaCat:document.getElementById("plano-btn-nova-cat"),btnAlteraCat:document.getElementById("plano-btn-altera-cat"),btnEliminaCat:document.getElementById("plano-btn-elimina-cat")};aux={btnOpen:document.getElementById("btn-open-aux"),panel:document.getElementById("aux-panel"),tbTipos:document.getElementById("aux-tipos"),tbItens:document.getElementById("aux-itens"),btnNovo:document.getElementById("aux-btn-novo"),btnAltera:document.getElementById("aux-btn-altera"),btnElimina:document.getElementById("aux-btn-elimina"),btnFechar:document.getElementById("aux-btn-fechar")}}
+function anamneseCarregarLocal(){anamneseCache=[{id:1,numero:1,texto:"EstÃƒÂ¡ bem de saÃƒÂºde no momento?"},{id:2,numero:2,texto:"Quando fez seu ÃƒÂºltimo tratamento mÃƒÂ©dico?"},{id:3,numero:3,texto:"EstÃƒÂ¡ atualmente em tratamento mÃƒÂ©dico?"},{id:4,numero:4,texto:"Apresenta alergia a medicamentos? Quais?"},{id:5,numero:5,texto:"Possui alguma doenÃƒÂ§a grave? Qual?"},{id:6,numero:6,texto:"EstÃƒÂ¡ tomando algum medicamento? Qual?"},{id:7,numero:7,texto:"Quando fez seu ÃƒÂºltimo tratamento dentÃƒÂ¡rio?"},{id:8,numero:8,texto:"Sente dificuldade em abrir a boca"},{id:9,numero:9,texto:"Range os dentes ÃƒÂ  noite?"},{id:10,numero:10,texto:"Aperta os dentes costumeiramente?"},{id:11,numero:11,texto:"Alguma complicaÃƒÂ§ÃƒÂ£o durante tratamento odontolÃƒÂ³gico?"},{id:12,numero:12,texto:"Tem sinusite?"},{id:13,numero:13,texto:"Tem perdido peso nos ÃƒÂºltimos meses?"},{id:14,numero:14,texto:"Tem ganho peso nos ÃƒÂºltimos meses?"},{id:15,numero:15,texto:"JÃƒÂ¡ foi hospitalizado(a) alguma vez?"},{id:16,numero:16,texto:"Foi submetido(a) ÃƒÂ  cirurgia?"},{id:17,numero:17,texto:"JÃƒÂ¡ recebeu transfusÃƒÂ£o de sangue?"}];anamneseSelId=anamneseCache[0]?.id||null;anamneseRender()}
+function anamneseVincularEventos(){if(!anamneseCfg||anamneseCfg.panel.dataset.bound==="1")return;anamneseCfg.panel.dataset.bound="1";bindStandardGridActivation(anamneseCfg.tbody,tr=>{anamneseSelId=Number(tr.dataset.id||0)||null;anamneseRender()},()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}anamneseAbrirModalPergunta("editar")});anamneseCfg.btnNovo.addEventListener("click",()=>window.alert("Novo questionÃƒÂ¡rio: em planejamento."));anamneseCfg.btnEditar.addEventListener("click",()=>window.alert("Alterar questionÃƒÂ¡rio: em planejamento."));anamneseCfg.btnExcluir.addEventListener("click",()=>window.alert("Eliminar questionÃƒÂ¡rio: em planejamento."));anamneseCfg.btnImprimir.addEventListener("click",()=>window.alert("Imprimir questionÃƒÂ¡rio: em planejamento."));anamneseCfg.btnFechar.addEventListener("click",()=>{anamneseCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});anamneseCfg.btnNovaPergunta.addEventListener("click",()=>window.alert("Nova pergunta: em planejamento."));anamneseCfg.btnAlterarPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}window.alert("Alterar pergunta: em planejamento.")});anamneseCfg.btnExcluirPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}window.alert("Eliminar pergunta: em planejamento.")});anamneseCfg.btnRenumera.addEventListener("click",()=>window.alert("Renumerar perguntas: em planejamento."))}
+async function anamneseAbrir(){anamneseEnsureUI();anamneseVincularEventos();hideAllPanels();ensurePanelChrome(anamneseCfg.panel);anamneseCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");anamneseCarregarLocal();footerMsg.textContent="ConfiguraÃƒÂ§ÃƒÂ£o de anamnese aberta."}
+function planoEnsureUI(){if(plano)return;const style=document.createElement("style");style.textContent=".plano-panel{width:381px;max-width:100%;min-height:483px;margin:0 auto;background:#fff;border:1px solid #cfd8e3;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.plano-sec{border:1px solid #cfd8e3;margin-bottom:8px}.plano-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.plano-grid{height:140px;overflow:auto}.plano-grid table{width:100%;border-collapse:collapse}.plano-grid td{height:20px;border-bottom:1px solid #edf1f6;padding:2px 4px}.plano-grid tr.selected{background:#d9e8fb}.plano-toolbar{display:flex;gap:6px;border:1px solid #cfd8e3;padding:4px;margin-bottom:6px}.aux-panel{width:556px;max-width:100%;min-height:401px;margin:0 auto;background:#fff;border:1px solid #cfd8e3;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.aux-wrap{display:grid;grid-template-columns:220px 1fr;gap:8px}.aux-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.aux-list,.aux-cont{border:1px solid #cfd8e3;overflow:auto;height:260px}.aux-list table,.aux-cont table{width:100%;border-collapse:collapse}.aux-list td,.aux-cont td{height:18px;border-bottom:1px solid #edf1f6;padding:1px 4px}.aux-list tr.selected,.aux-cont tr.selected{background:#d9e8fb}.aux-toolbar{display:flex;gap:6px;border:1px solid #cfd8e3;padding:4px;margin:8px 0}.cad-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1200}.cad-modal{width:320px;max-width:96vw;background:#fff;border:1px solid #bfc9d6;padding:8px;box-sizing:border-box}.cad-modal .f{margin-bottom:6px}.cad-modal label{display:block;font:12px Tahoma,sans-serif}.cad-modal input,.cad-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.cad-modal-actions{display:flex;justify-content:flex-end;gap:6px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="plano-panel" class="plano-panel hidden"><div class="plano-toolbar"><button id="plano-btn-novo-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo grupo</button><button id="plano-btn-altera-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="plano-btn-elimina-grupo" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="plano-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button></div><div class="plano-sec"><div class="plano-title">Grupo de contas</div><div class="plano-grid"><table><tbody id="plano-grupos"></tbody></table></div></div><div class="plano-sec"><div class="plano-title">Categorias do grupo</div><div class="plano-toolbar"><button id="plano-btn-nova-cat" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova categoria</button><button id="plano-btn-altera-cat" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="plano-btn-elimina-cat" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button></div><div class="plano-grid"><table><tbody id="plano-cats"></tbody></table></div></div></section><section id="aux-panel" class="aux-panel hidden"><div class="aux-wrap"><div><div class="aux-title">Itens configuráveis</div><div class="aux-list"><table><tbody id="aux-tipos"></tbody></table></div></div><div><div class="aux-title">Conteúdo da tabela</div><div class="aux-toolbar"><button id="aux-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo</button><button id="aux-btn-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="aux-btn-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="aux-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button></div><div class="aux-cont"><table><tbody id="aux-itens"></tbody></table></div></div></div></section><div id="cad-modal-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal"><div id="cad-modal-body"></div><div class="cad-modal-actions"><button id="cad-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="cad-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);plano={btnOpen:document.getElementById("btn-open-plano"),panel:document.getElementById("plano-panel"),tbGrupos:document.getElementById("plano-grupos"),tbCats:document.getElementById("plano-cats"),btnNovoGrupo:document.getElementById("plano-btn-novo-grupo"),btnAlteraGrupo:document.getElementById("plano-btn-altera-grupo"),btnEliminaGrupo:document.getElementById("plano-btn-elimina-grupo"),btnFechar:document.getElementById("plano-btn-fechar"),btnNovaCat:document.getElementById("plano-btn-nova-cat"),btnAlteraCat:document.getElementById("plano-btn-altera-cat"),btnEliminaCat:document.getElementById("plano-btn-elimina-cat")};aux={btnOpen:document.getElementById("btn-open-aux"),panel:document.getElementById("aux-panel"),tbTipos:document.getElementById("aux-tipos"),tbItens:document.getElementById("aux-itens"),btnNovo:document.getElementById("aux-btn-novo"),btnAltera:document.getElementById("aux-btn-altera"),btnElimina:document.getElementById("aux-btn-elimina"),btnFechar:document.getElementById("aux-btn-fechar")}}
 const cadModal={bg:()=>document.getElementById("cad-modal-backdrop"),body:()=>document.getElementById("cad-modal-body"),ok:()=>document.getElementById("cad-modal-ok"),cancel:()=>document.getElementById("cad-modal-cancelar")};
 function cadModalAbrir(html,onOk){cadModal.body().innerHTML=html;cadModal.bg().classList.remove("hidden");const ok=cadModal.ok(),cancel=cadModal.cancel();const close=()=>{cadModal.bg().classList.add("hidden");ok.onclick=null;cancel.onclick=null};cancel.onclick=close;ok.onclick=async()=>{const keep=await onOk();if(keep!==false)close()}}
 async function planoCarregar(){const{res,data}=await requestJson("GET","/cadastros/grupos",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar plano de contas.";return}gruposCache=Array.isArray(data)?data:[];grupoSelId=gruposCache.length?gruposCache[0].id:null;catSelId=null;planoRenderGrupos();planoRenderCats()}
@@ -8401,10 +9327,213 @@ async function planoAbrir(){planoEnsureUI();hideAllPanels();ensurePanelChrome(pl
 function planoGrupoSel(){return gruposCache.find(x=>x.id===grupoSelId)||null}
 function planoCatSel(){return planoGrupoSel()?.categorias?.find(x=>x.id===catSelId)||null}
 function planoDialogGrupo(ed=null){cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome" value="${esc(ed?.nome||"")}"></div><div class="f"><label>Tipo</label><select id="cad-tipo"><option ${ed?.tipo==="Profissional"?"selected":""}>Profissional</option><option ${ed?.tipo==="Pessoal"?"selected":""}>Pessoal</option></select></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const tipo=document.getElementById("cad-tipo").value;if(!nome){window.alert("Informe o nome do grupo.");return false}const method=ed?"PUT":"POST";const path=ed?`/cadastros/grupos/${ed.id}`:"/cadastros/grupos";const{res,data}=await requestJson(method,path,{nome,tipo},true);if(!res.ok){window.alert(data.detail||"Falha ao salvar grupo.");return false}await planoCarregar()})}
-async function planoDialogCategoria(ed=null){const gid=grupoSelId||ed?.grupo_id;if(!gid){window.alert("Selecione um grupo.");return}const op=gruposCache.map(g=>`<option value="${g.id}" ${g.id===gid?"selected":""}>${esc(g.nome)}</option>`).join("");cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome" value="${esc(ed?.nome||"")}"></div><div class="f"><label>Grupo</label><select id="cad-grupo">${op}</select></div><div class="f"><label>Tipo</label><select id="cad-tipo"><option ${ed?.tipo==="SaÃ­da"||ed?.tipo==="Saida"?"selected":""}>SaÃ­da</option><option ${ed?.tipo==="Entrada"?"selected":""}>Entrada</option></select></div><div class="f"><label><input id="cad-trib" type="checkbox" ${ed?.tributavel?"checked":""}> Categoria tributÃ¡vel</label></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const grupo_id=Number(document.getElementById("cad-grupo").value||0);const tipo=document.getElementById("cad-tipo").value;const tributavel=document.getElementById("cad-trib").checked;if(!nome){window.alert("Informe o nome da categoria.");return false}const method=ed?"PUT":"POST";const path=ed?`/cadastros/categorias/${ed.id}`:"/cadastros/categorias";const{res,data}=await requestJson(method,path,{nome,tipo,grupo_id,tributavel},true);if(!res.ok){window.alert(data.detail||"Falha ao salvar categoria.");return false}await planoCarregar();grupoSelId=grupo_id;planoRenderCats()})}
-async function planoExcluirGrupo(){const g=planoGrupoSel();if(!g){window.alert("Selecione um grupo.");return}if(!window.confirm("Deseja eliminar este grupo?"))return;const{res,data}=await requestJson("DELETE",`/cadastros/grupos/${g.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"NÃ£o foi possÃ­vel eliminar grupo.");return}await planoCarregar()}
-async function planoExcluirCategoria(){const c=planoCatSel();if(!c){window.alert("Selecione uma categoria.");return}const chk=await requestJson("GET",`/cadastros/categorias/${c.id}/em-uso`,undefined,true);if(!chk.res.ok){window.alert(chk.data.detail||"Falha ao validar categoria.");return}if(!chk.data.em_uso){if(!window.confirm("Deseja eliminar esta categoria?"))return;const del=await requestJson("DELETE",`/cadastros/categorias/${c.id}`,undefined,true);if(!del.res.ok){window.alert(del.data.detail||"Falha ao eliminar.");return}await planoCarregar();return}const outras=(gruposCache.flatMap(g=>g.categorias||[])).filter(x=>x.id!==c.id);if(!outras.length){window.alert("NÃ£o hÃ¡ categoria destino para migraÃ§Ã£o.");return}const op=outras.sort((a,b)=>String(a.nome).localeCompare(String(b.nome))).map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join("");cadModalAbrir(`<div class="f"><label>Categoria em uso: ${esc(c.nome)}</label></div><div class="f"><label>Migrar lanÃ§amentos para:</label><select id="cad-dest">${op}</select></div>`,async()=>{const destino=Number(document.getElementById("cad-dest").value||0);const{res,data}=await requestJson("POST",`/cadastros/categorias/${c.id}/migrar-e-excluir`,{categoria_destino_id:destino},true);if(!res.ok){window.alert(data.detail||"Falha na migraÃ§Ã£o de lanÃ§amentos.");return false}await planoCarregar()})}
+async function planoDialogCategoria(ed=null){const gid=grupoSelId||ed?.grupo_id;if(!gid){window.alert("Selecione um grupo.");return}const op=gruposCache.map(g=>`<option value="${g.id}" ${g.id===gid?"selected":""}>${esc(g.nome)}</option>`).join("");cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome" value="${esc(ed?.nome||"")}"></div><div class="f"><label>Grupo</label><select id="cad-grupo">${op}</select></div><div class="f"><label>Tipo</label><select id="cad-tipo"><option ${ed?.tipo==="SaÃƒÂ­da"||ed?.tipo==="Saida"?"selected":""}>SaÃƒÂ­da</option><option ${ed?.tipo==="Entrada"?"selected":""}>Entrada</option></select></div><div class="f"><label><input id="cad-trib" type="checkbox" ${ed?.tributavel?"checked":""}> Categoria tributÃƒÂ¡vel</label></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const grupo_id=Number(document.getElementById("cad-grupo").value||0);const tipo=document.getElementById("cad-tipo").value;const tributavel=document.getElementById("cad-trib").checked;if(!nome){window.alert("Informe o nome da categoria.");return false}const method=ed?"PUT":"POST";const path=ed?`/cadastros/categorias/${ed.id}`:"/cadastros/categorias";const{res,data}=await requestJson(method,path,{nome,tipo,grupo_id,tributavel},true);if(!res.ok){window.alert(data.detail||"Falha ao salvar categoria.");return false}await planoCarregar();grupoSelId=grupo_id;planoRenderCats()})}
+async function planoExcluirGrupo(){const g=planoGrupoSel();if(!g){window.alert("Selecione um grupo.");return}if(!window.confirm("Deseja eliminar este grupo?"))return;const{res,data}=await requestJson("DELETE",`/cadastros/grupos/${g.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"NÃƒÂ£o foi possÃƒÂ­vel eliminar grupo.");return}await planoCarregar()}
+async function planoExcluirCategoria(){const c=planoCatSel();if(!c){window.alert("Selecione uma categoria.");return}const chk=await requestJson("GET",`/cadastros/categorias/${c.id}/em-uso`,undefined,true);if(!chk.res.ok){window.alert(chk.data.detail||"Falha ao validar categoria.");return}if(!chk.data.em_uso){if(!window.confirm("Deseja eliminar esta categoria?"))return;const del=await requestJson("DELETE",`/cadastros/categorias/${c.id}`,undefined,true);if(!del.res.ok){window.alert(del.data.detail||"Falha ao eliminar.");return}await planoCarregar();return}const outras=(gruposCache.flatMap(g=>g.categorias||[])).filter(x=>x.id!==c.id);if(!outras.length){window.alert("NÃƒÂ£o hÃƒÂ¡ categoria destino para migraÃƒÂ§ÃƒÂ£o.");return}const op=outras.sort((a,b)=>String(a.nome).localeCompare(String(b.nome))).map(x=>`<option value="${x.id}">${esc(x.nome)}</option>`).join("");cadModalAbrir(`<div class="f"><label>Categoria em uso: ${esc(c.nome)}</label></div><div class="f"><label>Migrar lanÃƒÂ§amentos para:</label><select id="cad-dest">${op}</select></div>`,async()=>{const destino=Number(document.getElementById("cad-dest").value||0);const{res,data}=await requestJson("POST",`/cadastros/categorias/${c.id}/migrar-e-excluir`,{categoria_destino_id:destino},true);if(!res.ok){window.alert(data.detail||"Falha na migraÃƒÂ§ÃƒÂ£o de lanÃƒÂ§amentos.");return false}await planoCarregar()})}
 let auxLayoutDesktopAplicado=false;
+function auxTipoEh(tipo,chave){
+  const txt=String(tipo||"").toLowerCase();
+  if(chave==="especialidade")return txt.includes("especialidade");
+  if(chave==="situacao_agendamento")return txt.includes("agendamento");
+  if(chave==="situacao_paciente")return txt.includes("paciente");
+  if(chave==="grupo_medicamento")return txt.includes("grupo")&&txt.includes("medicamento");
+  return false;
+}
+function auxNormalizarHexCor(value){
+  const raw=String(value??"").trim();
+  if(!raw)return"";
+  const hex=raw.replace(/^0x/i,"").replace(/^#/,"");
+  const withHash=`#${hex}`;
+  return /^#[0-9a-fA-F]{6}$/.test(withHash)?withHash.toLowerCase():"";
+}
+function auxCorrigirMojibake(texto){
+  const bruto=String(texto??"").trim();
+  if(!/[ÃÂ]/.test(bruto))return bruto;
+  try{return decodeURIComponent(escape(bruto))}catch{return bruto}
+}
+function auxCorApresentacaoFonteSistema(){
+  const origem=(typeof prestAgendaApresCorOptions==="function")?prestAgendaApresCorOptions():[];
+  const lista=Array.isArray(origem)?origem:[];
+  const out=[];
+  const seen=new Set();
+  lista.forEach(item=>{
+    const hex=auxNormalizarHexCor(item?.value||item?.hex||"");
+    if(!hex||seen.has(hex))return;
+    seen.add(hex);
+    const label=auxCorrigirMojibake(item?.label||item?.nome||hex.toUpperCase());
+    out.push({hex,label:label||hex.toUpperCase()});
+  });
+  return out;
+}
+function auxCorApresentacaoNormLabelKey(texto){
+  return String(texto||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-zA-Z ]/g,"").toLowerCase().trim();
+}
+function auxCorApresentacaoHexPorLabel(label){
+  const chave=auxCorApresentacaoNormLabelKey(auxCorrigirMojibake(label));
+  if(!chave)return"";
+  const item=auxCorApresentacaoFonteSistema().find(x=>auxCorApresentacaoNormLabelKey(x.label)===chave);
+  return item?.hex||"";
+}
+function auxCorApresentacaoOpcoesHtml(corAtual){
+  const selecionada=auxNormalizarHexCor(corAtual)||"#000000";
+  const cores=[...auxCorApresentacaoFonteSistema()];
+  if(!cores.some(item=>item.hex===selecionada)){
+    cores.push({label:selecionada.toUpperCase(),hex:selecionada});
+  }
+  return cores.map(item=>{
+    const hex=auxNormalizarHexCor(item.hex||"");
+    const selected=hex===selecionada?"selected":"";
+    const label=auxCorrigirMojibake(String(item.label||"").trim())||hex.toUpperCase();
+    return `<option value="${esc(hex)}" ${selected}>${esc(label)}</option>`;
+  }).join("");
+}
+function auxCorApresentacaoCorLabel(hex){
+  const cor=auxNormalizarHexCor(hex);
+  if(!cor)return"(Sem cor)";
+  const item=auxCorApresentacaoFonteSistema().find(x=>x.hex===cor);
+  return item?.label||cor.toUpperCase();
+}
+let auxCorComboBound=false;
+function auxCorApresentacaoGarantirEstiloCombo(){
+  const styleId="aux-cor-combo-style";
+  if(document.getElementById(styleId))return;
+  const style=document.createElement("style");
+  style.id=styleId;
+  style.textContent=
+    ".aux-cor-native-hidden{display:none!important}" +
+    ".aux-cor-combo{position:relative;width:100%;font:11px Tahoma,sans-serif}" +
+    ".aux-cor-btn{width:100%;height:22px;border:1px solid #7f9db9;background:#fff;display:grid;grid-template-columns:1fr 18px;align-items:center;padding:0 3px;box-sizing:border-box;cursor:pointer}" +
+    ".aux-cor-swatch{width:16px;height:12px;border:1px solid #222;display:inline-block;box-sizing:border-box}" +
+    ".aux-cor-label{text-align:left;padding-left:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".aux-cor-arrow{height:100%;display:flex;align-items:center;justify-content:center;border-left:1px solid #9eb6ce;background:#dbe8f6;color:#2b4b6f;font-size:10px;line-height:1}" +
+    ".aux-cor-list{position:absolute;left:0;top:21px;width:100%;max-height:none;overflow:visible;background:#f3f3f3;border:1px solid #2b8ae2;box-sizing:border-box;z-index:12050}" +
+    ".aux-cor-item{height:24px;display:grid;grid-template-columns:20px 1fr;align-items:center;gap:4px;padding:0 4px;box-sizing:border-box;cursor:pointer}" +
+    ".aux-cor-item:hover{background:#d9e8fb}" +
+    ".aux-cor-item.active{background:#0078d7;color:#fff}" +
+    ".aux-cor-hidden{display:none}";
+  document.head.appendChild(style);
+}
+function auxCorApresentacaoFecharListas(except){
+  document.querySelectorAll(".aux-cor-list").forEach(list=>{
+    if(except&&list===except)return;
+    list.classList.add("aux-cor-hidden");
+  });
+}
+function auxCorApresentacaoMontarCombo(select){
+  if(!(select instanceof HTMLSelectElement))return null;
+  auxCorApresentacaoGarantirEstiloCombo();
+  if(!auxCorComboBound){
+    document.addEventListener("click",ev=>{
+      const tgt=ev.target;
+      if(!(tgt instanceof Element)||!tgt.closest(".aux-cor-combo"))auxCorApresentacaoFecharListas();
+    });
+    document.addEventListener("keydown",ev=>{
+      if(ev.key==="Escape")auxCorApresentacaoFecharListas();
+    });
+    auxCorComboBound=true;
+  }
+  [...select.options].forEach(opt=>{
+    const hex=auxNormalizarHexCor(opt.value||"");
+    const rotulo=auxCorApresentacaoCorLabel(hex)||auxCorrigirMojibake(opt.textContent||"");
+    const corPorLabel=auxCorApresentacaoHexPorLabel(rotulo);
+    opt.dataset.auxCor=corPorLabel||hex||"#ffffff";
+    opt.textContent=rotulo;
+    if(hex)opt.value=hex;
+  });
+  const holder=select.parentElement;
+  if(!(holder instanceof HTMLElement))return null;
+  const cadModal=select.closest("#cad-modal-backdrop .cad-modal");
+  if(cadModal instanceof HTMLElement){
+    cadModal.style.overflow="visible";
+    const cadBody=cadModal.querySelector("#cad-modal-body");
+    if(cadBody instanceof HTMLElement)cadBody.style.overflow="visible";
+  }
+  let combo=holder.querySelector(".aux-cor-combo");
+  if(!(combo instanceof HTMLElement)){
+    combo=document.createElement("div");
+    combo.className="aux-cor-combo";
+    combo.innerHTML=[
+      '<button type="button" class="aux-cor-btn">',
+      '<span class="aux-cor-label"></span>',
+      '<span class="aux-cor-arrow">▼</span>',
+      "</button>",
+      '<div class="aux-cor-list aux-cor-hidden"></div>',
+    ].join("");
+    holder.appendChild(combo);
+  }
+  const btn=combo.querySelector(".aux-cor-btn");
+  const lb=combo.querySelector(".aux-cor-label");
+  const list=combo.querySelector(".aux-cor-list");
+  if(!(btn instanceof HTMLButtonElement)||!(lb instanceof HTMLElement)||!(list instanceof HTMLDivElement))return null;
+  const syncHead=()=>{
+    const opt=select.selectedOptions&&select.selectedOptions[0]?select.selectedOptions[0]:null;
+    lb.textContent=String(opt?.textContent||"");
+  };
+  const renderList=()=>{
+    list.innerHTML="";
+    [...select.options].forEach((opt,idx)=>{
+      const item=document.createElement("div");
+      item.className="aux-cor-item"+(idx===select.selectedIndex?" active":"");
+      item.innerHTML=[
+        `<span class="aux-cor-swatch" style="background:${esc(String(opt.dataset.auxCor||"#ffffff"))}"></span>`,
+        `<span class="aux-cor-label">${esc(String(opt.textContent||""))}</span>`,
+      ].join("");
+      item.addEventListener("click",()=>{
+        select.selectedIndex=idx;
+        select.dispatchEvent(new Event("change",{bubbles:true}));
+        syncHead();
+        renderList();
+        auxCorApresentacaoFecharListas();
+      });
+      list.appendChild(item);
+    });
+  };
+  btn.onclick=ev=>{
+    ev.stopPropagation();
+    const abrir=list.classList.contains("aux-cor-hidden");
+    if(abrir){
+      list.style.maxHeight="none";
+      list.style.height="auto";
+      list.style.overflow="visible";
+      list.style.bottom="auto";
+      list.style.top="21px";
+      list.scrollTop=0;
+    }
+    auxCorApresentacaoFecharListas(abrir?list:null);
+    list.classList.toggle("aux-cor-hidden",!abrir);
+  };
+  select.classList.add("aux-cor-native-hidden");
+  if(!select.dataset.auxCorBound){
+    select.addEventListener("change",()=>{
+      syncHead();
+      renderList();
+    });
+    select.dataset.auxCorBound="1";
+  }
+  syncHead();
+  renderList();
+  return combo;
+}
+function auxGerarCodigoAutomatico(){
+  let maxNum=0;
+  let width=2;
+  for(const item of Array.isArray(auxItensCache)?auxItensCache:[]){
+    const codigo=String(item?.codigo??"").trim();
+    if(!/^\d+$/.test(codigo))continue;
+    maxNum=Math.max(maxNum,Number(codigo));
+    width=Math.max(width,codigo.length);
+  }
+  return String(maxNum+1).padStart(width,"0");
+}
+async function auxPosSalvarDependencias(tipo){
+  if(!auxTipoEh(tipo,"situacao_agendamento"))return;
+  if(typeof agendaLegadoRecarregarStatus==="function"){
+    try{await agendaLegadoRecarregarStatus()}catch{}
+  }
+  if(typeof agendaSemanaRenderEventos==="function"){
+    try{agendaSemanaRenderEventos()}catch{}
+  }
+}
 function auxAplicarLayoutDesktop(){
   if(auxLayoutDesktopAplicado)return;
   const styleId="aux-desktop-layout";
@@ -8446,7 +9575,7 @@ function auxAplicarLayoutDesktop(){
       hdr.className="aux-window-title";
       panel.insertBefore(hdr,wrap||panel.firstChild);
     }
-    hdr.textContent="ConfiguraÃ§Ã£o de itens";
+    hdr.textContent="Configuração de itens";
     const right=wrap&&wrap.children.length>=2?wrap.children[1]:null;
     if(right&&!panel.querySelector("#aux-total")){
       const total=document.createElement("div");
@@ -8458,8 +9587,8 @@ function auxAplicarLayoutDesktop(){
   }
   const titles=panel?.querySelectorAll(".aux-title");
   if(titles&&titles.length>=2){
-    titles[0].textContent="Itens configurÃ¡veis";
-    titles[1].textContent="ConteÃºdo da tabela";
+    titles[0].textContent="Itens configuráveis";
+    titles[1].textContent="Conteúdo da tabela";
   }
   if(panel)syncPanelCloseButtons(panel);
   auxLayoutDesktopAplicado=true;
@@ -8477,32 +9606,180 @@ async function auxCarregarTipos(){const{res,data}=await requestJson("GET","/cada
 async function auxCarregarItens(){const tr=aux.tbTipos.querySelector("tr.selected");const tipo=tr?.dataset?.tipo||"";if(!tipo){aux.tbItens.innerHTML="";auxItensCache=[];auxSelId=null;auxAtualizarTotal();return}const{res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent(tipo)}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar itens.");return}auxItensCache=Array.isArray(data)?data:[];auxSelId=null;aux.tbItens.innerHTML=auxItensCache.map((x,i)=>`<tr data-id="${x.id}"><td class="aux-item-idx">${i+1}</td><td class="aux-item-cod">${esc(x.codigo)}</td><td>${esc(x.descricao)}</td></tr>`).join("");auxAtualizarTotal()}
 async function auxAbrir(){planoEnsureUI();auxAplicarLayoutDesktop();hideAllPanels();ensurePanelChrome(aux.panel);aux.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");if(aux.tbTipos)aux.tbTipos.tabIndex=0;if(aux.tbItens)aux.tbItens.tabIndex=0;await auxCarregarTipos();if(aux.tbTipos)aux.tbTipos.focus()}
 function auxSel(){return auxItensCache.find(x=>x.id===auxSelId)||null}
-function auxDialogItem(ed=null){const tr=aux.tbTipos.querySelector("tr.selected");const tipo=tr?.dataset?.tipo||"";if(!tipo){window.alert("Selecione um tipo.");return}const method=ed?"PUT":"POST";const path=ed?`/cadastros/auxiliares/${ed.id}`:"/cadastros/auxiliares";if(tipo==="Especialidade"){const imgOptions=['<option value=""></option>',...AUX_ESPECIALIDADE_IMAGENS.map(x=>`<option value="${x.id}" ${Number(ed?.imagem_indice||0)===x.id?"selected":""}>${esc(x.nome)}</option>`)].join("");cadModalAbrir(`<div class="f" style="display:grid;grid-template-columns:96px 1fr;gap:8px;margin-bottom:4px"><div><label style="margin-bottom:1px">CÃ³digo:</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div><label style="margin-bottom:1px">DescriÃ§Ã£o:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div></div><div class="f" style="display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:end;margin-bottom:4px"><div><label style="margin-bottom:1px">Ordem:</label><input id="cad-ordem" type="number" min="0" step="1" value="${esc(String(ed?.ordem??""))}"></div><div><label style="margin-bottom:1px">Imagem:</label><select id="cad-img">${imgOptions}</select></div></div><div class="f" style="margin-top:0;margin-bottom:0"><label style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><input id="cad-inativo" type="checkbox" style="margin:0" ${ed?.inativo?"checked":""}><span>Inativar especialidade</span></label></div>`,async()=>{const codigo=document.getElementById("cad-cod").value.trim();const descricao=document.getElementById("cad-desc").value.trim();const ordemTxt=document.getElementById("cad-ordem").value.trim();const imagemTxt=document.getElementById("cad-img").value.trim();const inativo=document.getElementById("cad-inativo").checked;if(!codigo||!descricao){window.alert("Informe o cÃ³digo e a descriÃ§Ã£o.");return false}const payload={tipo,codigo,descricao,ordem:ordemTxt===""?null:Number(ordemTxt||0),imagem_indice:imagemTxt===""?null:Number(imagemTxt||0),inativo};const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}await auxCarregarItens()});const bg=cadModal.bg();const modal=bg?.querySelector(".cad-modal");const title=modal?.querySelector(".modal-title");if(title)title.textContent=ed?"Edita item":"Insere item";if(modal){modal.style.width="380px";modal.style.maxWidth="96vw";modal.style.padding="6px";}const body=cadModal.body();if(body){body.style.font="11px Tahoma,sans-serif";body.querySelectorAll("input,select").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});}return}cadModalAbrir(`<div class="f"><label>CÃ³digo</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div class="f"><label>DescriÃ§Ã£o</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div>`,async()=>{const codigo=document.getElementById("cad-cod").value.trim();const descricao=document.getElementById("cad-desc").value.trim();if(!codigo||!descricao){window.alert("Informe o cÃ³digo e a descriÃ§Ã£o.");return false}const{res,data}=await requestJson(method,path,{tipo,codigo,descricao},true);if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}await auxCarregarItens()})}
-async function auxExcluirItem(){const it=auxSel();if(!it){window.alert("Selecione um item.");return}if(!window.confirm(`Deseja eliminar o item:\n\n${it.codigo} - ${it.descricao} ?`))return;const{res,data}=await requestJson("DELETE",`/cadastros/auxiliares/${it.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar item.");return}await auxCarregarItens()}
-function indicesEnsureUI(){if(indicesCfg)return;const style=document.createElement("style");style.textContent=".indices-modal{width:420px;max-width:96vw;max-height:92vh;overflow:auto;background:#fff;border:1px solid #bfc9d6;border-radius:8px;padding:6px 8px 8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.indices-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.indices-section{border:1px solid #cfd8e3;margin-bottom:8px}.indices-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.indices-grid{height:140px;overflow:auto}.indices-grid.small{height:120px}.indices-grid table{width:100%;border-collapse:collapse}.indices-grid th,.indices-grid td{height:20px;border-bottom:1px solid #edf1f6;padding:2px 4px;text-align:left;font:12px Tahoma,sans-serif}.indices-grid th{background:#f5f7fa;font-weight:700}.indices-grid tr.selected{background:#d9e8fb}.indices-toolbar-sub{padding:4px 6px;border-bottom:1px solid #e6edf5;background:#f9fafb}.indices-row-valor{text-align:right;padding-right:6px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-indices-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="modal indices-modal"><div class="modal-header"><div class="modal-title">ConfiguraÃ§Ã£o de Ã­ndices financeiros</div></div><div class="indices-toolbar"><button id="idx-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo Ã­ndice</button><button id="idx-btn-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="idx-btn-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="idx-btn-fecha" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="indices-section"><div class="indices-title">Ãndices financeiros</div><div class="indices-grid"><table><thead><tr><th style="width:55%">Ãndice</th><th style="width:20%">Sigla</th><th style="width:25%">Valor Atual</th></tr></thead><tbody id="idx-tbody"></tbody></table></div></div><div class="indices-section"><div class="indices-title" id="idx-cot-title">CotaÃ§Ãµes</div><div class="indices-toolbar-sub"><button id="idx-cot-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo valor</button><button id="idx-cot-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="idx-cot-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button></div><div class="indices-grid small"><table><thead><tr><th style="width:55%">Data</th><th style="width:45%">CotaÃ§Ã£o</th></tr></thead><tbody id="idx-cot-tbody"></tbody></table></div></div></div>`;document.body.appendChild(backdrop);const modal=backdrop.querySelector(".indices-modal");ensureModalChrome(modal);indicesCfg={backdrop,modal,tbIndices:backdrop.querySelector("#idx-tbody"),tbCotacoes:backdrop.querySelector("#idx-cot-tbody"),lblCotacoes:backdrop.querySelector("#idx-cot-title"),btnNovo:backdrop.querySelector("#idx-btn-novo"),btnAltera:backdrop.querySelector("#idx-btn-altera"),btnElimina:backdrop.querySelector("#idx-btn-elimina"),btnFechar:backdrop.querySelector("#idx-btn-fecha"),btnCotNovo:backdrop.querySelector("#idx-cot-novo"),btnCotAltera:backdrop.querySelector("#idx-cot-altera"),btnCotElimina:backdrop.querySelector("#idx-cot-elimina")};backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)indicesFechar()});indicesCfg.btnFechar.addEventListener("click",indicesFechar);indicesCfg.btnNovo.addEventListener("click",indicesNovo);indicesCfg.btnAltera.addEventListener("click",indicesAlterar);indicesCfg.btnElimina.addEventListener("click",indicesExcluir);indicesCfg.btnCotNovo.addEventListener("click",cotacaoNova);indicesCfg.btnCotAltera.addEventListener("click",cotacaoAlterar);indicesCfg.btnCotElimina.addEventListener("click",cotacaoExcluir);bindStandardGridActivation(indicesCfg.tbIndices,tr=>{indiceSelNumero=Number(tr.dataset.id||0)||null;cotacaoSelId=null;indicesRender();indicesCarregarCotacoes()},tr=>indicesAlterar());bindStandardGridActivation(indicesCfg.tbCotacoes,tr=>{cotacaoSelId=Number(tr.dataset.id||0)||null;indicesRenderCotacoes()},tr=>cotacaoAlterar())}
+function auxDialogItem(ed=null){
+  const tr=aux.tbTipos.querySelector("tr.selected");
+  const tipo=tr?.dataset?.tipo||"";
+  if(!tipo){window.alert("Selecione um tipo.");return}
+  const method=ed?"PUT":"POST";
+  const path=ed?`/cadastros/auxiliares/${ed.id}`:"/cadastros/auxiliares";
+  const aplicarTituloModalAux=()=>{
+    const modal=cadModal.bg()?.querySelector(".cad-modal");
+    const title=modal?.querySelector(".modal-title,.modal-standard-title");
+    if(title)title.textContent=ed?"Edita item":"Insere item";
+  };
+  if(auxTipoEh(tipo,"especialidade")){
+    const imgOptions=['<option value=""></option>',...AUX_ESPECIALIDADE_IMAGENS.map(x=>`<option value="${x.id}" ${Number(ed?.imagem_indice||0)===x.id?"selected":""}>${esc(x.nome)}</option>`)].join("");
+    cadModalAbrir(`<div class="f" style="display:grid;grid-template-columns:96px 1fr;gap:8px;margin-bottom:4px"><div><label style="margin-bottom:1px">Código:</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div><label style="margin-bottom:1px">Descrição:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div></div><div class="f" style="display:grid;grid-template-columns:78px 1fr;gap:8px;align-items:end;margin-bottom:4px"><div><label style="margin-bottom:1px">Ordem:</label><input id="cad-ordem" type="number" min="0" step="1" value="${esc(String(ed?.ordem??""))}"></div><div><label style="margin-bottom:1px">Imagem:</label><select id="cad-img">${imgOptions}</select></div></div><div class="f" style="margin-top:0;margin-bottom:0"><label style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap"><input id="cad-inativo" type="checkbox" style="margin:0" ${ed?.inativo?"checked":""}><span>Inativar especialidade</span></label></div>`,async()=>{
+      const codigo=document.getElementById("cad-cod").value.trim();
+      const descricao=document.getElementById("cad-desc").value.trim();
+      const ordemTxt=document.getElementById("cad-ordem").value.trim();
+      const imagemTxt=document.getElementById("cad-img").value.trim();
+      const inativo=document.getElementById("cad-inativo").checked;
+      if(!codigo||!descricao){window.alert("Informe o código e a descrição.");return false}
+      const payload={tipo,codigo,descricao,ordem:ordemTxt===""?null:Number(ordemTxt||0),imagem_indice:imagemTxt===""?null:Number(imagemTxt||0),inativo};
+      const{res,data}=await requestJson(method,path,payload,true);
+      if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}
+      await auxCarregarItens();
+      await auxPosSalvarDependencias(tipo);
+    });
+    aplicarTituloModalAux();
+    const bg=cadModal.bg();
+    const modal=bg?.querySelector(".cad-modal");
+    if(modal){modal.style.width="380px";modal.style.maxWidth="96vw";modal.style.padding="6px";}
+    const body=cadModal.body();
+    if(body){
+      body.style.font="11px Tahoma,sans-serif";
+      body.querySelectorAll("input,select,textarea").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});
+      body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});
+    }
+    return;
+  }
+  if(auxTipoEh(tipo,"situacao_agendamento")){
+    const corAtual=auxNormalizarHexCor(ed?.cor_apresentacao||"");
+    const opcoesCor=auxCorApresentacaoOpcoesHtml(corAtual);
+    cadModalAbrir(`<div class="f" style="display:grid;grid-template-columns:96px 1fr;gap:8px;margin-bottom:4px"><div><label style="margin-bottom:1px">Código:</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div><label style="margin-bottom:1px">Descrição:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div></div><div class="f"><label style="margin-bottom:1px">Cor de apresentação:</label><div style="display:grid;grid-template-columns:18px 1fr;gap:8px;align-items:center"><span id="cad-cor-chip" style="display:inline-block;width:16px;height:14px;border:1px solid #666;background:${esc(corAtual||"#000000")}"></span><select id="cad-cor">${opcoesCor}</select></div></div><div class="f" style="margin-top:1px;margin-bottom:0"><label style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-start;margin:0;white-space:nowrap"><input id="cad-anot" type="checkbox" ${ed?.exibir_anotacao_historico?"checked":""} style="width:14px;height:14px;margin:0;flex:0 0 auto"><span style="line-height:14px">Exibir anotação no histórico</span></label></div>`,async()=>{
+      const codigo=document.getElementById("cad-cod").value.trim();
+      const descricao=document.getElementById("cad-desc").value.trim();
+      const cor=auxNormalizarHexCor(document.getElementById("cad-cor").value.trim());
+      const exibirAnot=document.getElementById("cad-anot").checked;
+      if(!codigo||!descricao){window.alert("Informe o código e a descrição.");return false}
+      const payload={tipo,codigo,descricao,inativo:!!ed?.inativo,cor_apresentacao:cor,exibir_anotacao_historico:exibirAnot,mensagem_alerta:String(ed?.mensagem_alerta||"").trim(),desativar_paciente_sistema:!!ed?.desativar_paciente_sistema};
+      const{res,data}=await requestJson(method,path,payload,true);
+      if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}
+      await auxCarregarItens();
+      await auxPosSalvarDependencias(tipo);
+    });
+    aplicarTituloModalAux();
+    const modal=cadModal.bg()?.querySelector(".cad-modal");
+    if(modal){modal.style.width="470px";modal.style.maxWidth="96vw";modal.style.padding="6px";}
+    const body=cadModal.body();
+    if(body){
+      body.style.font="11px Tahoma,sans-serif";
+      body.querySelectorAll("input:not([type='checkbox']),select").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});
+      body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});
+    }
+    const cboCor=document.getElementById("cad-cor");
+    const chip=document.getElementById("cad-cor-chip");
+    if(cboCor)auxCorApresentacaoMontarCombo(cboCor);
+    const syncCorChip=()=>{
+      const cor=auxNormalizarHexCor(cboCor?.value||"");
+      const preview=cor||"#ffffff";
+      if(chip){
+        chip.style.background=preview;
+        chip.style.borderColor=preview==="#ffffff"?"#777":"#666";
+        chip.title=auxCorApresentacaoCorLabel(cor);
+      }
+    };
+    if(cboCor)cboCor.addEventListener("change",syncCorChip);
+    syncCorChip();
+    return;
+  }
+  if(auxTipoEh(tipo,"situacao_paciente")){
+    cadModalAbrir(`<div class="f" style="display:grid;grid-template-columns:96px 1fr;gap:8px;margin-bottom:4px"><div><label style="margin-bottom:1px">Código:</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div><label style="margin-bottom:1px">Descrição:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div></div><div class="f"><label style="margin-bottom:1px">Mensagem / alerta:</label><input id="cad-msg" value="${esc(ed?.mensagem_alerta||"")}"></div><div class="f" style="margin-top:1px;margin-bottom:0"><label style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-start;margin:0;white-space:nowrap"><input id="cad-desativar" type="checkbox" ${ed?.desativar_paciente_sistema?"checked":""} style="width:14px;height:14px;margin:0;flex:0 0 auto"><span style="line-height:14px">Desativar paciente no sistema</span></label></div>`,async()=>{
+      const codigo=document.getElementById("cad-cod").value.trim();
+      const descricao=document.getElementById("cad-desc").value.trim();
+      const mensagem=document.getElementById("cad-msg").value.trim();
+      const desativar=document.getElementById("cad-desativar").checked;
+      if(!codigo||!descricao){window.alert("Informe o código e a descrição.");return false}
+      const payload={tipo,codigo,descricao,inativo:!!ed?.inativo,cor_apresentacao:ed?.cor_apresentacao||"",exibir_anotacao_historico:!!ed?.exibir_anotacao_historico,mensagem_alerta:mensagem,desativar_paciente_sistema:desativar};
+      const{res,data}=await requestJson(method,path,payload,true);
+      if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}
+      await auxCarregarItens();
+    });
+    aplicarTituloModalAux();
+    const modal=cadModal.bg()?.querySelector(".cad-modal");
+    if(modal){modal.style.width="470px";modal.style.maxWidth="96vw";modal.style.padding="6px";}
+    const body=cadModal.body();
+    if(body){
+      body.style.font="11px Tahoma,sans-serif";
+      body.querySelectorAll("input:not([type='checkbox']),select").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});
+      body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});
+    }
+    return;
+  }
+  if(auxTipoEh(tipo,"grupo_medicamento")){
+    const codigoGerado=String(ed?.codigo||"").trim()||auxGerarCodigoAutomatico();
+    cadModalAbrir(`<div class="f"><label>Descrição:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div>`,async()=>{
+      const descricao=document.getElementById("cad-desc").value.trim();
+      if(!descricao){window.alert("Informe a descrição.");return false}
+      const payload={tipo,codigo:codigoGerado,descricao};
+      const{res,data}=await requestJson(method,path,payload,true);
+      if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}
+      await auxCarregarItens();
+      await auxPosSalvarDependencias(tipo);
+    });
+    aplicarTituloModalAux();
+    const modal=cadModal.bg()?.querySelector(".cad-modal");
+    if(modal){modal.style.width="430px";modal.style.maxWidth="96vw";modal.style.padding="6px";}
+    const body=cadModal.body();
+    if(body){
+      body.style.font="11px Tahoma,sans-serif";
+      body.querySelectorAll("input,select").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});
+      body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});
+    }
+    return;
+  }
+  cadModalAbrir(`<div class="f" style="display:grid;grid-template-columns:96px 1fr;gap:8px;margin-bottom:4px"><div><label style="margin-bottom:1px">Código:</label><input id="cad-cod" value="${esc(ed?.codigo||"")}"></div><div><label style="margin-bottom:1px">Descrição:</label><input id="cad-desc" value="${esc(ed?.descricao||"")}"></div></div>`,async()=>{
+    const codigo=document.getElementById("cad-cod").value.trim();
+    const descricao=document.getElementById("cad-desc").value.trim();
+    if(!codigo||!descricao){window.alert("Informe o código e a descrição.");return false}
+    const{res,data}=await requestJson(method,path,{tipo,codigo,descricao},true);
+    if(!res.ok){window.alert(data.detail||"Falha ao salvar item.");return false}
+    await auxCarregarItens();
+  });
+  aplicarTituloModalAux();
+  const modal=cadModal.bg()?.querySelector(".cad-modal");
+  if(modal){modal.style.width="470px";modal.style.maxWidth="96vw";modal.style.padding="6px";}
+  const body=cadModal.body();
+  if(body){
+    body.style.font="11px Tahoma,sans-serif";
+    body.querySelectorAll("input,select").forEach(el=>{el.style.height="22px";el.style.font="11px Tahoma,sans-serif"});
+    body.querySelectorAll("label").forEach(el=>{el.style.font="11px Tahoma,sans-serif"});
+  }
+}
+async function auxExcluirItem(){
+  const it=auxSel();
+  if(!it){window.alert("Selecione um item.");return}
+  if(!window.confirm(`Deseja eliminar o item:\n\n${it.codigo} - ${it.descricao} ?`))return;
+  const{res,data}=await requestJson("DELETE",`/cadastros/auxiliares/${it.id}`,undefined,true);
+  if(!res.ok){window.alert(data.detail||"Falha ao eliminar item.");return}
+  await auxCarregarItens();
+  await auxPosSalvarDependencias(it?.tipo||"");
+}
+function indicesEnsureUI(){if(indicesCfg)return;const style=document.createElement("style");style.textContent=".indices-modal{width:420px;max-width:96vw;max-height:92vh;overflow:auto;background:#fff;border:1px solid #bfc9d6;border-radius:8px;padding:6px 8px 8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.indices-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.indices-section{border:1px solid #cfd8e3;margin-bottom:8px}.indices-title{background:#008080;color:#fff;padding:3px 6px;font:700 12px Calibri,sans-serif}.indices-grid{height:140px;overflow:auto}.indices-grid.small{height:120px}.indices-grid table{width:100%;border-collapse:collapse}.indices-grid th,.indices-grid td{height:20px;border-bottom:1px solid #edf1f6;padding:2px 4px;text-align:left;font:12px Tahoma,sans-serif}.indices-grid th{background:#f5f7fa;font-weight:700}.indices-grid tr.selected{background:#d9e8fb}.indices-toolbar-sub{padding:4px 6px;border-bottom:1px solid #e6edf5;background:#f9fafb}.indices-row-valor{text-align:right;padding-right:6px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-indices-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="modal indices-modal"><div class="modal-header"><div class="modal-title">ConfiguraÃƒÂ§ÃƒÂ£o de ÃƒÂ­ndices financeiros</div></div><div class="indices-toolbar"><button id="idx-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo ÃƒÂ­ndice</button><button id="idx-btn-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="idx-btn-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><button id="idx-btn-fecha" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="indices-section"><div class="indices-title">ÃƒÂndices financeiros</div><div class="indices-grid"><table><thead><tr><th style="width:55%">ÃƒÂndice</th><th style="width:20%">Sigla</th><th style="width:25%">Valor Atual</th></tr></thead><tbody id="idx-tbody"></tbody></table></div></div><div class="indices-section"><div class="indices-title" id="idx-cot-title">CotaÃƒÂ§ÃƒÂµes</div><div class="indices-toolbar-sub"><button id="idx-cot-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo valor</button><button id="idx-cot-altera" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera</button><button id="idx-cot-elimina" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button></div><div class="indices-grid small"><table><thead><tr><th style="width:55%">Data</th><th style="width:45%">CotaÃƒÂ§ÃƒÂ£o</th></tr></thead><tbody id="idx-cot-tbody"></tbody></table></div></div></div>`;document.body.appendChild(backdrop);const modal=backdrop.querySelector(".indices-modal");ensureModalChrome(modal);indicesCfg={backdrop,modal,tbIndices:backdrop.querySelector("#idx-tbody"),tbCotacoes:backdrop.querySelector("#idx-cot-tbody"),lblCotacoes:backdrop.querySelector("#idx-cot-title"),btnNovo:backdrop.querySelector("#idx-btn-novo"),btnAltera:backdrop.querySelector("#idx-btn-altera"),btnElimina:backdrop.querySelector("#idx-btn-elimina"),btnFechar:backdrop.querySelector("#idx-btn-fecha"),btnCotNovo:backdrop.querySelector("#idx-cot-novo"),btnCotAltera:backdrop.querySelector("#idx-cot-altera"),btnCotElimina:backdrop.querySelector("#idx-cot-elimina")};backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)indicesFechar()});indicesCfg.btnFechar.addEventListener("click",indicesFechar);indicesCfg.btnNovo.addEventListener("click",indicesNovo);indicesCfg.btnAltera.addEventListener("click",indicesAlterar);indicesCfg.btnElimina.addEventListener("click",indicesExcluir);indicesCfg.btnCotNovo.addEventListener("click",cotacaoNova);indicesCfg.btnCotAltera.addEventListener("click",cotacaoAlterar);indicesCfg.btnCotElimina.addEventListener("click",cotacaoExcluir);bindStandardGridActivation(indicesCfg.tbIndices,tr=>{indiceSelNumero=Number(tr.dataset.id||0)||null;cotacaoSelId=null;indicesRender();indicesCarregarCotacoes()},tr=>indicesAlterar());bindStandardGridActivation(indicesCfg.tbCotacoes,tr=>{cotacaoSelId=Number(tr.dataset.id||0)||null;indicesRenderCotacoes()},tr=>cotacaoAlterar())}
 function indicesFechar(){if(indicesCfg?.backdrop)indicesCfg.backdrop.classList.add("hidden")}
 async function indicesAbrir(){indicesEnsureUI();const ok=await indicesCarregar();if(!ok)return;if(indicesCfg?.backdrop)indicesCfg.backdrop.classList.remove("hidden")}
-async function indicesCarregar(){const{res,data}=await requestJson("GET","/indices-financeiros",undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar Ã­ndices financeiros.");return false}indicesCache=Array.isArray(data)?data:[];if(!indiceSelNumero||!indicesCache.some(x=>Number(x.id||0)===Number(indiceSelNumero))){indiceSelNumero=indicesCache.length?Number(indicesCache[0]?.id||0):null}indicesRender();await indicesCarregarCotacoes();return true}
-function indicesRender(){if(!indicesCfg)return;indicesCfg.tbIndices.innerHTML=indicesCache.map(item=>{const id=Number(item.id||0);const selected=id===Number(indiceSelNumero);const nome=String(item.nome||"");const sigla=String(item.sigla||"");const valor=formatNumFixed(Number(item.valor_atual||0),4);return`<tr data-id="${id}" class="${selected?"selected":""}"><td>${esc(nome)}</td><td>${esc(sigla)}</td><td class="indices-row-valor">${esc(valor)}</td></tr>`}).join("")||'<tr><td colspan="3">Nenhum Ã­ndice cadastrado.</td></tr>';const sel=indicesCache.find(x=>Number(x.id||0)===Number(indiceSelNumero));if(indicesCfg.lblCotacoes){indicesCfg.lblCotacoes.textContent=sel?`CotaÃ§Ãµes para ${sel.nome}`:"CotaÃ§Ãµes"}}
-async function indicesCarregarCotacoes(){if(!indicesCfg)return;if(!indiceSelNumero){cotacoesCache=[];cotacaoSelId=null;indicesRenderCotacoes();return}const{res,data}=await requestJson("GET",`/indices-financeiros/${encodeURIComponent(String(indiceSelNumero))}/cotacoes`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar cotaÃ§Ãµes.");cotacoesCache=[];cotacaoSelId=null;indicesRenderCotacoes();return}cotacoesCache=Array.isArray(data)?data:[];if(!cotacaoSelId||!cotacoesCache.some(x=>Number(x.id||0)===Number(cotacaoSelId))){cotacaoSelId=cotacoesCache.length?Number(cotacoesCache[0]?.id||0):null}indicesRenderCotacoes()}
-function indicesRenderCotacoes(){if(!indicesCfg)return;indicesCfg.tbCotacoes.innerHTML=cotacoesCache.map(item=>{const id=Number(item.id||0);const selected=id===Number(cotacaoSelId);const data=formatDataPt(item.data||"");const valor=formatNumFixed(Number(item.valor||0),4);return`<tr data-id="${id}" class="${selected?"selected":""}"><td>${esc(data)}</td><td class="indices-row-valor">${esc(valor)}</td></tr>`}).join("")||'<tr><td colspan="2">Nenhuma cotaÃ§Ã£o cadastrada.</td></tr>'}
+async function indicesCarregar(){const{res,data}=await requestJson("GET","/indices-financeiros",undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar ÃƒÂ­ndices financeiros.");return false}indicesCache=Array.isArray(data)?data:[];if(!indiceSelNumero||!indicesCache.some(x=>Number(x.id||0)===Number(indiceSelNumero))){indiceSelNumero=indicesCache.length?Number(indicesCache[0]?.id||0):null}indicesRender();await indicesCarregarCotacoes();return true}
+function indicesRender(){if(!indicesCfg)return;indicesCfg.tbIndices.innerHTML=indicesCache.map(item=>{const id=Number(item.id||0);const selected=id===Number(indiceSelNumero);const nome=String(item.nome||"");const sigla=String(item.sigla||"");const valor=formatNumFixed(Number(item.valor_atual||0),4);return`<tr data-id="${id}" class="${selected?"selected":""}"><td>${esc(nome)}</td><td>${esc(sigla)}</td><td class="indices-row-valor">${esc(valor)}</td></tr>`}).join("")||'<tr><td colspan="3">Nenhum ÃƒÂ­ndice cadastrado.</td></tr>';const sel=indicesCache.find(x=>Number(x.id||0)===Number(indiceSelNumero));if(indicesCfg.lblCotacoes){indicesCfg.lblCotacoes.textContent=sel?`CotaÃƒÂ§ÃƒÂµes para ${sel.nome}`:"CotaÃƒÂ§ÃƒÂµes"}}
+async function indicesCarregarCotacoes(){if(!indicesCfg)return;if(!indiceSelNumero){cotacoesCache=[];cotacaoSelId=null;indicesRenderCotacoes();return}const{res,data}=await requestJson("GET",`/indices-financeiros/${encodeURIComponent(String(indiceSelNumero))}/cotacoes`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar cotaÃƒÂ§ÃƒÂµes.");cotacoesCache=[];cotacaoSelId=null;indicesRenderCotacoes();return}cotacoesCache=Array.isArray(data)?data:[];if(!cotacaoSelId||!cotacoesCache.some(x=>Number(x.id||0)===Number(cotacaoSelId))){cotacaoSelId=cotacoesCache.length?Number(cotacoesCache[0]?.id||0):null}indicesRenderCotacoes()}
+function indicesRenderCotacoes(){if(!indicesCfg)return;indicesCfg.tbCotacoes.innerHTML=cotacoesCache.map(item=>{const id=Number(item.id||0);const selected=id===Number(cotacaoSelId);const data=formatDataPt(item.data||"");const valor=formatNumFixed(Number(item.valor||0),4);return`<tr data-id="${id}" class="${selected?"selected":""}"><td>${esc(data)}</td><td class="indices-row-valor">${esc(valor)}</td></tr>`}).join("")||'<tr><td colspan="2">Nenhuma cotaÃƒÂ§ÃƒÂ£o cadastrada.</td></tr>'}
 function indicesSelecionado(){return indicesCache.find(x=>Number(x.id||0)===Number(indiceSelNumero))||null}
 function cotacaoSelecionada(){return cotacoesCache.find(x=>Number(x.id||0)===Number(cotacaoSelId))||null}
 function formatDataPt(valor){const txt=String(valor||"").trim();if(/^\d{4}-\d{2}-\d{2}$/.test(txt)){const [y,m,d]=txt.split("-");return`${d}/${m}/${y}`}return txt}
-function indicesNovo(){cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome"></div><div class="f"><label>Sigla</label><input id="cad-sigla"></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const sigla=document.getElementById("cad-sigla").value.trim();if(!nome){window.alert("Informe o nome do Ã­ndice.");return false}if(!sigla){window.alert("Informe a sigla do Ã­ndice.");return false}const{res,data}=await requestJson("POST","/indices-financeiros",{nome,sigla},true);if(!res.ok){window.alert(data.detail||"Falha ao criar Ã­ndice.");return false}await indicesCarregar()})}
-function indicesAlterar(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um Ã­ndice.");return}if(idx.reservado){window.alert("Ãndice reservado do sistema.");return}cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome" value="${esc(idx.nome||"")}"></div><div class="f"><label>Sigla</label><input id="cad-sigla" value="${esc(idx.sigla||"")}"></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const sigla=document.getElementById("cad-sigla").value.trim();if(!nome){window.alert("Informe o nome do Ã­ndice.");return false}if(!sigla){window.alert("Informe a sigla do Ã­ndice.");return false}const{res,data}=await requestJson("PATCH",`/indices-financeiros/${encodeURIComponent(String(idx.id))}`,{nome,sigla},true);if(!res.ok){window.alert(data.detail||"Falha ao alterar Ã­ndice.");return false}await indicesCarregar()})}
-async function indicesExcluir(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um Ã­ndice.");return}if(idx.reservado){window.alert("Ãndice reservado do sistema.");return}const chk=await requestJson("GET",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/em-uso`,undefined,true);if(!chk.res.ok){window.alert(chk.data.detail||"Falha ao validar Ã­ndice.");return}if(!chk.data?.em_uso){if(!window.confirm("Deseja eliminar este Ã­ndice?"))return;const del=await requestJson("DELETE",`/indices-financeiros/${encodeURIComponent(String(idx.id))}`,undefined,true);if(!del.res.ok){window.alert(del.data.detail||"Falha ao eliminar Ã­ndice.");return}await indicesCarregar();return}const alternativas=indicesCache.filter(x=>Number(x.id||0)!==Number(idx.id));if(!alternativas.length){window.alert("NÃ£o hÃ¡ Ã­ndice destino para migraÃ§Ã£o.");return}const op=alternativas.map(x=>`<option value="${x.id}">${esc(x.nome||"")}</option>`).join("");cadModalAbrir(`<div class="f"><label>Ãndice em uso: ${esc(idx.nome||"")}</label></div><div class="f"><label>Migrar dados para:</label><select id="cad-dest">${op}</select></div>`,async()=>{const destino=Number(document.getElementById("cad-dest").value||0);if(!destino){window.alert("Selecione o Ã­ndice destino.");return false}const{res,data}=await requestJson("POST",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/migrar-e-excluir`,{numero_destino:destino},true);if(!res.ok){window.alert(data.detail||"Falha ao migrar Ã­ndice.");return false}await indicesCarregar()})}
-function cotacaoNova(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um Ã­ndice.");return}const hoje=new Date();const dataPadrao=`${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;cadModalAbrir(`<div class="f"><label>Data</label><input id="cad-data" value="${dataPadrao}"></div><div class="f"><label>CotaÃ§Ã£o</label><input id="cad-valor" type="number" step="0.0001" value="1.0000"></div>`,async()=>{const data=document.getElementById("cad-data").value.trim();const valor=Number(document.getElementById("cad-valor").value||0);if(!data){window.alert("Informe a data.");return false}if(!Number.isFinite(valor)||valor<=0){window.alert("Informe uma cotaÃ§Ã£o vÃ¡lida.");return false}const{res,data:resp}=await requestJson("POST",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes`,{data,valor},true);if(!res.ok){window.alert(resp.detail||"Falha ao salvar cotaÃ§Ã£o.");return false}await indicesCarregar()})}
-function cotacaoAlterar(){const idx=indicesSelecionado();const cot=cotacaoSelecionada();if(!idx||!cot){window.alert("Selecione uma cotaÃ§Ã£o.");return}cadModalAbrir(`<div class="f"><label>Data</label><input id="cad-data" value="${esc(formatDataPt(cot.data||""))}"></div><div class="f"><label>CotaÃ§Ã£o</label><input id="cad-valor" type="number" step="0.0001" value="${esc(String(cot.valor??""))}"></div>`,async()=>{const data=document.getElementById("cad-data").value.trim();const valor=Number(document.getElementById("cad-valor").value||0);if(!data){window.alert("Informe a data.");return false}if(!Number.isFinite(valor)||valor<=0){window.alert("Informe uma cotaÃ§Ã£o vÃ¡lida.");return false}const{res,data:resp}=await requestJson("PATCH",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes/${encodeURIComponent(String(cot.id))}`,{data,valor},true);if(!res.ok){window.alert(resp.detail||"Falha ao alterar cotaÃ§Ã£o.");return false}await indicesCarregar()})}
-async function cotacaoExcluir(){const idx=indicesSelecionado();const cot=cotacaoSelecionada();if(!idx||!cot){window.alert("Selecione uma cotaÃ§Ã£o.");return}if(!window.confirm("Deseja eliminar esta cotaÃ§Ã£o?"))return;const{res,data}=await requestJson("DELETE",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes/${encodeURIComponent(String(cot.id))}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar cotaÃ§Ã£o.");return}await indicesCarregar()}
+function indicesNovo(){cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome"></div><div class="f"><label>Sigla</label><input id="cad-sigla"></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const sigla=document.getElementById("cad-sigla").value.trim();if(!nome){window.alert("Informe o nome do ÃƒÂ­ndice.");return false}if(!sigla){window.alert("Informe a sigla do ÃƒÂ­ndice.");return false}const{res,data}=await requestJson("POST","/indices-financeiros",{nome,sigla},true);if(!res.ok){window.alert(data.detail||"Falha ao criar ÃƒÂ­ndice.");return false}await indicesCarregar()})}
+function indicesAlterar(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um ÃƒÂ­ndice.");return}if(idx.reservado){window.alert("ÃƒÂndice reservado do sistema.");return}cadModalAbrir(`<div class="f"><label>Nome</label><input id="cad-nome" value="${esc(idx.nome||"")}"></div><div class="f"><label>Sigla</label><input id="cad-sigla" value="${esc(idx.sigla||"")}"></div>`,async()=>{const nome=document.getElementById("cad-nome").value.trim();const sigla=document.getElementById("cad-sigla").value.trim();if(!nome){window.alert("Informe o nome do ÃƒÂ­ndice.");return false}if(!sigla){window.alert("Informe a sigla do ÃƒÂ­ndice.");return false}const{res,data}=await requestJson("PATCH",`/indices-financeiros/${encodeURIComponent(String(idx.id))}`,{nome,sigla},true);if(!res.ok){window.alert(data.detail||"Falha ao alterar ÃƒÂ­ndice.");return false}await indicesCarregar()})}
+async function indicesExcluir(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um ÃƒÂ­ndice.");return}if(idx.reservado){window.alert("ÃƒÂndice reservado do sistema.");return}const chk=await requestJson("GET",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/em-uso`,undefined,true);if(!chk.res.ok){window.alert(chk.data.detail||"Falha ao validar ÃƒÂ­ndice.");return}if(!chk.data?.em_uso){if(!window.confirm("Deseja eliminar este ÃƒÂ­ndice?"))return;const del=await requestJson("DELETE",`/indices-financeiros/${encodeURIComponent(String(idx.id))}`,undefined,true);if(!del.res.ok){window.alert(del.data.detail||"Falha ao eliminar ÃƒÂ­ndice.");return}await indicesCarregar();return}const alternativas=indicesCache.filter(x=>Number(x.id||0)!==Number(idx.id));if(!alternativas.length){window.alert("NÃƒÂ£o hÃƒÂ¡ ÃƒÂ­ndice destino para migraÃƒÂ§ÃƒÂ£o.");return}const op=alternativas.map(x=>`<option value="${x.id}">${esc(x.nome||"")}</option>`).join("");cadModalAbrir(`<div class="f"><label>ÃƒÂndice em uso: ${esc(idx.nome||"")}</label></div><div class="f"><label>Migrar dados para:</label><select id="cad-dest">${op}</select></div>`,async()=>{const destino=Number(document.getElementById("cad-dest").value||0);if(!destino){window.alert("Selecione o ÃƒÂ­ndice destino.");return false}const{res,data}=await requestJson("POST",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/migrar-e-excluir`,{numero_destino:destino},true);if(!res.ok){window.alert(data.detail||"Falha ao migrar ÃƒÂ­ndice.");return false}await indicesCarregar()})}
+function cotacaoNova(){const idx=indicesSelecionado();if(!idx){window.alert("Selecione um ÃƒÂ­ndice.");return}const hoje=new Date();const dataPadrao=`${String(hoje.getDate()).padStart(2,"0")}/${String(hoje.getMonth()+1).padStart(2,"0")}/${hoje.getFullYear()}`;cadModalAbrir(`<div class="f"><label>Data</label><input id="cad-data" value="${dataPadrao}"></div><div class="f"><label>CotaÃƒÂ§ÃƒÂ£o</label><input id="cad-valor" type="number" step="0.0001" value="1.0000"></div>`,async()=>{const data=document.getElementById("cad-data").value.trim();const valor=Number(document.getElementById("cad-valor").value||0);if(!data){window.alert("Informe a data.");return false}if(!Number.isFinite(valor)||valor<=0){window.alert("Informe uma cotaÃƒÂ§ÃƒÂ£o vÃƒÂ¡lida.");return false}const{res,data:resp}=await requestJson("POST",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes`,{data,valor},true);if(!res.ok){window.alert(resp.detail||"Falha ao salvar cotaÃƒÂ§ÃƒÂ£o.");return false}await indicesCarregar()})}
+function cotacaoAlterar(){const idx=indicesSelecionado();const cot=cotacaoSelecionada();if(!idx||!cot){window.alert("Selecione uma cotaÃƒÂ§ÃƒÂ£o.");return}cadModalAbrir(`<div class="f"><label>Data</label><input id="cad-data" value="${esc(formatDataPt(cot.data||""))}"></div><div class="f"><label>CotaÃƒÂ§ÃƒÂ£o</label><input id="cad-valor" type="number" step="0.0001" value="${esc(String(cot.valor??""))}"></div>`,async()=>{const data=document.getElementById("cad-data").value.trim();const valor=Number(document.getElementById("cad-valor").value||0);if(!data){window.alert("Informe a data.");return false}if(!Number.isFinite(valor)||valor<=0){window.alert("Informe uma cotaÃƒÂ§ÃƒÂ£o vÃƒÂ¡lida.");return false}const{res,data:resp}=await requestJson("PATCH",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes/${encodeURIComponent(String(cot.id))}`,{data,valor},true);if(!res.ok){window.alert(resp.detail||"Falha ao alterar cotaÃƒÂ§ÃƒÂ£o.");return false}await indicesCarregar()})}
+async function cotacaoExcluir(){const idx=indicesSelecionado();const cot=cotacaoSelecionada();if(!idx||!cot){window.alert("Selecione uma cotaÃƒÂ§ÃƒÂ£o.");return}if(!window.confirm("Deseja eliminar esta cotaÃƒÂ§ÃƒÂ£o?"))return;const{res,data}=await requestJson("DELETE",`/indices-financeiros/${encodeURIComponent(String(idx.id))}/cotacoes/${encodeURIComponent(String(cot.id))}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar cotaÃƒÂ§ÃƒÂ£o.");return}await indicesCarregar()}
 const usersAtualSelecionado=()=>usersCache.find(u=>u.id===usersSelecionadoId)||null;
 function usersNormalizeText(value){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim().toLowerCase()}
 function usersIsContaMasterBase(user){if(!user||typeof user!=="object")return false;if(user.is_system_user===true)return true;const tipo=usersNormalizeText(user.tipo_usuario);const codigo=Number(user.codigo||0);return codigo===255&&tipo==="clinica"}
 function usersCanManageSelected(user){if(!user)return false;return!usersIsContaMasterBase(user)}
-function usersAtualizarAcoesToolbar(){const u=usersAtualSelecionado();const canManage=usersCanManageSelected(u);const semSelecao=!u;const disabled=semSelecao||!canManage;[usersBtnEditar,usersBtnExcluir,usersBtnPreferencias,usersBtnPermissoes].forEach(btn=>{if(!btn)return;btn.disabled=disabled});if(usersBtnEditar)usersBtnEditar.title=disabled?(!u?"Selecione um usuÃ¡rio.":"Conta base 'ClÃ­nica' Ã© protegida."):"";if(usersBtnExcluir)usersBtnExcluir.title=disabled?(!u?"Selecione um usuÃ¡rio.":"Conta base 'ClÃ­nica' Ã© protegida."):"";if(usersBtnPreferencias)usersBtnPreferencias.title=disabled?(!u?"Selecione um usuÃ¡rio.":"Conta base 'ClÃ­nica' Ã© protegida."):"";if(usersBtnPermissoes)usersBtnPermissoes.title=disabled?(!u?"Selecione um usuÃ¡rio.":"Conta base 'ClÃ­nica' Ã© protegida."):""}
+function usersAtualizarAcoesToolbar(){const u=usersAtualSelecionado();const canManage=usersCanManageSelected(u);const semSelecao=!u;const disabled=semSelecao||!canManage;[usersBtnEditar,usersBtnExcluir,usersBtnPreferencias,usersBtnPermissoes].forEach(btn=>{if(!btn)return;btn.disabled=disabled});if(usersBtnEditar)usersBtnEditar.title=disabled?(!u?"Selecione um usuÃƒÂ¡rio.":"Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida."):"";if(usersBtnExcluir)usersBtnExcluir.title=disabled?(!u?"Selecione um usuÃƒÂ¡rio.":"Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida."):"";if(usersBtnPreferencias)usersBtnPreferencias.title=disabled?(!u?"Selecione um usuÃƒÂ¡rio.":"Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida."):"";if(usersBtnPermissoes)usersBtnPermissoes.title=disabled?(!u?"Selecione um usuÃƒÂ¡rio.":"Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida."):""}
 function usersSelecionar(id){usersSelecionadoId=Number(id||0)||null;usersTbody.querySelectorAll("tr[data-id]").forEach(tr=>tr.classList.toggle("selected",Number(tr.dataset.id||0)===usersSelecionadoId));usersAtualizarAcoesToolbar()}
 function usersOptions(items,valueField,labelField,selectedValue,placeholder){const opts=[];if(placeholder!==undefined)opts.push(`<option value="">${esc(placeholder)}</option>`);(Array.isArray(items)?items:[]).forEach(item=>{const value=String(item?.[valueField]??"");const label=String(item?.[labelField]??"").trim()||value;const selected=String(selectedValue??"")===value?' selected':"";opts.push(`<option value="${esc(value)}"${selected}>${esc(label)}</option>`)});return opts.join("")}
-async function usersCarregarCombos(){const [tiposResp,prestResp,undResp]=await Promise.all([requestJson("GET","/cadastros/auxiliares?tipo="+encodeURIComponent("Tipos de usuÃ¡rio"),undefined,true),requestJson("GET","/cadastros/prestadores",undefined,true),requestJson("GET","/cadastros/unidades-atendimento/combos",undefined,true)]);usersTiposCache=(tiposResp.res?.ok&&Array.isArray(tiposResp.data)?tiposResp.data:[]).filter(x=>String(x.descricao||"").trim());usersPrestadoresLookup=((prestResp.res?.ok&&prestResp.data&&Array.isArray(prestResp.data.itens))?prestResp.data.itens:[]).filter(x=>Number(x.row_id||x.id||0)>0);usersUnidadesLookup=(undResp.res?.ok&&Array.isArray(undResp.data)?undResp.data:[]).filter(x=>Number(x.row_id||x.id||0)>0)}
+async function usersCarregarCombos(){const [tiposResp,prestResp,undResp]=await Promise.all([requestJson("GET","/cadastros/auxiliares?tipo="+encodeURIComponent("Tipos de usuÃƒÂ¡rio"),undefined,true),requestJson("GET","/cadastros/prestadores",undefined,true),requestJson("GET","/cadastros/unidades-atendimento/combos",undefined,true)]);usersTiposCache=(tiposResp.res?.ok&&Array.isArray(tiposResp.data)?tiposResp.data:[]).filter(x=>String(x.descricao||"").trim());usersPrestadoresLookup=((prestResp.res?.ok&&prestResp.data&&Array.isArray(prestResp.data.itens))?prestResp.data.itens:[]).filter(x=>Number(x.row_id||x.id||0)>0);usersUnidadesLookup=(undResp.res?.ok&&Array.isArray(undResp.data)?undResp.data:[]).filter(x=>Number(x.row_id||x.id||0)>0)}
 function usersPermNormalizeLevel(nivel){const value=String(nivel||"").trim().toLowerCase();if(value==="habilitado"||value==="protegido"||value==="desabilitado")return value;return"desabilitado"}
 function usersPermIcon(level){const normalized=usersPermNormalizeLevel(level);if(normalized==="protegido"){return`<img class="users-perm-key" src="/desktop-assets/chave.png" alt="senha" title="Solicita senha">`}return`<span class="users-perm-dot ${normalized}" title="${esc(normalized)}"></span>`}
 function usersPermModuleCode(item){if(!item)return"";const code=item?.codigo??item?.id??item?.id_modulo??item?.ID_MODULO;return String(code||"").trim()}
@@ -8515,24 +9792,24 @@ function usersPermSortFunctions(list){const items=Array.isArray(list)?list.slice
 function usersPermNormalizeFunctionsByModule(raw){const out={};if(raw&&typeof raw==="object"){Object.keys(raw).forEach(key=>{const k=String(key||"").trim();if(!k)return;const list=Array.isArray(raw[key])?raw[key]:[];out[k]=list.filter(Boolean)})}return out}
 function usersPermGetFunctionsForModule(modulo){const key=String(modulo||"").trim();if(!key)return[];const source=usersPermFunctionsByModule||{};let funcoes=source[key];if(!Array.isArray(funcoes)){const num=Number(key);if(Number.isFinite(num)){funcoes=source[String(num)]||source[num]}}if(!Array.isArray(funcoes)&&usersPermEasyMode){const item=(Array.isArray(usersPermModules)?usersPermModules:[]).find(m=>String(usersPermModuleCode(m))===key||String(m?.id||"").trim()===key);if(item){const altKey=String(item?.id??item?.codigo??"").trim();if(Array.isArray(source[altKey]))funcoes=source[altKey]}}if(!Array.isArray(funcoes))return[];return usersPermSortFunctions(funcoes)}
 function usersPermFuncLevel(funcId,moduleLevel){const base=usersPermNormalizeLevel(moduleLevel);if(base==="desabilitado")return"desabilitado";const key=String(funcId||"").trim();if(!key)return base;const raw=usersPermFuncLevels?.[key];return usersPermNormalizeLevel(raw||moduleLevel)}
-async function usersPermConfirmPassword(){if(!usersPermEditId)return false;const senha=(window.prompt("Digite a senha do usuÃ¡rio para confirmar:")||"").trim();if(!senha)return false;const{res,data}=await requestJson("POST",`/admin/users/${usersPermEditId}/verify-password`,{senha},true);if(!res.ok){window.alert(data.detail||"Senha incorreta.");return false}return true}
+async function usersPermConfirmPassword(){if(!usersPermEditId)return false;const senha=(window.prompt("Digite a senha do usuÃƒÂ¡rio para confirmar:")||"").trim();if(!senha)return false;const{res,data}=await requestJson("POST",`/admin/users/${usersPermEditId}/verify-password`,{senha},true);if(!res.ok){window.alert(data.detail||"Senha incorreta.");return false}return true}
 async function usersPermApplyLevel(level,scope){const alvo=(scope==="func"&&usersPermSelectedFuncId)?"func":"module";if(level==="protegido"){const ok=await usersPermConfirmPassword();if(!ok){usersPermSyncModuleRadios();usersPermSyncFuncRadios();return}}if(alvo==="func"){usersPermSetFuncLevel(level)}else{usersPermSetModuleLevel(level)}}
 function usersPermSyncModuleRadios(){if(!usersPermModuleRadioH||!usersPermModuleRadioD||!usersPermModuleRadioP)return;const nivel=usersPermNormalizeLevel(usersPermCurrent?.[usersPermSelectedModule]);usersPermModuleRadioH.checked=nivel==="habilitado";usersPermModuleRadioD.checked=nivel==="desabilitado";usersPermModuleRadioP.checked=nivel==="protegido";const disabled=!usersPermSelectedModule;if(usersPermModuleActions)usersPermModuleActions.classList.toggle("disabled",disabled);[usersPermModuleRadioH,usersPermModuleRadioD,usersPermModuleRadioP].forEach(r=>{if(r)r.disabled=disabled})}
 function usersPermSyncFuncRadios(){if(!usersPermFuncRadioH||!usersPermFuncRadioD||!usersPermFuncRadioP)return;const nivel=usersPermFuncLevel(usersPermSelectedFuncId,usersPermCurrent?.[usersPermSelectedModule]);usersPermFuncRadioH.checked=nivel==="habilitado";usersPermFuncRadioD.checked=nivel==="desabilitado";usersPermFuncRadioP.checked=nivel==="protegido";const disabled=!usersPermSelectedFuncId;if(usersPermFuncActions)usersPermFuncActions.classList.toggle("disabled",disabled);[usersPermFuncRadioH,usersPermFuncRadioD,usersPermFuncRadioP].forEach(r=>{if(r)r.disabled=disabled})}
 function usersPermBuildPayload(){const permissoes={};Object.keys(usersPermCurrent||{}).forEach(codigo=>{permissoes[codigo]=usersPermNormalizeLevel(usersPermCurrent[codigo])});return usersPermEasyMode?{permissoes:{},easy_modules:permissoes,easy_funcoes:usersPermFuncLevels||{},easy_mode:true}:{permissoes}}
-async function usersPermAutoSave(){if(!usersPermEditId)return;const payload=usersPermBuildPayload();const{res,data}=await requestJson("PATCH",`/admin/users/${usersPermEditId}/permissions`,payload,true);if(!res.ok){setUsersStatus(data.detail||"Falha ao salvar permissÃµes.",true);return}setUsersStatus("PermissÃµes salvas.",false)}
+async function usersPermAutoSave(){if(!usersPermEditId)return;const payload=usersPermBuildPayload();const{res,data}=await requestJson("PATCH",`/admin/users/${usersPermEditId}/permissions`,payload,true);if(!res.ok){setUsersStatus(data.detail||"Falha ao salvar permissÃƒÂµes.",true);return}setUsersStatus("PermissÃƒÂµes salvas.",false)}
 function usersPermScheduleAutoSave(){if(usersPermAutosaveTimer){window.clearTimeout(usersPermAutosaveTimer)}usersPermAutosaveTimer=window.setTimeout(()=>{usersPermAutosaveTimer=null;usersPermAutoSave()},500)}
 function usersPermFlushAutoSave(){if(usersPermAutosaveTimer){window.clearTimeout(usersPermAutosaveTimer);usersPermAutosaveTimer=null;usersPermAutoSave()}}
 function usersPermSetModuleLevel(level){const modulo=String(usersPermSelectedModule||"").trim();if(!modulo)return;usersPermCurrent[modulo]=usersPermNormalizeLevel(level);usersRenderPermissoes(usersPermModules,usersPermLevels,usersPermCurrent);usersPermSelecionarModulo(modulo);usersPermScheduleAutoSave()}
 function usersPermSetFuncLevel(level){const funcId=String(usersPermSelectedFuncId||"").trim();if(!funcId)return;usersPermFuncLevels[funcId]=usersPermNormalizeLevel(level);usersPermRenderFuncoes();usersPermSyncFuncRadios();usersPermScheduleAutoSave()}
-function usersBuildFallbackProfiles(modules){const all={};(Array.isArray(modules)?modules:[]).forEach(item=>{const cod=String(item?.codigo||"").trim();if(cod)all[cod]="habilitado"});return[{codigo:"admin",nome:"Administrador",tipo_usuario:"",is_admin:true,permissoes:{...all}},{codigo:"clinica",nome:"ClÃ­nica",tipo_usuario:"ClÃ­nica",is_admin:false,permissoes:{usuarios:"protegido",prestadores:"protegido",agenda:"habilitado",financeiro:"protegido",materiais:"habilitado",procedimentos:"habilitado",anamnese:"habilitado",relatorios:"protegido",configuracao:"protegido"}},{codigo:"dentista",nome:"CirurgiÃ£o dentista",tipo_usuario:"CirurgiÃ£o dentista",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"desabilitado",agenda:"habilitado",financeiro:"protegido",materiais:"habilitado",procedimentos:"habilitado",anamnese:"habilitado",relatorios:"protegido",configuracao:"desabilitado"}},{codigo:"auxiliar",nome:"Auxiliar odontolÃ³gico(a)",tipo_usuario:"Auxiliar odontolÃ³gico(a)",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"desabilitado",agenda:"habilitado",financeiro:"desabilitado",materiais:"desabilitado",procedimentos:"desabilitado",anamnese:"habilitado",relatorios:"desabilitado",configuracao:"desabilitado"}},{codigo:"func_admin",nome:"FuncionÃ¡rio(a) administrativo(a)",tipo_usuario:"FuncionÃ¡rio(a) administrativo(a)",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"protegido",agenda:"habilitado",financeiro:"protegido",materiais:"protegido",procedimentos:"protegido",anamnese:"protegido",relatorios:"protegido",configuracao:"protegido"}}]}
-function usersBuildFallbackFunctionsByModule(){return{usuarios:["Inserir usuÃ¡rio","Alterar usuÃ¡rio","Eliminar usuÃ¡rio","Alterar senha","Configurar permissÃµes"],prestadores:["Inserir prestador","Alterar prestador","Eliminar prestador","Configurar credenciamento","Configurar comissÃ£o"],agenda:["Inserir agendamento","Alterar agendamento","Eliminar agendamento","Agenda de contatos","Quadro de avisos","Controle de retornos"],financeiro:["Inserir lanÃ§amento","Alterar lanÃ§amento","Eliminar lanÃ§amento","Baixa de lanÃ§amento","Emitir recibo","Contas a receber","ComissÃµes internas"],materiais:["Inserir item","Alterar item","Eliminar item","Inserir movimentaÃ§Ã£o","Alterar movimentaÃ§Ã£o","Eliminar movimentaÃ§Ã£o"],procedimentos:["Inserir intervenÃ§Ãµes","Alterar intervenÃ§Ãµes","Eliminar intervenÃ§Ãµes","CriaÃ§Ã£o de tratamento","AlteraÃ§Ã£o de tratamento","OrÃ§amento","Especialidades"],anamnese:["Alterar resposta","Inserir medicamento","Alterar medicamento","Eliminar medicamento","RestriÃ§Ãµes terapÃªuticas","QuestionÃ¡rios de anamnese"],relatorios:["Pesquisa pacientes","Pesquisa contatos","Tratamentos","Financeiros","EstatÃ­sticos","Agendas","Estoques","ProtÃ©ticos","Fichas em branco","Mala direta"],configuracao:["PreferÃªncias","Tabelas auxiliares","ConvÃªnios e planos","Unidades de atendimento","Chat interno"]}}
-async function usersCarregarPermissoesSchema(){if(usersPermSchema)return usersPermSchema;const{res,data}=await requestJson("GET","/admin/users/permissions/schema",undefined,true);if(!res.ok){throw new Error(data.detail||"Falha ao carregar esquema de permissÃµes.")}const modules=Array.isArray(data?.modules)?data.modules:[];const levels=Array.isArray(data?.levels)?data.levels:["desabilitado","protegido","habilitado"];const profiles=Array.isArray(data?.profiles)&&data.profiles.length?data.profiles:usersBuildFallbackProfiles(modules);const functionsByModule=(data&&typeof data.functions_by_module==="object"&&data.functions_by_module)?data.functions_by_module:usersBuildFallbackFunctionsByModule();const easyModules=Array.isArray(data?.easy_modules_schema)?data.easy_modules_schema:[];const easyLevels=Array.isArray(data?.easy_levels)?data.easy_levels:levels;const easyFunctions=(data&&typeof data.easy_functions_by_module==="object"&&data.easy_functions_by_module)?data.easy_functions_by_module:{};usersPermSchema={modules,levels,profiles,functions_by_module:functionsByModule,easy_modules:easyModules,easy_levels:easyLevels,easy_functions_by_module:easyFunctions};return usersPermSchema}
+function usersBuildFallbackProfiles(modules){const all={};(Array.isArray(modules)?modules:[]).forEach(item=>{const cod=String(item?.codigo||"").trim();if(cod)all[cod]="habilitado"});return[{codigo:"admin",nome:"Administrador",tipo_usuario:"",is_admin:true,permissoes:{...all}},{codigo:"clinica",nome:"ClÃƒÂ­nica",tipo_usuario:"ClÃƒÂ­nica",is_admin:false,permissoes:{usuarios:"protegido",prestadores:"protegido",agenda:"habilitado",financeiro:"protegido",materiais:"habilitado",procedimentos:"habilitado",anamnese:"habilitado",relatorios:"protegido",configuracao:"protegido"}},{codigo:"dentista",nome:"CirurgiÃƒÂ£o dentista",tipo_usuario:"CirurgiÃƒÂ£o dentista",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"desabilitado",agenda:"habilitado",financeiro:"protegido",materiais:"habilitado",procedimentos:"habilitado",anamnese:"habilitado",relatorios:"protegido",configuracao:"desabilitado"}},{codigo:"auxiliar",nome:"Auxiliar odontolÃƒÂ³gico(a)",tipo_usuario:"Auxiliar odontolÃƒÂ³gico(a)",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"desabilitado",agenda:"habilitado",financeiro:"desabilitado",materiais:"desabilitado",procedimentos:"desabilitado",anamnese:"habilitado",relatorios:"desabilitado",configuracao:"desabilitado"}},{codigo:"func_admin",nome:"FuncionÃƒÂ¡rio(a) administrativo(a)",tipo_usuario:"FuncionÃƒÂ¡rio(a) administrativo(a)",is_admin:false,permissoes:{usuarios:"desabilitado",prestadores:"protegido",agenda:"habilitado",financeiro:"protegido",materiais:"protegido",procedimentos:"protegido",anamnese:"protegido",relatorios:"protegido",configuracao:"protegido"}}]}
+function usersBuildFallbackFunctionsByModule(){return{usuarios:["Inserir usuÃƒÂ¡rio","Alterar usuÃƒÂ¡rio","Eliminar usuÃƒÂ¡rio","Alterar senha","Configurar permissÃƒÂµes"],prestadores:["Inserir prestador","Alterar prestador","Eliminar prestador","Configurar credenciamento","Configurar comissÃƒÂ£o"],agenda:["Inserir agendamento","Alterar agendamento","Eliminar agendamento","Agenda de contatos","Quadro de avisos","Controle de retornos"],financeiro:["Inserir lanÃƒÂ§amento","Alterar lanÃƒÂ§amento","Eliminar lanÃƒÂ§amento","Baixa de lanÃƒÂ§amento","Emitir recibo","Contas a receber","ComissÃƒÂµes internas"],materiais:["Inserir item","Alterar item","Eliminar item","Inserir movimentaÃƒÂ§ÃƒÂ£o","Alterar movimentaÃƒÂ§ÃƒÂ£o","Eliminar movimentaÃƒÂ§ÃƒÂ£o"],procedimentos:["Inserir intervenÃƒÂ§ÃƒÂµes","Alterar intervenÃƒÂ§ÃƒÂµes","Eliminar intervenÃƒÂ§ÃƒÂµes","CriaÃƒÂ§ÃƒÂ£o de tratamento","AlteraÃƒÂ§ÃƒÂ£o de tratamento","OrÃƒÂ§amento","Especialidades"],anamnese:["Alterar resposta","Inserir medicamento","Alterar medicamento","Eliminar medicamento","RestriÃƒÂ§ÃƒÂµes terapÃƒÂªuticas","QuestionÃƒÂ¡rios de anamnese"],relatorios:["Pesquisa pacientes","Pesquisa contatos","Tratamentos","Financeiros","EstatÃƒÂ­sticos","Agendas","Estoques","ProtÃƒÂ©ticos","Fichas em branco","Mala direta"],configuracao:["PreferÃƒÂªncias","Tabelas auxiliares","ConvÃƒÂªnios e planos","Unidades de atendimento","Chat interno"]}}
+async function usersCarregarPermissoesSchema(){if(usersPermSchema)return usersPermSchema;const{res,data}=await requestJson("GET","/admin/users/permissions/schema",undefined,true);if(!res.ok){throw new Error(data.detail||"Falha ao carregar esquema de permissÃƒÂµes.")}const modules=Array.isArray(data?.modules)?data.modules:[];const levels=Array.isArray(data?.levels)?data.levels:["desabilitado","protegido","habilitado"];const profiles=Array.isArray(data?.profiles)&&data.profiles.length?data.profiles:usersBuildFallbackProfiles(modules);const functionsByModule=(data&&typeof data.functions_by_module==="object"&&data.functions_by_module)?data.functions_by_module:usersBuildFallbackFunctionsByModule();const easyModules=Array.isArray(data?.easy_modules_schema)?data.easy_modules_schema:[];const easyLevels=Array.isArray(data?.easy_levels)?data.easy_levels:levels;const easyFunctions=(data&&typeof data.easy_functions_by_module==="object"&&data.easy_functions_by_module)?data.easy_functions_by_module:{};usersPermSchema={modules,levels,profiles,functions_by_module:functionsByModule,easy_modules:easyModules,easy_levels:easyLevels,easy_functions_by_module:easyFunctions};return usersPermSchema}
 function usersPopularModalCombos(user=null){if(usersModalTipo)usersModalTipo.innerHTML=usersOptions(usersTiposCache,"descricao","descricao",user?.tipo_usuario||"","");if(usersModalPrestador)usersModalPrestador.innerHTML=usersOptions(usersPrestadoresLookup,"row_id","nome",user?.prestador_row_id||"","<< Nenhum >>");if(usersModalUnidade)usersModalUnidade.innerHTML=usersOptions(usersUnidadesLookup,"row_id","nome",user?.unidade_row_id||"","<< Nenhuma >>")}
 function usersSyncSenhaAtualVisibility(){if(!usersModalSenhaAtualWrap)return;const editar=usersModalMode==="editar";usersModalSenhaAtualWrap.style.display=editar?"":"none";if(!editar&&usersModalSenhaAtual)usersModalSenhaAtual.value=""}
 function usersToggleSenhaVisibilidade(){const mostrar=!!usersModalShowSenha?.checked;const tipo=mostrar?"text":"password";[usersModalSenhaAtual,usersModalSenha,usersModalConfirma].forEach(el=>{if(el)el.type=tipo})}
 function usersPreencherModal(user=null){usersModalNome.value=String(user?.nome||"");if(usersModalApelido)usersModalApelido.value=String(user?.apelido||"");if(usersModalEmail)usersModalEmail.value=String(user?.email||"");if(usersModalAtivo)usersModalAtivo.checked=user?user.ativo===false:false;if(usersModalAdmin)usersModalAdmin.checked=!!user?.is_admin;if(usersModalForcarSenha)usersModalForcarSenha.checked=!!user?.forcar_troca_senha;if(usersModalSenhaAtual)usersModalSenhaAtual.value="";usersModalSenha.value="";usersModalConfirma.value="";if(usersModalShowSenha)usersModalShowSenha.checked=false;usersSyncSenhaAtualVisibility();usersToggleSenhaVisibilidade();usersPopularModalCombos(user)}
-function usersRenderAdvanced(){if(!usersCache.length){usersTbody.innerHTML='<tr><td colspan="5">Sem usuarios.</td></tr>';usersSelecionadoId=null;usersAtualizarAcoesToolbar();return}usersTbody.innerHTML=usersCache.map(u=>{const conectado=u.online?'<span style="color:#0a7a00">Sim</span>':'<span style="color:#1f2937">NÃ£o</span>';const status=u.ativo?'<span title="Ativo" style="color:#0a7a00;font-size:18px;line-height:1">â—</span>':'<span title="Inativo" style="color:#b00020;font-size:18px;line-height:1">â—</span>';return`<tr data-id="${u.id}"><td>${esc(u.nome||"-")}</td><td>${esc(u.apelido||"-")}</td><td>${esc(u.tipo_usuario||"-")}</td><td>${conectado}</td><td>${status}</td></tr>`}).join("");const existeSelecionado=usersCache.some(u=>Number(u.id||0)===Number(usersSelecionadoId||0));if(!existeSelecionado)usersSelecionadoId=Number(usersCache[0]?.id||0)||null;if(usersSelecionadoId)usersSelecionar(usersSelecionadoId);else usersAtualizarAcoesToolbar()}
+function usersRenderAdvanced(){if(!usersCache.length){usersTbody.innerHTML='<tr><td colspan="5">Sem usuarios.</td></tr>';usersSelecionadoId=null;usersAtualizarAcoesToolbar();return}usersTbody.innerHTML=usersCache.map(u=>{const conectado=u.online?'<span style="color:#0a7a00">Sim</span>':'<span style="color:#1f2937">NÃƒÂ£o</span>';const status=u.ativo?'<span title="Ativo" style="color:#0a7a00;font-size:18px;line-height:1">Ã¢â€”Â</span>':'<span title="Inativo" style="color:#b00020;font-size:18px;line-height:1">Ã¢â€”Â</span>';return`<tr data-id="${u.id}"><td>${esc(u.nome||"-")}</td><td>${esc(u.apelido||"-")}</td><td>${esc(u.tipo_usuario||"-")}</td><td>${conectado}</td><td>${status}</td></tr>`}).join("");const existeSelecionado=usersCache.some(u=>Number(u.id||0)===Number(usersSelecionadoId||0));if(!existeSelecionado)usersSelecionadoId=Number(usersCache[0]?.id||0)||null;if(usersSelecionadoId)usersSelecionar(usersSelecionadoId);else usersAtualizarAcoesToolbar()}
 async function carregarUsuarios(silent=false){if(!silent)setUsersStatus("",false);try{let res,data;if(usersGrantOverride){({res,data}=await requestJsonBase("GET","/admin/users",undefined,true,{"X-Protected-Grant":usersGrantOverride}));if(res&&res.ok){usersCache=Array.isArray(data)?data:[];usersRenderAdvanced();return}}({res,data}=await requestJson("GET","/admin/users",undefined,true));if(!res.ok){setUsersStatus(data.detail||"Falha ao carregar usuarios.",true);return}usersCache=Array.isArray(data)?data:[];usersRenderAdvanced()}catch{setUsersStatus("Erro de conexao ao carregar usuarios.",true)}}
 function usersStartRefresh(){usersStopRefresh();usersRefreshTimer=window.setInterval(()=>{if(usersPanel.classList.contains("hidden"))return;carregarUsuarios(true)},3000)}
 function usersStopRefresh(){if(usersRefreshTimer){window.clearInterval(usersRefreshTimer);usersRefreshTimer=null}}
@@ -8542,15 +9819,15 @@ function usersFecharModal(){usersModalBackdrop.classList.add("hidden")}
 async function usersSalvarEstrutural(){const codigoTxt=(usersModalCodigo.value||"").trim();const codigo=Number(codigoTxt||0);const nome=(usersModalNome.value||"").trim();const apelido=(usersModalApelido?.value||"").trim();const tipo_usuario=(usersModalTipo?.value||"").trim();const email=(usersModalEmail?.value||"").trim();const prestador_row_id=Number(usersModalPrestador?.value||0)||null;const unidade_row_id=Number(usersModalUnidade?.value||0)||null;const ativo=!usersModalAtivo?.checked;const usuarioEdicao=usersModalMode==="editar"?usersCache.find(u=>Number(u.id||0)===Number(usersModalEditId||0))||null:null;const is_admin=usersModalMode==="editar"?!!usuarioEdicao?.is_admin:false;const forcar_troca_senha=!!usersModalForcarSenha?.checked;const senhaAtual=usersModalSenhaAtual?.value||"";const senha=usersModalSenha.value||"";const confirma=usersModalConfirma.value||"";if(!codigo||!Number.isInteger(codigo)||codigo<=0){window.alert("Informe um codigo numerico valido.");return}if(!nome){window.alert("Informe o nome do usuario.");return}const payload={codigo,nome,apelido,tipo_usuario,email:email||null,prestador_row_id,unidade_row_id,ativo,is_admin,forcar_troca_senha};let res,data;if(usersModalMode==="novo"){if(!senha){window.alert("Informe a senha.");return}if(senha!==confirma){window.alert("A confirmacao da senha nao confere.");return}payload.senha=senha;payload.confirma_senha=confirma;({res,data}=await requestJson("POST","/admin/users",payload,true))}else{const houveSenha=Boolean(senhaAtual||senha||confirma);if(houveSenha){if(!senhaAtual){window.alert("Informe a senha atual.");return}if(!senha){window.alert("Informe a nova senha.");return}if(senha!==confirma){window.alert("A confirmacao da senha nao confere.");return}const alvoNome=usuarioEdicao?.nome||nome;const alvoCodigo=Number(usuarioEdicao?.codigo||codigo)||null;const payloadSenha={usuario:alvoNome,senha_atual:senhaAtual,nova_senha:senha,confirma_senha:confirma};if(alvoCodigo)payloadSenha.codigo=alvoCodigo;const respSenha=await requestJson("POST","/admin/users/change-password",payloadSenha,true);if(!respSenha.res.ok){window.alert(respSenha.data.detail||"Falha ao alterar senha.");return}}({res,data}=await requestJson("PATCH","/admin/users/"+usersModalEditId,payload,true))}if(!res.ok){window.alert(data.detail||"Falha ao salvar usuario.");return}usersFecharModal();setUsersStatus(data.detail||"Usuario salvo com sucesso.",false);await carregarUsuarios()}
 async function usersSalvarNovo(){await usersSalvarEstrutural()}
 function usersPassSetLayout(showMeta=false,showAtual=false){const wrapCodigo=usersPassCodigo?.closest("div");const wrapUsuario=usersPassUsuario?.closest("div");const wrapAtual=usersPassAtual?.closest("div");if(wrapCodigo)wrapCodigo.style.display=showMeta?"":"none";if(wrapUsuario)wrapUsuario.style.display=showMeta?"":"none";if(wrapAtual)wrapAtual.style.display=showAtual?"":"none";if(usersPassTitle)usersPassTitle.textContent=showAtual?"Alterar senha":"Troca de senha"}
-async function usersSolicitarSenhaAtual(){try{const senha=await protectedPassDialog();if(senha===null)return null;if(!senha){const ok=window.confirm("Sua senha ainda nÃ£o foi cadastrada.\nDeseja cadastrÃ¡-la agora ?");if(!ok)return null}return senha||""}catch{return null}}
+async function usersSolicitarSenhaAtual(){try{const senha=await protectedPassDialog();if(senha===null)return null;if(!senha){const ok=window.confirm("Sua senha ainda nÃƒÂ£o foi cadastrada.\nDeseja cadastrÃƒÂ¡-la agora ?");if(!ok)return null}return senha||""}catch{return null}}
 function usersAbrirModalSenha(contexto=null){const ctx=contexto||usersChangePassContext||{};usersPassCodigo.value=ctx.codigo?String(ctx.codigo):"";usersPassUsuario.value=String(ctx.usuario||"");usersPassAtual.value="";usersPassNova.value="";usersPassConfirma.value="";usersPassSetLayout(false,false);usersPassBackdrop.classList.remove("hidden")}
 function usersFecharModalSenha(){usersPassBackdrop.classList.add("hidden");usersChangePassContext=null}
-async function usersSalvarSenha(){const ctx=usersChangePassContext||{};const codigoTxt=ctx.codigo?String(ctx.codigo):String((usersPassCodigo.value||"").trim());const usuario=String(ctx.usuario||usersPassUsuario.value||"").trim();const senha_atual=ctx.senhaAtual!=null?String(ctx.senhaAtual):String(usersPassAtual.value||"");const nova_senha=String(usersPassNova.value||"");const confirma_senha=String(usersPassConfirma.value||"");if(!usuario){window.alert("Informe o usuario.");return}if(!nova_senha){window.alert("Senha nÃ£o pode ser nula.");return}if(nova_senha!==confirma_senha){window.alert("Senha e confirmaÃ§Ã£o devem ser idÃªnticas.");return}const payload={usuario,senha_atual,nova_senha,confirma_senha,codigo:codigoTxt?Number(codigoTxt):null};const{res,data}=await requestJson("POST","/admin/users/change-password",payload,true);if(!res.ok){const detail=String(data?.detail||"");if(detail.includes("Senha atual incorreta")){window.alert("Sua senha foi digitada incorretamente.");usersFecharModalSenha();await usersAbrirSenhaSessaoAtual();return}if(detail.includes("Senha nao pode ser nula")||detail.includes("Senha nÃ£o pode ser nula")){window.alert("Senha nÃ£o pode ser nula.");return}if(detail.includes("confirmacao")||detail.includes("confirma")){window.alert("Senha e confirmaÃ§Ã£o devem ser idÃªnticas.");return}window.alert(detail||"Falha ao alterar senha.");return}usersFecharModalSenha();setUsersStatus(data.detail||"Senha alterada com sucesso.",false)}
+async function usersSalvarSenha(){const ctx=usersChangePassContext||{};const codigoTxt=ctx.codigo?String(ctx.codigo):String((usersPassCodigo.value||"").trim());const usuario=String(ctx.usuario||usersPassUsuario.value||"").trim();const senha_atual=ctx.senhaAtual!=null?String(ctx.senhaAtual):String(usersPassAtual.value||"");const nova_senha=String(usersPassNova.value||"");const confirma_senha=String(usersPassConfirma.value||"");if(!usuario){window.alert("Informe o usuario.");return}if(!nova_senha){window.alert("Senha nÃƒÂ£o pode ser nula.");return}if(nova_senha!==confirma_senha){window.alert("Senha e confirmaÃƒÂ§ÃƒÂ£o devem ser idÃƒÂªnticas.");return}const payload={usuario,senha_atual,nova_senha,confirma_senha,codigo:codigoTxt?Number(codigoTxt):null};const{res,data}=await requestJson("POST","/admin/users/change-password",payload,true);if(!res.ok){const detail=String(data?.detail||"");if(detail.includes("Senha atual incorreta")){window.alert("Sua senha foi digitada incorretamente.");usersFecharModalSenha();await usersAbrirSenhaSessaoAtual();return}if(detail.includes("Senha nao pode ser nula")||detail.includes("Senha nÃƒÂ£o pode ser nula")){window.alert("Senha nÃƒÂ£o pode ser nula.");return}if(detail.includes("confirmacao")||detail.includes("confirma")){window.alert("Senha e confirmaÃƒÂ§ÃƒÂ£o devem ser idÃƒÂªnticas.");return}window.alert(detail||"Falha ao alterar senha.");return}usersFecharModalSenha();setUsersStatus(data.detail||"Senha alterada com sucesso.",false)}
 async function usersAbrirSenhaSessaoAtual(){if(!sessaoAtual){window.alert("Sessao nao encontrada.");return}const senhaAtual=await usersSolicitarSenhaAtual();if(senhaAtual===null)return;usersChangePassContext={usuario:String(sessaoAtual.nome||"").trim(),codigo:!!sessaoAtual.codigo?sessaoAtual.codigo:null,senhaAtual};usersAbrirModalSenha(usersChangePassContext)}
-function usersEditarSelecionado(){const u=usersAtualSelecionado();if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃ­nica' Ã© protegida.");return}usersAbrirModalEditar()}
-async function usersExcluirSelecionado(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃ­nica' Ã© protegida.");return}if(!window.confirm(`Excluir o usuario '${u.nome}'?`))return;const{res,data}=await requestJson("DELETE","/admin/users/"+u.id,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir usuario.");return}setUsersStatus(data.detail||"Usuario excluido com sucesso.",false);usersSelecionadoId=null;await carregarUsuarios()}
+function usersEditarSelecionado(){const u=usersAtualSelecionado();if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida.");return}usersAbrirModalEditar()}
+async function usersExcluirSelecionado(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida.");return}if(!window.confirm(`Excluir o usuario '${u.nome}'?`))return;const{res,data}=await requestJson("DELETE","/admin/users/"+u.id,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir usuario.");return}setUsersStatus(data.detail||"Usuario excluido com sucesso.",false);usersSelecionadoId=null;await carregarUsuarios()}
 function usersAbrirImpressos(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}cnfRelatorioAbrir({targetUser:u,origin:"usuarios"});}
-function usersAbrirPreferencias(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃ­nica' Ã© protegida.");return}prefAbrir({targetUser:u,origin:"usuarios"});}
+function usersAbrirPreferencias(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida.");return}prefAbrir({targetUser:u,origin:"usuarios"});}
 function usersPermSetTab(tab){usersPermActiveTab=(tab==="perfis")?"perfis":"acesso";if(usersPermTabAcessoBtn)usersPermTabAcessoBtn.classList.toggle("active",usersPermActiveTab==="acesso");if(usersPermTabPerfisBtn)usersPermTabPerfisBtn.classList.toggle("active",usersPermActiveTab==="perfis");if(usersPermTabAcesso)usersPermTabAcesso.classList.toggle("hidden",usersPermActiveTab!=="acesso");if(usersPermTabPerfis)usersPermTabPerfis.classList.toggle("hidden",usersPermActiveTab!=="perfis");if(usersPermActiveTab==="perfis"){usersPerfLoad()}}
 function usersPermGetProfileByCode(codigo){const key=String(codigo||"").trim();return(Array.isArray(usersPermProfiles)?usersPermProfiles:[]).find(item=>String(item?.codigo||"").trim()===key)||null}
 function usersPermSelecionarFuncao(codigo,focusWrap=false){if(usersPermFunctionWrap&&!usersPermFunctionWrap.dataset.keybind){usersPermFunctionWrap.dataset.keybind="1";usersPermFunctionWrap.addEventListener("keydown",usersPermHandleFunctionKeydown)}usersPermSelectedFuncId=String(codigo||"").trim();usersPermSelectionScope="func";usersPermFuncTbody?.querySelectorAll?.("tr[data-func]")?.forEach(tr=>tr.classList.toggle("selected",String(tr.getAttribute("data-func")||"")===usersPermSelectedFuncId));if(focusWrap&&usersPermFunctionWrap)usersPermFunctionWrap.focus({preventScroll:true});usersPermSyncFuncRadios()}
@@ -8568,16 +9845,16 @@ function usersPerfRenderPrestadores(){if(!usersPerfPrestadoresWrap)return;const 
 async function usersPerfHandlePrestadorChange(){if(!usersPermEditId||!usersPerfSelectedPerfilId)return;const checkedIds=Array.from(usersPerfPrestadoresWrap.querySelectorAll("input[type=\"checkbox\"][data-prestador]:checked")).map(inp=>Number(inp.getAttribute("data-prestador")||0)).filter(n=>n>0);const payload={perfil_id:Number(usersPerfSelectedPerfilId),prestador_ids:checkedIds};const{res,data}=await requestJson("PATCH",`/admin/users/${usersPermEditId}/profiles`,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar perfil.");return}usersPerfAssignments[String(usersPerfSelectedPerfilId)]=checkedIds}
 async function usersPerfLoad(){if(!usersPermEditId)return;const{res,data}=await requestJson("GET",`/admin/users/${usersPermEditId}/profiles`,undefined,true);if(!res.ok){return}usersPerfProfiles=Array.isArray(data?.profiles)?data.profiles:[];usersPerfPrestadores=Array.isArray(data?.prestadores)?data.prestadores:[];usersPerfAssignments=(data&&typeof data.assignments==="object"&&data.assignments)?data.assignments:{};if(!usersPerfSelectedPerfilId&&usersPerfProfiles.length){usersPerfSelectedPerfilId=Number(usersPerfProfiles[0].id||0)||null}usersPerfRenderProfiles();usersPerfRenderPrestadores()}
 function usersPermInferProfileCode(tipoUsuario){const tipoNorm=String(tipoUsuario||"").trim().toLowerCase();if(!tipoNorm)return"";const perfis=Array.isArray(usersPermProfiles)?usersPermProfiles:[];const byTipo=perfis.find(item=>String(item?.tipo_usuario||"").trim().toLowerCase()===tipoNorm);return byTipo?String(byTipo.codigo||""):""}
-function usersPermAplicarPerfilSelecionado(){const perfil=usersPermGetProfileByCode(usersPermSelectedProfileCode);if(!perfil||typeof perfil.permissoes!=="object"){window.alert("Selecione um perfil vÃ¡lido.");return}const next={...(usersPermCurrent||{})};Object.keys(perfil.permissoes||{}).forEach(codigo=>{next[codigo]=usersPermNormalizeLevel(perfil.permissoes[codigo])});usersPermCurrent=next;usersRenderPermissoes(usersPermModules,usersPermLevels,usersPermCurrent);usersPermSetTab("acesso")}
+function usersPermAplicarPerfilSelecionado(){const perfil=usersPermGetProfileByCode(usersPermSelectedProfileCode);if(!perfil||typeof perfil.permissoes!=="object"){window.alert("Selecione um perfil vÃƒÂ¡lido.");return}const next={...(usersPermCurrent||{})};Object.keys(perfil.permissoes||{}).forEach(codigo=>{next[codigo]=usersPermNormalizeLevel(perfil.permissoes[codigo])});usersPermCurrent=next;usersRenderPermissoes(usersPermModules,usersPermLevels,usersPermCurrent);usersPermSetTab("acesso")}
 function usersFecharPermissoes(){usersPermFlushAutoSave();if(usersPermBackdrop)usersPermBackdrop.classList.add("hidden");usersPermEditId=null;usersPermModules=[];usersPermLevels=[];usersPermCurrent={};usersPermSelectedModule="";usersPermProfiles=[];usersPermSelectedProfileCode="";usersPermFunctionsByModule={};usersPermFuncLevels={};usersPermSelectedFuncId="";usersPermEasyMode=false;usersPerfProfiles=[];usersPerfPrestadores=[];usersPerfAssignments={};usersPerfSelectedPerfilId=null;usersPermSetTab("acesso")}
 function usersRenderPermissoes(modules,levels,permissoes){const ordered=usersPermSortModules(Array.isArray(modules)?modules:[]);usersPermModules=ordered;usersPermLevels=Array.isArray(levels)&&levels.length?levels:["desabilitado","protegido","habilitado"];if(!usersPermTbody)return;const current={};usersPermModules.forEach(item=>{const codigo=usersPermModuleCode(item);if(!codigo)return;current[codigo]=usersPermNormalizeLevel(permissoes?.[codigo])});usersPermCurrent=current;usersPermTbody.innerHTML=usersPermModules.map(item=>{const codigo=usersPermModuleCode(item);const nome=usersPermModuleName(item)||codigo;const nivel=usersPermNormalizeLevel(usersPermCurrent?.[codigo]);return`<tr data-module="${esc(codigo)}"><td class="perm-label">${esc(nome)}</td><td class="perm-icon">${usersPermIcon(nivel)}</td></tr>`}).join("");Array.from(usersPermTbody.querySelectorAll("tr[data-module]")).forEach(tr=>{tr.addEventListener("click",()=>usersPermSelecionarModulo(tr.getAttribute("data-module"),true))});
 const existeSelecionado=usersPermModules.some(item=>usersPermModuleCode(item)===usersPermSelectedModule);if(!existeSelecionado)usersPermSelectedModule=usersPermModuleCode(usersPermModules?.[0])||"";usersPermSelecionarModulo(usersPermSelectedModule);usersPermRenderPerfilPreview();usersPermSyncModuleRadios()}
-async function usersAbrirPermissoes(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃ­nica' Ã© protegida.");return}try{await usersCarregarPermissoesSchema();const{res,data}=await requestJson("GET",`/admin/users/${u.id}/permissions`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar permissÃµes.");return}usersPermEditId=Number(u.id||0)||null;usersPerfSelectedPerfilId=null;const easySchema=Array.isArray(usersPermSchema?.easy_modules)&&usersPermSchema.easy_modules.length?usersPermSchema.easy_modules:[];const easyLevels=Array.isArray(usersPermSchema?.easy_levels)&&usersPermSchema.easy_levels.length?usersPermSchema.easy_levels:[];const easyFuncs=(usersPermSchema&&typeof usersPermSchema.easy_functions_by_module==="object"&&usersPermSchema.easy_functions_by_module)?usersPermSchema.easy_functions_by_module:{};usersPermEasyMode=easySchema.length>0;usersPermModules=usersPermEasyMode?easySchema:(Array.isArray(data?.modules)?data.modules:(usersPermSchema?.modules||[]));usersPermLevels=usersPermEasyMode?(easyLevels.length?easyLevels:usersPermSchema?.levels||["desabilitado","protegido","habilitado"]):(Array.isArray(data?.levels)&&data.levels.length?data.levels:(usersPermSchema?.levels||["desabilitado","protegido","habilitado"]));usersPermProfiles=Array.isArray(usersPermSchema?.profiles)?usersPermSchema.profiles:[];const rawFunctions=usersPermEasyMode?easyFuncs:((usersPermSchema&&typeof usersPermSchema.functions_by_module==="object"&&usersPermSchema.functions_by_module)?usersPermSchema.functions_by_module:{});usersPermFunctionsByModule=usersPermNormalizeFunctionsByModule(rawFunctions);usersPermFuncLevels=usersPermEasyMode&&(data&&typeof data.easy_funcoes==="object"&&data.easy_funcoes)?data.easy_funcoes:{};if(usersPermNome)usersPermNome.value=String(data?.nome||u.nome||"");if(usersPermTipo)usersPermTipo.value=String(data?.tipo_usuario||u.tipo_usuario||"");if(usersPermTitleName)usersPermTitleName.textContent=String(data?.nome||u.nome||"usuÃ¡rio");const alvoAdmin=Boolean(u?.is_admin);if(usersPermTabPerfisBtn)usersPermTabPerfisBtn.classList.toggle("hidden",alvoAdmin);if(alvoAdmin&&usersPermTabPerfis)usersPermTabPerfis.classList.add("hidden");if(alvoAdmin&&usersPermActiveTab==="perfis")usersPermActiveTab="acesso";usersPermSelectedProfileCode=usersPermInferProfileCode(data?.tipo_usuario||u.tipo_usuario||"")||String(usersPermProfiles?.[0]?.codigo||"");usersPermRenderProfiles();const permsPayload=usersPermEasyMode?(data?.easy_modules||{}):(data?.permissoes||{});usersRenderPermissoes(usersPermModules,usersPermLevels,permsPayload);usersPermSetTab("acesso");usersPermBackdrop.classList.remove("hidden");usersPermSyncModuleRadios();usersPermSyncFuncRadios()}catch(err){window.alert(err?.message||"Falha ao abrir permissÃµes.")}}
-async function usersSalvarPermissoes(){if(!usersPermEditId){window.alert("UsuÃ¡rio nÃ£o selecionado.");return}const payload=usersPermBuildPayload();const{res,data}=await requestJson("PATCH",`/admin/users/${usersPermEditId}/permissions`,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar permissÃµes.");return}usersFecharPermissoes();setUsersStatus(data.detail||"PermissÃµes atualizadas com sucesso.",false);await carregarUsuarios(true)}
+async function usersAbrirPermissoes(){const u=usersAtualSelecionado();if(!u){window.alert("Selecione um usuario.");return}if(!usersCanManageSelected(u)){window.alert("Conta base 'ClÃƒÂ­nica' ÃƒÂ© protegida.");return}try{await usersCarregarPermissoesSchema();const{res,data}=await requestJson("GET",`/admin/users/${u.id}/permissions`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar permissÃƒÂµes.");return}usersPermEditId=Number(u.id||0)||null;usersPerfSelectedPerfilId=null;const easySchema=Array.isArray(usersPermSchema?.easy_modules)&&usersPermSchema.easy_modules.length?usersPermSchema.easy_modules:[];const easyLevels=Array.isArray(usersPermSchema?.easy_levels)&&usersPermSchema.easy_levels.length?usersPermSchema.easy_levels:[];const easyFuncs=(usersPermSchema&&typeof usersPermSchema.easy_functions_by_module==="object"&&usersPermSchema.easy_functions_by_module)?usersPermSchema.easy_functions_by_module:{};usersPermEasyMode=easySchema.length>0;usersPermModules=usersPermEasyMode?easySchema:(Array.isArray(data?.modules)?data.modules:(usersPermSchema?.modules||[]));usersPermLevels=usersPermEasyMode?(easyLevels.length?easyLevels:usersPermSchema?.levels||["desabilitado","protegido","habilitado"]):(Array.isArray(data?.levels)&&data.levels.length?data.levels:(usersPermSchema?.levels||["desabilitado","protegido","habilitado"]));usersPermProfiles=Array.isArray(usersPermSchema?.profiles)?usersPermSchema.profiles:[];const rawFunctions=usersPermEasyMode?easyFuncs:((usersPermSchema&&typeof usersPermSchema.functions_by_module==="object"&&usersPermSchema.functions_by_module)?usersPermSchema.functions_by_module:{});usersPermFunctionsByModule=usersPermNormalizeFunctionsByModule(rawFunctions);usersPermFuncLevels=usersPermEasyMode&&(data&&typeof data.easy_funcoes==="object"&&data.easy_funcoes)?data.easy_funcoes:{};if(usersPermNome)usersPermNome.value=String(data?.nome||u.nome||"");if(usersPermTipo)usersPermTipo.value=String(data?.tipo_usuario||u.tipo_usuario||"");if(usersPermTitleName)usersPermTitleName.textContent=String(data?.nome||u.nome||"usuÃƒÂ¡rio");const alvoAdmin=Boolean(u?.is_admin);if(usersPermTabPerfisBtn)usersPermTabPerfisBtn.classList.toggle("hidden",alvoAdmin);if(alvoAdmin&&usersPermTabPerfis)usersPermTabPerfis.classList.add("hidden");if(alvoAdmin&&usersPermActiveTab==="perfis")usersPermActiveTab="acesso";usersPermSelectedProfileCode=usersPermInferProfileCode(data?.tipo_usuario||u.tipo_usuario||"")||String(usersPermProfiles?.[0]?.codigo||"");usersPermRenderProfiles();const permsPayload=usersPermEasyMode?(data?.easy_modules||{}):(data?.permissoes||{});usersRenderPermissoes(usersPermModules,usersPermLevels,permsPayload);usersPermSetTab("acesso");usersPermBackdrop.classList.remove("hidden");usersPermSyncModuleRadios();usersPermSyncFuncRadios()}catch(err){window.alert(err?.message||"Falha ao abrir permissÃƒÂµes.")}}
+async function usersSalvarPermissoes(){if(!usersPermEditId){window.alert("UsuÃƒÂ¡rio nÃƒÂ£o selecionado.");return}const payload=usersPermBuildPayload();const{res,data}=await requestJson("PATCH",`/admin/users/${usersPermEditId}/permissions`,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar permissÃƒÂµes.");return}usersFecharPermissoes();setUsersStatus(data.detail||"PermissÃƒÂµes atualizadas com sucesso.",false);await carregarUsuarios(true)}
 const setSaStatus=(m,e)=>{if(!sa.status)return;sa.status.textContent=m||"";sa.status.className="users-status "+(e?"err":"ok")};
 const isSuperAdminSessao=()=>!!(sessaoAtual&&sessaoAtual.is_superadmin);
 const saMoney=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-function saRenderOverview(d){if(!d)return;sa.totalClinicas.value=String(d.total_clinicas??0);sa.totalUsuarios.value=String(d.total_usuarios??0);sa.mrr.value=saMoney(d.mrr_estimado||0);sa.arr.value=saMoney(d.arr_estimado||0);sa.clinicasAtivas.value=String(d.clinicas_ativas??0);sa.clinicasTrial.value=String(d.clinicas_trial??0);sa.clinicasExpiradas.value=String(d.clinicas_expiradas??0);sa.clinicasSuspensas.value=String(d.clinicas_suspensas??0);if(sa.clinicasSemUsuario)sa.clinicasSemUsuario.value=String(d.clinicas_sem_usuario??0);if(sa.clinicasArquivadas)sa.clinicasArquivadas.value=String(d.clinicas_arquivadas??0);if(sa.onlineSummary)sa.onlineSummary.textContent=d.online_resumo||"Nenhum usuÃ¡rio online."}
+function saRenderOverview(d){if(!d)return;sa.totalClinicas.value=String(d.total_clinicas??0);sa.totalUsuarios.value=String(d.total_usuarios??0);sa.mrr.value=saMoney(d.mrr_estimado||0);sa.arr.value=saMoney(d.arr_estimado||0);sa.clinicasAtivas.value=String(d.clinicas_ativas??0);sa.clinicasTrial.value=String(d.clinicas_trial??0);sa.clinicasExpiradas.value=String(d.clinicas_expiradas??0);sa.clinicasSuspensas.value=String(d.clinicas_suspensas??0);if(sa.clinicasSemUsuario)sa.clinicasSemUsuario.value=String(d.clinicas_sem_usuario??0);if(sa.clinicasArquivadas)sa.clinicasArquivadas.value=String(d.clinicas_arquivadas??0);if(sa.onlineSummary)sa.onlineSummary.textContent=d.online_resumo||"Nenhum usuÃƒÂ¡rio online."}
 function saRenderClinicas(){
   if(!saClinicasCache.length){sa.tbClinicas.innerHTML='<tr><td colspan="8">Sem clinicas.</td></tr>';return}
   sa.tbClinicas.innerHTML=saClinicasCache.map(c=>{
@@ -8591,7 +9868,7 @@ function saRenderClinicas(){
           <button class="btn-mini" data-sa-action="mensal" data-id="${c.id}" type="button">Mensal</button>
           <button class="btn-mini" data-sa-action="anual" data-id="${c.id}" type="button">Anual</button>
           <button class="btn-mini" data-sa-action="superadmin" data-id="${c.id}" type="button">Super Admin</button>
-          <button class="btn-mini" data-sa-action="novo-user" data-id="${c.id}" type="button">Novo usuÃ¡rio</button>
+          <button class="btn-mini" data-sa-action="novo-user" data-id="${c.id}" type="button">Novo usuÃƒÂ¡rio</button>
           <span style="color:#64748b;align-self:center">Owner</span>
         </div>`
       : `<div class="users-actions">
@@ -8602,7 +9879,7 @@ function saRenderClinicas(){
           <button class="btn-mini" data-sa-action="mensal" data-id="${c.id}" type="button">Mensal</button>
           <button class="btn-mini" data-sa-action="anual" data-id="${c.id}" type="button">Anual</button>
           <button class="btn-mini" data-sa-action="superadmin" data-id="${c.id}" type="button">Super Admin</button>
-          <button class="btn-mini" data-sa-action="novo-user" data-id="${c.id}" type="button">Novo usuÃ¡rio</button>
+          <button class="btn-mini" data-sa-action="novo-user" data-id="${c.id}" type="button">Novo usuÃƒÂ¡rio</button>
           <button class="btn-mini" data-sa-action="excluir-clinica" data-id="${c.id}" type="button" style="border-color:#fecaca;color:#991b1b">Excluir</button>
         </div>`;
     return `<tr data-id="${c.id}">
@@ -8630,11 +9907,11 @@ async function saCarregarAuditoria(){const{res,data}=await requestJson("GET","/s
 async function saRecarregarTudo(){if(!isSuperAdminSessao())return;setSaStatus("",false);try{await saCarregarOverview();await saCarregarClinicas();await saCarregarUsuarios();await saCarregarCobrancas();await saCarregarAuditoria();setSaStatus("Painel atualizado.",false)}catch(err){setSaStatus(err.message||"Falha ao carregar Painel ADM.",true)}}
 async function saAbrir(){if(!isSuperAdminSessao()){footerMsg.textContent="Acesso restrito ao Super Admin.";return}hideAllPanels();sa.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await saRecarregarTudo()}
 const saNomeClinica=id=>{const item=saClinicasCache.find(x=>Number(x.id)===Number(id));return item?.nome||`#${id}`};
-async function saAlterarStatusClinica(id,ativo){const nome=saNomeClinica(id);const acao=ativo?"ativar":"suspender";if(!window.confirm(`Confirmar ${acao} a clÃ­nica "${nome}"?`))return;const motivo=window.prompt("Motivo (opcional):","");if(motivo===null)return;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/status`,{ativo,motivo:motivo||""},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar status da clinica.");return}footerMsg.textContent=data.detail||"Status atualizado.";await saRecarregarTudo()}
-async function saAlterarPlanoClinica(id,plano){const nome=saNomeClinica(id);const planoNorm=String(plano||"").trim().toUpperCase();const planoRotulo=planoNorm==="DEMO"?"Demo":planoNorm==="MENSAL"?"Mensal":planoNorm==="ANUAL"?"Anual":planoNorm==="SUPERADMIN"?"Super Admin":planoNorm;if(!window.confirm(`Aplicar o plano ${planoRotulo} para a clÃ­nica "${nome}"?`))return;let dias=null;if(planoNorm!=="SUPERADMIN"){const d=window.prompt("Dias de validade (deixe em branco para padrÃ£o do plano):","");if(d===null)return;if(String(d).trim()!==""){const n=Number(d);if(Number.isFinite(n)&&n>0)dias=Math.round(n)}}const payload={plano,manter_ativo:true};if(dias!==null)payload.dias=dias;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/plano`,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar plano da clinica.");return}footerMsg.textContent=data.detail||"Plano atualizado.";await saRecarregarTudo()}
-async function saProrrogarTesteClinica(id,dias){const qtd=Math.round(Number(dias||0));if(!Number.isFinite(qtd)||qtd<1){window.alert("Informe dias vÃ¡lidos (mÃ­nimo 1).");return}const nome=saNomeClinica(id);if(!window.confirm(`Prorrogar o perÃ­odo de teste da clÃ­nica "${nome}" por ${qtd} dias?`))return;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/trial-extra`,{dias:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao prorrogar perÃ­odo de teste.");return}footerMsg.textContent=data.detail||"PerÃ­odo de teste prorrogado.";await saRecarregarTudo()}
-async function saExcluirClinica(id){const item=saClinicasCache.find(x=>Number(x.id)===Number(id));const nome=item?.nome||`#${id}`;if(!window.confirm(`Deseja excluir definitivamente a conta \"${nome}\"?\n\nEsta aÃ§Ã£o remove os dados da clÃ­nica e nÃ£o pode ser desfeita.`))return;const confirma=(window.prompt("Digite EXCLUIR para confirmar:","")||"").trim().toUpperCase();if(confirma!=="EXCLUIR"){window.alert("ConfirmaÃ§Ã£o invÃ¡lida. ExclusÃ£o cancelada.");return}const{res,data}=await requestJson("DELETE",`/superadmin/clinicas/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir conta.");return}footerMsg.textContent=data.detail||"Conta removida definitivamente.";await saRecarregarTudo()}
-async function saCriarUsuarioClinica(clinicaId){const nomeClinica=saNomeClinica(clinicaId);const nome=window.prompt("Nome do novo usuario/admin:","")||"";if(!nome.trim())return;const email=window.prompt("E-mail do novo usuario/admin:","")||"";if(!email.trim())return;const senha=window.prompt("Senha inicial (minimo 6 caracteres):","")||"";if(String(senha).trim().length<6){window.alert("Senha deve ter no minimo 6 caracteres.");return}if(!window.confirm(`Criar o usuÃ¡rio admin "${nome.trim()}" para a clÃ­nica "${nomeClinica}"?`))return;const{res,data}=await requestJson("POST","/superadmin/usuarios",{clinica_id:clinicaId,nome:nome.trim(),email:email.trim(),senha:senha,is_admin:true,ativar_clinica:true},true);if(!res.ok){window.alert(data.detail||"Falha ao criar usuario para a clinica.");return}footerMsg.textContent=data.detail||"Usuario criado com sucesso.";await saRecarregarTudo()}
+async function saAlterarStatusClinica(id,ativo){const nome=saNomeClinica(id);const acao=ativo?"ativar":"suspender";if(!window.confirm(`Confirmar ${acao} a clÃƒÂ­nica "${nome}"?`))return;const motivo=window.prompt("Motivo (opcional):","");if(motivo===null)return;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/status`,{ativo,motivo:motivo||""},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar status da clinica.");return}footerMsg.textContent=data.detail||"Status atualizado.";await saRecarregarTudo()}
+async function saAlterarPlanoClinica(id,plano){const nome=saNomeClinica(id);const planoNorm=String(plano||"").trim().toUpperCase();const planoRotulo=planoNorm==="DEMO"?"Demo":planoNorm==="MENSAL"?"Mensal":planoNorm==="ANUAL"?"Anual":planoNorm==="SUPERADMIN"?"Super Admin":planoNorm;if(!window.confirm(`Aplicar o plano ${planoRotulo} para a clÃƒÂ­nica "${nome}"?`))return;let dias=null;if(planoNorm!=="SUPERADMIN"){const d=window.prompt("Dias de validade (deixe em branco para padrÃƒÂ£o do plano):","");if(d===null)return;if(String(d).trim()!==""){const n=Number(d);if(Number.isFinite(n)&&n>0)dias=Math.round(n)}}const payload={plano,manter_ativo:true};if(dias!==null)payload.dias=dias;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/plano`,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar plano da clinica.");return}footerMsg.textContent=data.detail||"Plano atualizado.";await saRecarregarTudo()}
+async function saProrrogarTesteClinica(id,dias){const qtd=Math.round(Number(dias||0));if(!Number.isFinite(qtd)||qtd<1){window.alert("Informe dias vÃƒÂ¡lidos (mÃƒÂ­nimo 1).");return}const nome=saNomeClinica(id);if(!window.confirm(`Prorrogar o perÃƒÂ­odo de teste da clÃƒÂ­nica "${nome}" por ${qtd} dias?`))return;const{res,data}=await requestJson("PATCH",`/superadmin/clinicas/${id}/trial-extra`,{dias:qtd},true);if(!res.ok){window.alert(data.detail||"Falha ao prorrogar perÃƒÂ­odo de teste.");return}footerMsg.textContent=data.detail||"PerÃƒÂ­odo de teste prorrogado.";await saRecarregarTudo()}
+async function saExcluirClinica(id){const item=saClinicasCache.find(x=>Number(x.id)===Number(id));const nome=item?.nome||`#${id}`;if(!window.confirm(`Deseja excluir definitivamente a conta \"${nome}\"?\n\nEsta aÃƒÂ§ÃƒÂ£o remove os dados da clÃƒÂ­nica e nÃƒÂ£o pode ser desfeita.`))return;const confirma=(window.prompt("Digite EXCLUIR para confirmar:","")||"").trim().toUpperCase();if(confirma!=="EXCLUIR"){window.alert("ConfirmaÃƒÂ§ÃƒÂ£o invÃƒÂ¡lida. ExclusÃƒÂ£o cancelada.");return}const{res,data}=await requestJson("DELETE",`/superadmin/clinicas/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao excluir conta.");return}footerMsg.textContent=data.detail||"Conta removida definitivamente.";await saRecarregarTudo()}
+async function saCriarUsuarioClinica(clinicaId){const nomeClinica=saNomeClinica(clinicaId);const nome=window.prompt("Nome do novo usuario/admin:","")||"";if(!nome.trim())return;const email=window.prompt("E-mail do novo usuario/admin:","")||"";if(!email.trim())return;const senha=window.prompt("Senha inicial (minimo 6 caracteres):","")||"";if(String(senha).trim().length<6){window.alert("Senha deve ter no minimo 6 caracteres.");return}if(!window.confirm(`Criar o usuÃƒÂ¡rio admin "${nome.trim()}" para a clÃƒÂ­nica "${nomeClinica}"?`))return;const{res,data}=await requestJson("POST","/superadmin/usuarios",{clinica_id:clinicaId,nome:nome.trim(),email:email.trim(),senha:senha,is_admin:true,ativar_clinica:true},true);if(!res.ok){window.alert(data.detail||"Falha ao criar usuario para a clinica.");return}footerMsg.textContent=data.detail||"Usuario criado com sucesso.";await saRecarregarTudo()}
 async function saAlterarStatusUsuario(id,ativo){const{res,data}=await requestJson("PATCH",`/superadmin/usuarios/${id}/status`,{ativo},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar status do usuario.");return}footerMsg.textContent=data.detail||"Status de usuario atualizado.";await saRecarregarTudo()}
 async function saAlterarPerfilUsuario(id,isAdmin){const{res,data}=await requestJson("PATCH",`/superadmin/usuarios/${id}/perfil`,{is_admin:isAdmin},true);if(!res.ok){window.alert(data.detail||"Falha ao atualizar perfil do usuario.");return}footerMsg.textContent=data.detail||"Perfil de usuario atualizado.";await saRecarregarTudo()}
 async function saResetarSenhaUsuario(id){const novaSenha=window.prompt("Nova senha (minimo 6 caracteres):","")||"";if(novaSenha.trim().length<6){window.alert("Senha deve ter no minimo 6 caracteres.");return}const{res,data}=await requestJson("POST",`/superadmin/usuarios/${id}/reset-senha`,{nova_senha:novaSenha.trim()},true);if(!res.ok){window.alert(data.detail||"Falha ao redefinir senha.");return}footerMsg.textContent=data.detail||"Senha redefinida com sucesso."}
@@ -8652,22 +9929,22 @@ async function carregarCenario(){try{const{res,data}=await requestJson("GET","/c
 async function salvarCenario(){try{const{res,data}=await postJson("/cenario",cenarioPayload(),true);footerMsg.textContent=res.ok?(data.detail||"Cenario salvo com sucesso."):(data.detail||"Falha ao salvar cenario.")}catch{footerMsg.textContent="Erro de conexao ao salvar cenario."}}
 async function calcularFixosAno(){try{const ano=parseInt(c.box_Ano.value||"0",10);if(!ano){footerMsg.textContent="Informe um ano valido.";return}const{res,data}=await postJson("/cenario/calcular-fixos",{ano},true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao calcular fixos.";return}c.lblFixo_pessoal.textContent=formatMoney(data.fixo_pessoal||0);c.lblFixo_empresa.textContent=formatMoney(data.fixo_empresa||0);c.lblCusto_Anual.textContent=formatMoney(data.custo_anual||0);footerMsg.textContent="Calculo anual concluido."}catch{footerMsg.textContent="Erro de conexao ao calcular fixos."}}
 const abrirCenario=async()=>{showScenarioPanel(true);setTab("fixo");await carregarCenario()};
-const RCC_CAMPOS_PADRAO=["Categoria","Conta corrente","Complemento","CrÃ©dito","Data","DÃ©bito","Grupo","HistÃ³rico","LanÃ§amento","Pagamento","ReferÃªncia","Saldo"];
+const RCC_CAMPOS_PADRAO=["Categoria","Conta corrente","Complemento","CrÃƒÂ©dito","Data","DÃƒÂ©bito","Grupo","HistÃƒÂ³rico","LanÃƒÂ§amento","Pagamento","ReferÃƒÂªncia","Saldo"];
 const AUX_ESPECIALIDADE_IMAGENS=[
-  {id:1,nome:"DentÃ­stica"},
-  {id:2,nome:"PrÃ³tese"},
+  {id:1,nome:"Dent\u00edstica"},
+  {id:2,nome:"Pr\u00f3tese"},
   {id:3,nome:"Endodontia"},
   {id:4,nome:"Periodontia"},
   {id:5,nome:"Gerais"},
   {id:6,nome:"Cirurgia"},
   {id:7,nome:"Ortodontia"},
-  {id:8,nome:"PrevenÃ§Ã£o"},
+  {id:8,nome:"Preven\u00e7\u00e3o"},
   {id:9,nome:"Odontopediatria"},
-  {id:10,nome:"DiagnÃ³stico"},
+  {id:10,nome:"Diagn\u00f3stico"},
   {id:11,nome:"Radiologia"},
-  {id:12,nome:"EstÃ©tica"},
+  {id:12,nome:"Est\u00e9tica"},
   {id:13,nome:"Implantodontia"},
-  {id:14,nome:"GenÃ©rica"}
+  {id:14,nome:"Gen\u00e9rica"}
 ];
 function rccEnsureUI(){
   if(rcc)return;
@@ -8757,19 +10034,19 @@ function rccEnsureUI(){
     <section id="rcc-panel" class="rcc-panel hidden">
       <div class="rcc-head">
         <img src="/desktop-assets/easy/cmd_testa.bmp" alt="">
-        <p>Pesquisa fluxo de caixa - selecione os critÃ©rios de pesquisa e os dados para visualizaÃ§Ã£o do relatÃ³rio.</p>
+        <p>Pesquisa fluxo de caixa - selecione os critÃƒÂ©rios de pesquisa e os dados para visualizaÃƒÂ§ÃƒÂ£o do relatÃƒÂ³rio.</p>
       </div>
       <div class="rcc-tab-buttons">
-        <button id="rcc-tab-btn-geral" class="rcc-tab-btn active" type="button">CritÃ©rios gerais</button>
-        <button id="rcc-tab-btn-add" class="rcc-tab-btn" type="button">CritÃ©rios adicionais</button>
-        <button id="rcc-tab-btn-opc" class="rcc-tab-btn" type="button">OpÃ§Ãµes de relatÃ³rio</button>
+        <button id="rcc-tab-btn-geral" class="rcc-tab-btn active" type="button">CritÃƒÂ©rios gerais</button>
+        <button id="rcc-tab-btn-add" class="rcc-tab-btn" type="button">CritÃƒÂ©rios adicionais</button>
+        <button id="rcc-tab-btn-opc" class="rcc-tab-btn" type="button">OpÃƒÂ§ÃƒÂµes de relatÃƒÂ³rio</button>
       </div>
 
       <div id="rcc-tab-geral" class="rcc-tab">
         <div class="rcc-grid-geral">
           <div class="row-left"><label><input id="rcc-box-cc" type="checkbox"> Conta corrente..........................</label></div>
           <div class="row-right"><select id="rcc-cbo-cc"></select></div>
-          <div class="row-left"><label><input id="rcc-box-lancamento" type="checkbox"> Tipo de lanÃ§amento.....................</label></div>
+          <div class="row-left"><label><input id="rcc-box-lancamento" type="checkbox"> Tipo de lanÃƒÂ§amento.....................</label></div>
           <div class="row-right"><select id="rcc-cbo-lancamento"></select></div>
           <div class="row-left"><label><input id="rcc-box-grupo" type="checkbox"> Grupo.....................................</label></div>
           <div class="row-right"><select id="rcc-cbo-grupo"></select></div>
@@ -8777,29 +10054,29 @@ function rccEnsureUI(){
           <div class="row-right"><select id="rcc-cbo-tipo-grupo"></select></div>
           <div class="row-left"><label><input id="rcc-box-cat" type="checkbox"> Categoria................................</label></div>
           <div class="row-right"><select id="rcc-cbo-cat"></select></div>
-          <div class="row-left"><label><input id="rcc-box-venc" type="checkbox"> PerÃ­odo de vencimento.................</label></div>
+          <div class="row-left"><label><input id="rcc-box-venc" type="checkbox"> PerÃƒÂ­odo de vencimento.................</label></div>
           <div class="row-right"><input id="rcc-data-1" class="rcc-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="dd/mm/aaaa"><span>a</span><input id="rcc-data-2" class="rcc-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="dd/mm/aaaa"></div>
-          <div class="row-left"><label><input id="rcc-box-lanc" type="checkbox"> PerÃ­odo de lanÃ§amento.................</label></div>
+          <div class="row-left"><label><input id="rcc-box-lanc" type="checkbox"> PerÃƒÂ­odo de lanÃƒÂ§amento.................</label></div>
           <div class="row-right"><input id="rcc-data-3" class="rcc-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="dd/mm/aaaa"><span>a</span><input id="rcc-data-4" class="rcc-date" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="dd/mm/aaaa"></div>
         </div>
       </div>
 
       <div id="rcc-tab-add" class="rcc-tab hidden">
         <div class="rcc-grid-add">
-          <div class="trib-label">Incluir no relatÃ³rio:</div>
+          <div class="trib-label">Incluir no relatÃƒÂ³rio:</div>
           <div class="trib">
-            <label><input id="rcc-box-tributaveis" type="checkbox"> LanÃ§amentos tributÃ¡veis</label>
-            <label><input id="rcc-box-ntributaveis" type="checkbox"> LanÃ§amentos nÃ£o tributÃ¡veis</label>
+            <label><input id="rcc-box-tributaveis" type="checkbox"> LanÃƒÂ§amentos tributÃƒÂ¡veis</label>
+            <label><input id="rcc-box-ntributaveis" type="checkbox"> LanÃƒÂ§amentos nÃƒÂ£o tributÃƒÂ¡veis</label>
           </div>
-          <div><label><input id="rcc-box-situacao" type="checkbox"> SituaÃ§Ã£o do lanÃ§amento................</label></div>
+          <div><label><input id="rcc-box-situacao" type="checkbox"> SituaÃƒÂ§ÃƒÂ£o do lanÃƒÂ§amento................</label></div>
           <div><select id="rcc-cbo-situacao"></select></div>
           <div><label><input id="rcc-box-pag" type="checkbox"> Forma de pagamento...................</label></div>
           <div><select id="rcc-cbo-pag"></select></div>
-          <div><label><input id="rcc-box-ref" type="checkbox"> ReferÃªncia...............................</label></div>
+          <div><label><input id="rcc-box-ref" type="checkbox"> ReferÃƒÂªncia...............................</label></div>
           <div><input id="rcc-txt-ref" type="text"></div>
           <div><label><input id="rcc-box-comp" type="checkbox"> Complemento............................</label></div>
           <div><input id="rcc-txt-comp" type="text"></div>
-          <div><label><input id="rcc-box-doc" type="checkbox"> NÂº documento...........................</label></div>
+          <div><label><input id="rcc-box-doc" type="checkbox"> NÃ‚Âº documento...........................</label></div>
           <div><input id="rcc-txt-doc" type="text"></div>
         </div>
       </div>
@@ -8807,7 +10084,7 @@ function rccEnsureUI(){
       <div id="rcc-tab-opc" class="rcc-tab hidden">
         <div class="rcc-opc">
           <div>
-            <div class="lab">Dados disponÃ­veis:</div>
+            <div class="lab">Dados disponÃƒÂ­veis:</div>
             <div class="rcc-opc-wrap"><table><tbody id="rcc-disp-body"></tbody></table></div>
           </div>
           <div class="rcc-opc-actions">
@@ -8819,12 +10096,12 @@ function rccEnsureUI(){
             <div class="rcc-opc-wrap"><table><tbody id="rcc-sel-body"></tbody></table></div>
           </div>
           <div class="rcc-side">
-            <div class="f"><label>Ordem de impressÃ£o:</label><select id="rcc-cbo-ordem"></select></div>
-            <div class="f"><label>SaÃ­da do relatÃ³rio:</label><select id="rcc-cbo-saida"><option>Tela</option><option>Arquivo</option><option>Imprimir</option></select></div>
-            <div class="f"><label>Modo de impressÃ£o</label><label class="inline"><input id="rcc-rad-retrato" name="rcc-modo" type="radio" checked>Modo "Retrato"</label><label class="inline"><input id="rcc-rad-paisagem" name="rcc-modo" type="radio">Modo "Paisagem"</label></div>
+            <div class="f"><label>Ordem de impressÃƒÂ£o:</label><select id="rcc-cbo-ordem"></select></div>
+            <div class="f"><label>SaÃƒÂ­da do relatÃƒÂ³rio:</label><select id="rcc-cbo-saida"><option>Tela</option><option>Arquivo</option><option>Imprimir</option></select></div>
+            <div class="f"><label>Modo de impressÃƒÂ£o</label><label class="inline"><input id="rcc-rad-retrato" name="rcc-modo" type="radio" checked>Modo "Retrato"</label><label class="inline"><input id="rcc-rad-paisagem" name="rcc-modo" type="radio">Modo "Paisagem"</label></div>
           </div>
         </div>
-        <div class="rcc-nome"><label>Nome do relatÃ³rio:</label><input id="rcc-txt-nome" type="text"></div>
+        <div class="rcc-nome"><label>Nome do relatÃƒÂ³rio:</label><input id="rcc-txt-nome" type="text"></div>
       </div>
 
       <div class="rcc-bottom">
@@ -8850,7 +10127,7 @@ function rccEnsureUI(){
                 <img id="rview-logo" class="rview-logo" alt="">
                 <div class="rview-head-text">
                   <div id="rview-head-caption" class="rview-head-caption"></div>
-                  <div id="rview-title" class="rview-report-title">RelatÃ³rio</div>
+                  <div id="rview-title" class="rview-report-title">RelatÃƒÂ³rio</div>
                   <div id="rview-user" class="rview-user"></div>
                 </div>
               </div>
@@ -8894,15 +10171,15 @@ function rccEnsureUI(){
     if(rcc.boxDoc.checked&&rcc.txtDoc.value.trim())p.set("documento",rcc.txtDoc.value.trim());
     if(rcc.boxVenc.checked){
       const d1=dateBrToIso(rcc.data1.value),d2=dateBrToIso(rcc.data2.value);
-      if(rcc.data1.value&&!d1){window.alert("Data inicial de vencimento invÃ¡lida. Use dd/mm/aaaa.");return null}
-      if(rcc.data2.value&&!d2){window.alert("Data final de vencimento invÃ¡lida. Use dd/mm/aaaa.");return null}
+      if(rcc.data1.value&&!d1){window.alert("Data inicial de vencimento invÃƒÂ¡lida. Use dd/mm/aaaa.");return null}
+      if(rcc.data2.value&&!d2){window.alert("Data final de vencimento invÃƒÂ¡lida. Use dd/mm/aaaa.");return null}
       if(d1)p.set("data_venc_ini",d1);
       if(d2)p.set("data_venc_fim",d2);
     }
     if(rcc.boxLanc.checked){
       const d3=dateBrToIso(rcc.data3.value),d4=dateBrToIso(rcc.data4.value);
-      if(rcc.data3.value&&!d3){window.alert("Data inicial de lanÃ§amento invÃ¡lida. Use dd/mm/aaaa.");return null}
-      if(rcc.data4.value&&!d4){window.alert("Data final de lanÃ§amento invÃ¡lida. Use dd/mm/aaaa.");return null}
+      if(rcc.data3.value&&!d3){window.alert("Data inicial de lanÃƒÂ§amento invÃƒÂ¡lida. Use dd/mm/aaaa.");return null}
+      if(rcc.data4.value&&!d4){window.alert("Data final de lanÃƒÂ§amento invÃƒÂ¡lida. Use dd/mm/aaaa.");return null}
       if(d3)p.set("data_lanc_ini",d3);
       if(d4)p.set("data_lanc_fim",d4);
     }
@@ -8911,8 +10188,8 @@ function rccEnsureUI(){
     p.set("ordem",rcc.cboOrdem.value||"Data");
     return p;
   };
-  const valorCampo=(row,campo)=>{if(campo==="Categoria")return row.categoria_nome||"";if(campo==="Conta corrente")return row.conta||"";if(campo==="Complemento")return row.complemento||"";if(campo==="CrÃ©dito")return Number(row.credito||0)>0?ccFmt(row.credito):"";if(campo==="Data")return ccDateISOToBR(row.data_lancamento||"");if(campo==="DÃ©bito")return Number(row.debito||0)>0?ccFmt(row.debito):"";if(campo==="Grupo")return row.grupo_nome||"";if(campo==="HistÃ³rico")return row.historico||"";if(campo==="LanÃ§amento")return row.tipo_descricao||"";if(campo==="Pagamento")return ccDateISOToBR(row.data_pagamento||"");if(campo==="ReferÃªncia")return row.referencia||"";if(campo==="Saldo")return ccFmt(row.saldo||0);return""};
-  const isMoney=(campo)=>campo==="CrÃ©dito"||campo==="DÃ©bito"||campo==="Saldo";
+  const valorCampo=(row,campo)=>{if(campo==="Categoria")return row.categoria_nome||"";if(campo==="Conta corrente")return row.conta||"";if(campo==="Complemento")return row.complemento||"";if(campo==="CrÃƒÂ©dito")return Number(row.credito||0)>0?ccFmt(row.credito):"";if(campo==="Data")return ccDateISOToBR(row.data_lancamento||"");if(campo==="DÃƒÂ©bito")return Number(row.debito||0)>0?ccFmt(row.debito):"";if(campo==="Grupo")return row.grupo_nome||"";if(campo==="HistÃƒÂ³rico")return row.historico||"";if(campo==="LanÃƒÂ§amento")return row.tipo_descricao||"";if(campo==="Pagamento")return ccDateISOToBR(row.data_pagamento||"");if(campo==="ReferÃƒÂªncia")return row.referencia||"";if(campo==="Saldo")return ccFmt(row.saldo||0);return""};
+  const isMoney=(campo)=>campo==="CrÃƒÂ©dito"||campo==="DÃƒÂ©bito"||campo==="Saldo";
   const linhasPorPagina=()=>{
     const alturaFolha=rcc.radPaisagem.checked?794:1123;
     const alturaTitulo=28;
@@ -8926,13 +10203,13 @@ function rccEnsureUI(){
   };
   const totaisPorColunaHtml=(campos,isUltimaPagina,totalRegistros)=>{
     if(!isUltimaPagina||totalRegistros<=0)return"";
-    const temDebito=campos.includes("DÃ©bito");
-    const temCredito=campos.includes("CrÃ©dito");
+    const temDebito=campos.includes("DÃƒÂ©bito");
+    const temCredito=campos.includes("CrÃƒÂ©dito");
     if(!temDebito&&!temCredito)return"";
-    const idxLabel=campos.findIndex(c=>c!=="DÃ©bito"&&c!=="CrÃ©dito");
+    const idxLabel=campos.findIndex(c=>c!=="DÃƒÂ©bito"&&c!=="CrÃƒÂ©dito");
     const cells=campos.map((c,idx)=>{
-      if(c==="DÃ©bito")return `<td class="money">${ccFmt(rcc.totalDebito||0)}</td>`;
-      if(c==="CrÃ©dito")return `<td class="money">${ccFmt(rcc.totalCredito||0)}</td>`;
+      if(c==="DÃƒÂ©bito")return `<td class="money">${ccFmt(rcc.totalDebito||0)}</td>`;
+      if(c==="CrÃƒÂ©dito")return `<td class="money">${ccFmt(rcc.totalCredito||0)}</td>`;
       if(idx===idxLabel)return `<td class="total-label">TOTAL</td>`;
       return "<td></td>";
     }).join("");
@@ -8955,7 +10232,7 @@ function rccEnsureUI(){
     if(rcc.viewTitle)rcc.viewTitle.style.cssText=cssTitulo;
     if(rcc.viewUser){
       const showUser=cfg?.printUser&&usuario;
-      rcc.viewUser.textContent=showUser?`UsuÃ¡rio: ${usuario}`:"";
+      rcc.viewUser.textContent=showUser?`UsuÃƒÂ¡rio: ${usuario}`:"";
       rcc.viewUser.style.display=showUser?"block":"none";
       rcc.viewUser.style.cssText=cssCab;
     }
@@ -8968,7 +10245,7 @@ function rccEnsureUI(){
       rcc.viewTime.style.cssText=cssCab;
     }
     if(rcc.viewPageMeta){
-      rcc.viewPageMeta.textContent=cfg?.printPage?`PÃ¡g.: ${rcc.pagina||1}`:"";
+      rcc.viewPageMeta.textContent=cfg?.printPage?`PÃƒÂ¡g.: ${rcc.pagina||1}`:"";
       rcc.viewPageMeta.style.cssText=cssCab;
     }
     if(rcc.viewLogo){
@@ -9033,18 +10310,18 @@ function rccEnsureUI(){
         <img class="rel-logo" src="${esc(logoSrc)}" alt="" style="display:${logoSrc?"block":"none"}">
         <div class="rel-head-text">
           ${cfg?.headerText?`<div class="rel-head-caption">${esc(cfg.headerText)}</div>`:""}
-          <div class="rel-title">${esc(titulo||"RelatÃ³rio")}</div>
-          ${showUser?`<div class="rel-user">UsuÃ¡rio: ${esc(usuario)}</div>`:""}
+          <div class="rel-title">${esc(titulo||"RelatÃƒÂ³rio")}</div>
+          ${showUser?`<div class="rel-user">UsuÃƒÂ¡rio: ${esc(usuario)}</div>`:""}
         </div>
       </div>
       <div class="rel-meta" style="${cssCab}">
         ${showDateTime?`<div>Data: ${esc(data)}</div><div>Hora: ${esc(hora)}</div>`:""}
-        ${showPage?`<div>PÃ¡g.: 1</div>`:""}
+        ${showPage?`<div>PÃƒÂ¡g.: 1</div>`:""}
       </div>
     </div>`;
     const rodapeLinha=totaisPorColunaHtml(campos,true,rows.length);
     const rowsHtml=linhasHtmlRelatorio(campos,rows);
-    return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo||"RelatÃ³rio")}</title><style>
+    return`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(titulo||"RelatÃƒÂ³rio")}</title><style>
       @page { size: ${pageW}cm ${pageH}cm; margin: ${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm; }
       body{margin:${mTop}cm ${mRight}cm ${mBottom}cm ${mLeft}cm;font-family:Tahoma,Arial,sans-serif;font-size:11px;color:#000}
       .rel-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
@@ -9063,14 +10340,14 @@ function rccEnsureUI(){
       tfoot td.total-label{letter-spacing:.3px}
     </style></head><body>${headerHtml}<table><thead><tr>${campos.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsHtml||`<tr><td colspan="${Math.max(1,campos.length)}" style="text-align:center">Sem dados.</td></tr>`}</tbody><tfoot>${rodapeLinha}</tfoot></table></body></html>`;
   };
-  const abrirDialogoImpressaoRelatorio=(campos,rows,titulo)=>{const html=montarHtmlRelatorio(campos,rows,titulo);const frame=document.createElement("iframe");frame.style.position="fixed";frame.style.right="0";frame.style.bottom="0";frame.style.width="0";frame.style.height="0";frame.style.border="0";document.body.appendChild(frame);const win=frame.contentWindow;const doc=win?.document;if(!doc){frame.remove();window.alert("NÃ£o foi possÃ­vel iniciar a impressÃ£o.");return false}doc.open();doc.write(html);doc.close();let printed=false;const doPrint=()=>{if(printed)return;printed=true;try{win.focus();win.print()}catch{}};frame.onload=doPrint;setTimeout(doPrint,180);const cleanup=()=>{setTimeout(()=>{try{frame.remove()}catch{}},1200)};try{win.addEventListener("afterprint",cleanup)}catch{}setTimeout(cleanup,60000);return true};
+  const abrirDialogoImpressaoRelatorio=(campos,rows,titulo)=>{const html=montarHtmlRelatorio(campos,rows,titulo);const frame=document.createElement("iframe");frame.style.position="fixed";frame.style.right="0";frame.style.bottom="0";frame.style.width="0";frame.style.height="0";frame.style.border="0";document.body.appendChild(frame);const win=frame.contentWindow;const doc=win?.document;if(!doc){frame.remove();window.alert("NÃƒÂ£o foi possÃƒÂ­vel iniciar a impressÃƒÂ£o.");return false}doc.open();doc.write(html);doc.close();let printed=false;const doPrint=()=>{if(printed)return;printed=true;try{win.focus();win.print()}catch{}};frame.onload=doPrint;setTimeout(doPrint,180);const cleanup=()=>{setTimeout(()=>{try{frame.remove()}catch{}},1200)};try{win.addEventListener("afterprint",cleanup)}catch{}setTimeout(cleanup,60000);return true};
   const csvEsc=(v)=>{const s=String(v??"");if(/[;"\n\r]/.test(s))return`"${s.replace(/"/g,'""')}"`;return s};
-  const exportarCsvRelatorio=(campos,rows)=>{const linhas=[];linhas.push(campos.map(csvEsc).join(";"));rows.forEach(row=>{linhas.push(campos.map(c=>csvEsc(String(valorCampo(row,c)||""))).join(";"))});const totais=totaisPorColunaHtml(campos,true,rows.length);if(totais){const idxLabel=campos.findIndex(c=>c!=="DÃ©bito"&&c!=="CrÃ©dito");const totalLinha=campos.map((c,idx)=>{if(c==="DÃ©bito")return ccFmt(rcc.totalDebito||0);if(c==="CrÃ©dito")return ccFmt(rcc.totalCredito||0);if(idx===idxLabel)return"TOTAL";return""});linhas.push(totalLinha.map(csvEsc).join(";"))}return"\ufeff"+linhas.join("\r\n")};
-  const exportarExcelRelatorio=(campos,rows,titulo)=>{const rodapeLinha=totaisPorColunaHtml(campos,true,rows.length);const rowsHtml=linhasHtmlRelatorio(campos,rows);const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃ³rio")}</h3><table border="1"><thead><tr>${campos.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsHtml||`<tr><td colspan="${Math.max(1,campos.length)}">Sem dados.</td></tr>`}</tbody><tfoot>${rodapeLinha}</tfoot></table></body></html>`;baixarArquivoTexto(`${nomeArquivoBase()}.xls`,"\ufeff"+html,"application/vnd.ms-excel;charset=utf-8;")};
+  const exportarCsvRelatorio=(campos,rows)=>{const linhas=[];linhas.push(campos.map(csvEsc).join(";"));rows.forEach(row=>{linhas.push(campos.map(c=>csvEsc(String(valorCampo(row,c)||""))).join(";"))});const totais=totaisPorColunaHtml(campos,true,rows.length);if(totais){const idxLabel=campos.findIndex(c=>c!=="DÃƒÂ©bito"&&c!=="CrÃƒÂ©dito");const totalLinha=campos.map((c,idx)=>{if(c==="DÃƒÂ©bito")return ccFmt(rcc.totalDebito||0);if(c==="CrÃƒÂ©dito")return ccFmt(rcc.totalCredito||0);if(idx===idxLabel)return"TOTAL";return""});linhas.push(totalLinha.map(csvEsc).join(";"))}return"\ufeff"+linhas.join("\r\n")};
+  const exportarExcelRelatorio=(campos,rows,titulo)=>{const rodapeLinha=totaisPorColunaHtml(campos,true,rows.length);const rowsHtml=linhasHtmlRelatorio(campos,rows);const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃƒÂ³rio")}</h3><table border="1"><thead><tr>${campos.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsHtml||`<tr><td colspan="${Math.max(1,campos.length)}">Sem dados.</td></tr>`}</tbody><tfoot>${rodapeLinha}</tfoot></table></body></html>`;baixarArquivoTexto(`${nomeArquivoBase()}.xls`,"\ufeff"+html,"application/vnd.ms-excel;charset=utf-8;")};
   const pdfEscape=(s)=>String(s??"").replace(/\\/g,"\\\\").replace(/\(/g,"\\(").replace(/\)/g,"\\)");
-  const gerarPdfSimplesBlob=(campos,rows,titulo)=>{const header=campos.map(c=>String(c||""));const dados=rows.map(r=>campos.map(c=>String(valorCampo(r,c)||"")));const idxLabel=campos.findIndex(c=>c!=="DÃ©bito"&&c!=="CrÃ©dito");if(rows.length>0){dados.push(campos.map((c,idx)=>{if(c==="DÃ©bito")return ccFmt(rcc.totalDebito||0);if(c==="CrÃ©dito")return ccFmt(rcc.totalCredito||0);if(idx===idxLabel)return"TOTAL";return""}))}const w=header.map((h,i)=>Math.min(24,Math.max(h.length,...dados.map(l=>(l[i]||"").length),6)));const toLine=(arr)=>arr.map((v,i)=>String(v||"").padEnd(w[i]," ").slice(0,w[i])).join(" | ");const sep=w.map(x=>"-".repeat(x)).join("-+-");const lines=[String(titulo||"RelatÃ³rio"),"",toLine(header),sep,...dados.map(toLine)];const pageHeight=842;const startY=800;const lh=13;const bottom=40;const perPage=Math.max(20,Math.floor((startY-bottom)/lh));const pages=[];for(let i=0;i<lines.length;i+=perPage)pages.push(lines.slice(i,i+perPage));const objs=[];const addObj=(id,body)=>objs.push({id,body});addObj(1,"<< /Type /Catalog /Pages 2 0 R >>");addObj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");let nextId=4;const kids=[];for(const pg of pages){const contentId=nextId++;const pageId=nextId++;const stream=["BT","/F1 10 Tf","13 TL",`40 ${startY} Td`,...pg.map((ln,idx)=>`${idx===0?"":"T* "}(${pdfEscape(ln)}) Tj`),"ET"].join("\n");addObj(contentId,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);addObj(pageId,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);kids.push(`${pageId} 0 R`)}addObj(2,`<< /Type /Pages /Count ${kids.length||1} /Kids [${kids.join(" ")}] >>`);objs.sort((a,b)=>a.id-b.id);let pdf="%PDF-1.4\n";const enc=new TextEncoder();const offsets={};for(const o of objs){offsets[o.id]=enc.encode(pdf).length;pdf+=`${o.id} 0 obj\n${o.body}\nendobj\n`}const xref=enc.encode(pdf).length;const maxId=Math.max(...objs.map(o=>o.id));pdf+=`xref\n0 ${maxId+1}\n0000000000 65535 f \n`;for(let i=1;i<=maxId;i++){const off=offsets[i]||0;pdf+=`${String(off).padStart(10,"0")} 00000 n \n`}pdf+=`trailer\n<< /Size ${maxId+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Blob([pdf],{type:"application/pdf"})};
-  const blobPorFormato=(formato,campos,rows,titulo)=>{if(formato==="PDF")return gerarPdfSimplesBlob(campos,rows,titulo);if(formato==="EXCEL"){const rodapeLinha=totaisPorColunaHtml(campos,true,rows.length);const rowsHtml=linhasHtmlRelatorio(campos,rows);const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃ³rio")}</h3><table border="1"><thead><tr>${campos.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsHtml||`<tr><td colspan="${Math.max(1,campos.length)}">Sem dados.</td></tr>`}</tbody><tfoot>${rodapeLinha}</tfoot></table></body></html>`;return new Blob(["\ufeff"+html],{type:"application/vnd.ms-excel;charset=utf-8;"})}return new Blob([exportarCsvRelatorio(campos,rows)],{type:"text/csv;charset=utf-8;"})};
-  const escolherFormatoArquivoFallback=()=>{const raw=(window.prompt("Escolha o formato para exportar: CSV, PDF ou XLMS (Excel).","CSV")||"").trim().toUpperCase();if(!raw)return"";if(raw==="CSV"||raw==="CVS")return"CSV";if(raw==="PDF")return"PDF";if(raw==="EXCEL"||raw==="XLS"||raw==="XLSX"||raw==="XLSM"||raw==="XLMS")return"EXCEL";window.alert("Formato invÃ¡lido. Use CSV, PDF ou XLMS.");return""};
+  const gerarPdfSimplesBlob=(campos,rows,titulo)=>{const header=campos.map(c=>String(c||""));const dados=rows.map(r=>campos.map(c=>String(valorCampo(r,c)||"")));const idxLabel=campos.findIndex(c=>c!=="DÃƒÂ©bito"&&c!=="CrÃƒÂ©dito");if(rows.length>0){dados.push(campos.map((c,idx)=>{if(c==="DÃƒÂ©bito")return ccFmt(rcc.totalDebito||0);if(c==="CrÃƒÂ©dito")return ccFmt(rcc.totalCredito||0);if(idx===idxLabel)return"TOTAL";return""}))}const w=header.map((h,i)=>Math.min(24,Math.max(h.length,...dados.map(l=>(l[i]||"").length),6)));const toLine=(arr)=>arr.map((v,i)=>String(v||"").padEnd(w[i]," ").slice(0,w[i])).join(" | ");const sep=w.map(x=>"-".repeat(x)).join("-+-");const lines=[String(titulo||"RelatÃƒÂ³rio"),"",toLine(header),sep,...dados.map(toLine)];const pageHeight=842;const startY=800;const lh=13;const bottom=40;const perPage=Math.max(20,Math.floor((startY-bottom)/lh));const pages=[];for(let i=0;i<lines.length;i+=perPage)pages.push(lines.slice(i,i+perPage));const objs=[];const addObj=(id,body)=>objs.push({id,body});addObj(1,"<< /Type /Catalog /Pages 2 0 R >>");addObj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");let nextId=4;const kids=[];for(const pg of pages){const contentId=nextId++;const pageId=nextId++;const stream=["BT","/F1 10 Tf","13 TL",`40 ${startY} Td`,...pg.map((ln,idx)=>`${idx===0?"":"T* "}(${pdfEscape(ln)}) Tj`),"ET"].join("\n");addObj(contentId,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);addObj(pageId,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);kids.push(`${pageId} 0 R`)}addObj(2,`<< /Type /Pages /Count ${kids.length||1} /Kids [${kids.join(" ")}] >>`);objs.sort((a,b)=>a.id-b.id);let pdf="%PDF-1.4\n";const enc=new TextEncoder();const offsets={};for(const o of objs){offsets[o.id]=enc.encode(pdf).length;pdf+=`${o.id} 0 obj\n${o.body}\nendobj\n`}const xref=enc.encode(pdf).length;const maxId=Math.max(...objs.map(o=>o.id));pdf+=`xref\n0 ${maxId+1}\n0000000000 65535 f \n`;for(let i=1;i<=maxId;i++){const off=offsets[i]||0;pdf+=`${String(off).padStart(10,"0")} 00000 n \n`}pdf+=`trailer\n<< /Size ${maxId+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Blob([pdf],{type:"application/pdf"})};
+  const blobPorFormato=(formato,campos,rows,titulo)=>{if(formato==="PDF")return gerarPdfSimplesBlob(campos,rows,titulo);if(formato==="EXCEL"){const rodapeLinha=totaisPorColunaHtml(campos,true,rows.length);const rowsHtml=linhasHtmlRelatorio(campos,rows);const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><h3>${esc(titulo||"RelatÃƒÂ³rio")}</h3><table border="1"><thead><tr>${campos.map(c=>`<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rowsHtml||`<tr><td colspan="${Math.max(1,campos.length)}">Sem dados.</td></tr>`}</tbody><tfoot>${rodapeLinha}</tfoot></table></body></html>`;return new Blob(["\ufeff"+html],{type:"application/vnd.ms-excel;charset=utf-8;"})}return new Blob([exportarCsvRelatorio(campos,rows)],{type:"text/csv;charset=utf-8;"})};
+  const escolherFormatoArquivoFallback=()=>{const raw=(window.prompt("Escolha o formato para exportar: CSV, PDF ou XLMS (Excel).","CSV")||"").trim().toUpperCase();if(!raw)return"";if(raw==="CSV"||raw==="CVS")return"CSV";if(raw==="PDF")return"PDF";if(raw==="EXCEL"||raw==="XLS"||raw==="XLSX"||raw==="XLSM"||raw==="XLMS")return"EXCEL";window.alert("Formato invÃƒÂ¡lido. Use CSV, PDF ou XLMS.");return""};
   const salvarBlobComDialogo=async(suggestedBase,campos,rows,titulo)=>{if(typeof window.showSaveFilePicker==="function"){try{const handle=await window.showSaveFilePicker({suggestedName:`${suggestedBase}.csv`,types:[{description:"Arquivo CSV",accept:{"text/csv":[".csv"]}},{description:"Arquivo PDF",accept:{"application/pdf":[".pdf"]}},{description:"Arquivo Excel",accept:{"application/vnd.ms-excel":[".xls",".xlsx",".xlms",".xlsm"]}}]});const nome=(handle.name||"").toLowerCase();let formato="CSV";if(nome.endsWith(".pdf"))formato="PDF";else if(nome.endsWith(".xls")||nome.endsWith(".xlsx")||nome.endsWith(".xlms")||nome.endsWith(".xlsm"))formato="EXCEL";const blob=blobPorFormato(formato,campos,rows,titulo);const writable=await handle.createWritable();await writable.write(blob);await writable.close();return formato}catch(err){if(err&&err.name==="AbortError")return"";throw err}}const formato=escolherFormatoArquivoFallback();if(!formato)return"";const blob=blobPorFormato(formato,campos,rows,titulo);const ext=formato==="PDF"?"pdf":(formato==="EXCEL"?"xls":"csv");const blobUrl=URL.createObjectURL(blob);const a=document.createElement("a");a.href=blobUrl;a.download=`${suggestedBase}.${ext}`;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(blobUrl);return formato};
   const updateZoom=()=>{const z=Math.max(50,Math.min(200,Number(rcc.viewZoom.value||100)));rcc.viewZoom.value=String(z);const scale=z/100;rcc.viewSheet.style.transform=`scale(${scale})`;rcc.viewSheetHolder.style.height=`${Math.ceil((rcc.baseSheetHeight||1123)*scale)+30}px`};
   const renderPagina=()=>{
@@ -9096,7 +10373,7 @@ function rccEnsureUI(){
     rccAplicarConfigPreview();
     rccAplicarEstilosTabela();
   };
-  const abrirPreview=()=>{rcc.viewTitle.textContent=rcc.txtNome.value.trim()||"RelatÃ³rio";const paisagem=rcc.radPaisagem.checked;rcc.viewSheet.classList.remove("portrait","landscape");rcc.viewSheet.classList.add(paisagem?"landscape":"portrait");rcc.baseSheetHeight=paisagem?794:1123;rcc.pagina=1;rcc.viewPag.value="1";rcc.panel.classList.add("hidden");rcc.viewPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");rccAplicarConfigPreview();updateZoom();renderPagina();footerMsg.textContent="RelatÃ³rio carregado em tela."};
+  const abrirPreview=()=>{rcc.viewTitle.textContent=rcc.txtNome.value.trim()||"RelatÃƒÂ³rio";const paisagem=rcc.radPaisagem.checked;rcc.viewSheet.classList.remove("portrait","landscape");rcc.viewSheet.classList.add(paisagem?"landscape":"portrait");rcc.baseSheetHeight=paisagem?794:1123;rcc.pagina=1;rcc.viewPag.value="1";rcc.panel.classList.add("hidden");rcc.viewPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");rccAplicarConfigPreview();updateZoom();renderPagina();footerMsg.textContent="RelatÃƒÂ³rio carregado em tela."};
   const voltarFiltros=()=>{rcc.viewPanel.classList.add("hidden");rcc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")};
   const imprimirPreview=()=>{
     const campos=rcc.camposSelecionados;
@@ -9104,7 +10381,7 @@ function rccEnsureUI(){
     const ini=(rcc.pagina-1)*lpp;
     const fim=Math.min(rcc.dados.length,ini+lpp);
     const rows=rcc.dados.slice(ini,fim);
-    abrirJanelaImpressaoRelatorio(campos,rows,rcc.viewTitle.textContent||"RelatÃ³rio");
+    abrirJanelaImpressaoRelatorio(campos,rows,rcc.viewTitle.textContent||"RelatÃƒÂ³rio");
   };
   const exportarArquivoRelatorio=(campos,rows,titulo)=>{
     const formato=escolherFormatoArquivo();
@@ -9117,7 +10394,7 @@ function rccEnsureUI(){
     }
     if(formato==="PDF"){
       const ok=abrirJanelaImpressaoRelatorio(campos,rows,titulo);
-      if(ok)footerMsg.textContent="Janela de impressÃ£o PDF aberta.";
+      if(ok)footerMsg.textContent="Janela de impressÃƒÂ£o PDF aberta.";
       return;
     }
     if(formato==="EXCEL"){
@@ -9130,16 +10407,16 @@ function rccEnsureUI(){
     const params=montarParams();
     if(!params)return;
     const {res,data}=await requestJson("GET",`/financeiro/relatorio-cc?${params.toString()}`,undefined,true);
-    if(!res.ok){window.alert(data.detail||"Falha ao gerar relatÃ³rio.");return}
+    if(!res.ok){window.alert(data.detail||"Falha ao gerar relatÃƒÂ³rio.");return}
     rcc.dados=Array.isArray(data?.itens)?data.itens:[];
     rcc.totalDebito=Number(data?.total_debito||0);
     rcc.totalCredito=Number(data?.total_credito||0);
     const saida=rcc.cboSaida.value||"Tela";
-    const titulo=rcc.txtNome.value.trim()||"RelatÃ³rio";
+    const titulo=rcc.txtNome.value.trim()||"RelatÃƒÂ³rio";
     if(saida==="Tela"){abrirPreview();return}
     if(saida==="Imprimir"){
       const ok=abrirJanelaImpressaoRelatorio(rcc.camposSelecionados,rcc.dados,titulo);
-      if(ok)footerMsg.textContent="ImpressÃ£o iniciada.";
+      if(ok)footerMsg.textContent="ImpressÃƒÂ£o iniciada.";
       return;
     }
     if(saida==="Arquivo"){
@@ -9148,7 +10425,7 @@ function rccEnsureUI(){
     }
     abrirPreview();
   };
-  const carregarCombos=async()=>{rcc.cboCC.innerHTML='<option value="CLINICA">ClÃ­nica</option><option value="CIRURGIAO">CirurgiÃ£o</option>';rcc.cboLancamento.innerHTML="<option>CrÃ©dito</option><option>DÃ©bito</option>";rcc.cboTipoGrupo.innerHTML="<option>Pessoal</option><option>Profissional</option>";rcc.cboSituacao.innerHTML="<option>Aberto</option><option>Efetivado</option>";const gResp=await requestJson("GET","/cadastros/grupos",undefined,true);if(gResp.res.ok){const grupos=Array.isArray(gResp.data)?gResp.data:[];const nomesGrupo=[...new Set(grupos.map(g=>g.nome).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));const tipos=[...new Set(grupos.map(g=>g.tipo).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));const cats=[...new Set(grupos.flatMap(g=>Array.isArray(g.categorias)?g.categorias.map(c=>c.nome):[]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));rcc.cboGrupo.innerHTML=nomesGrupo.map(x=>`<option>${esc(x)}</option>`).join("");if(tipos.length)rcc.cboTipoGrupo.innerHTML=tipos.map(x=>`<option>${esc(x)}</option>`).join("");rcc.cboCat.innerHTML=cats.map(x=>`<option>${esc(x)}</option>`).join("")}const pResp=await requestJson("GET","/financeiro/formas-pagamento-usadas",undefined,true);if(pResp.res.ok){const formas=[...new Set((Array.isArray(pResp.data)?pResp.data:[]).map(x=>x.descricao).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));rcc.cboPag.innerHTML=formas.map(x=>`<option>${esc(x)}</option>`).join("")}};
+  const carregarCombos=async()=>{rcc.cboCC.innerHTML='<option value="CLINICA">ClÃƒÂ­nica</option><option value="CIRURGIAO">CirurgiÃƒÂ£o</option>';rcc.cboLancamento.innerHTML="<option>CrÃƒÂ©dito</option><option>DÃƒÂ©bito</option>";rcc.cboTipoGrupo.innerHTML="<option>Pessoal</option><option>Profissional</option>";rcc.cboSituacao.innerHTML="<option>Aberto</option><option>Efetivado</option>";const gResp=await requestJson("GET","/cadastros/grupos",undefined,true);if(gResp.res.ok){const grupos=Array.isArray(gResp.data)?gResp.data:[];const nomesGrupo=[...new Set(grupos.map(g=>g.nome).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));const tipos=[...new Set(grupos.map(g=>g.tipo).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));const cats=[...new Set(grupos.flatMap(g=>Array.isArray(g.categorias)?g.categorias.map(c=>c.nome):[]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));rcc.cboGrupo.innerHTML=nomesGrupo.map(x=>`<option>${esc(x)}</option>`).join("");if(tipos.length)rcc.cboTipoGrupo.innerHTML=tipos.map(x=>`<option>${esc(x)}</option>`).join("");rcc.cboCat.innerHTML=cats.map(x=>`<option>${esc(x)}</option>`).join("")}const pResp=await requestJson("GET","/financeiro/formas-pagamento-usadas",undefined,true);if(pResp.res.ok){const formas=[...new Set((Array.isArray(pResp.data)?pResp.data:[]).map(x=>x.descricao).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),"pt-BR"));rcc.cboPag.innerHTML=formas.map(x=>`<option>${esc(x)}</option>`).join("")}};
   rcc._carregarCombos=carregarCombos;rcc._reset=resetFiltros;rcc._renderCampos=renderCampos;rcc._openTab=openTab;
   rcc.tabBtnGeral.addEventListener("click",()=>openTab("geral"));rcc.tabBtnAdd.addEventListener("click",()=>openTab("add"));rcc.tabBtnOpc.addEventListener("click",()=>openTab("opc"));
   rcc.dispBody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-campo]");if(tr)selectRow(rcc.dispBody,tr)});
@@ -9169,7 +10446,7 @@ function rccEnsureUI(){
   rcc.viewZoom.addEventListener("change",()=>{updateZoom();renderPagina()});
   resetFiltros();
 }
-async function rccAbrir(origem="menu"){rccEnsureUI();rcc.origem=origem;hideAllPanels();ensurePanelChrome(rcc.panel);ensurePanelChrome(rcc.viewPanel);rcc.panel.classList.remove("hidden");if(rcc._openTab)rcc._openTab("geral");workspaceEmpty.classList.add("hidden");await rcc._carregarCombos();footerMsg.textContent="MÃ³dulo Pesquisa fluxo de caixa aberto."}
+async function rccAbrir(origem="menu"){rccEnsureUI();rcc.origem=origem;hideAllPanels();ensurePanelChrome(rcc.panel);ensurePanelChrome(rcc.viewPanel);rcc.panel.classList.remove("hidden");if(rcc._openTab)rcc._openTab("geral");workspaceEmpty.classList.add("hidden");await rcc._carregarCombos();footerMsg.textContent="MÃƒÂ³dulo Pesquisa fluxo de caixa aberto."}
 function rccFechar(){if(!rcc)return;rcc.panel.classList.add("hidden");rcc.viewPanel.classList.add("hidden");if(rcc.origem==="cc"&&cc){cc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");footerMsg.textContent="Retornado para Conta Corrente.";return}workspaceEmpty.classList.remove("hidden")}
 function fcxEnsureUI(){
   if(fcx)return;
@@ -9201,15 +10478,15 @@ function fcxEnsureUI(){
   workspaceEmpty.insertAdjacentHTML("afterend",`
     <section id="fcx-panel" class="fcx-panel hidden">
       <div class="fcx-toolbar">
-        <button id="fcx-btn-atualizar" class="materiais-btn" type="button"><img src="/desktop-assets/dashboard.png" alt="">Atualizar grÃ¡fico</button>
+        <button id="fcx-btn-atualizar" class="materiais-btn" type="button"><img src="/desktop-assets/dashboard.png" alt="">Atualizar grÃƒÂ¡fico</button>
         <button id="fcx-btn-imprime" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">Imprime...</button>
         <button id="fcx-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fechar</button>
       </div>
       <div class="fcx-filtros">
         <label>Conta corrente:</label>
-        <select id="fcx-cbo-cc" class="conta"><option value="CLINICA">ClÃ­nica</option><option value="CIRURGIAO">CirurgiÃ£o</option></select>
+        <select id="fcx-cbo-cc" class="conta"><option value="CLINICA">ClÃƒÂ­nica</option><option value="CIRURGIAO">CirurgiÃƒÂ£o</option></select>
         <div class="fcx-vline"></div>
-        <label>PerÃ­odo:</label>
+        <label>PerÃƒÂ­odo:</label>
         <select id="fcx-mes-inicio" class="mes"></select>
         <input id="fcx-ano-inicio" class="ano" type="number" min="2000" max="2100">
         <label>a</label>
@@ -9218,7 +10495,7 @@ function fcxEnsureUI(){
       </div>
       <div class="fcx-tabs">
         <div class="fcx-tab-buttons">
-          <button id="fcx-tab-btn-evolucao" class="fcx-tab-btn active" type="button">EvoluÃ§Ã£o</button>
+          <button id="fcx-tab-btn-evolucao" class="fcx-tab-btn active" type="button">EvoluÃƒÂ§ÃƒÂ£o</button>
           <button id="fcx-tab-btn-grupo" class="fcx-tab-btn" type="button">Comparativo por grupo financeiro</button>
           <button id="fcx-tab-btn-categoria" class="fcx-tab-btn" type="button">Comparativo por categoria financeira</button>
         </div>
@@ -9226,11 +10503,11 @@ function fcxEnsureUI(){
           <canvas id="fcx-canvas-evolucao" class="fcx-canvas" width="875" height="430"></canvas>
         </div>
         <div id="fcx-tab-grupo" class="fcx-tab hidden">
-          <div class="fcx-tipo"><label>Tipo:</label><select id="fcx-cbo-tipo-grupo"><option>CRÃ‰DITO</option><option>DÃ‰BITO</option></select></div>
+          <div class="fcx-tipo"><label>Tipo:</label><select id="fcx-cbo-tipo-grupo"><option>CRÃƒâ€°DITO</option><option>DÃƒâ€°BITO</option></select></div>
           <canvas id="fcx-canvas-grupo" class="fcx-canvas" width="875" height="400"></canvas>
         </div>
         <div id="fcx-tab-categoria" class="fcx-tab hidden">
-          <div class="fcx-tipo"><label>Tipo:</label><select id="fcx-cbo-tipo-categoria"><option>CRÃ‰DITO</option><option>DÃ‰BITO</option></select></div>
+          <div class="fcx-tipo"><label>Tipo:</label><select id="fcx-cbo-tipo-categoria"><option>CRÃƒâ€°DITO</option><option>DÃƒâ€°BITO</option></select></div>
           <canvas id="fcx-canvas-categoria" class="fcx-canvas" width="875" height="400"></canvas>
         </div>
       </div>
@@ -9259,7 +10536,7 @@ function fcxEnsureUI(){
     canvasCategoria:document.getElementById("fcx-canvas-categoria"),
     abaAtual:"evolucao"
   };
-  const meses=["Janeiro","Fevereiro","MarÃ§o","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+  const meses=["Janeiro","Fevereiro","MarÃƒÂ§o","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
   const opts=meses.map((m,idx)=>`<option value="${idx+1}">${m}</option>`).join("");
   fcx.mesInicio.innerHTML=opts;
   fcx.mesFim.innerHTML=opts;
@@ -9315,7 +10592,7 @@ function fcxRenderEvolucao(){
   const canvas=fcx?.canvasEvolucao;
   if(!canvas)return;
   const itens=Array.isArray(fcxData?.evolucao)?fcxData.evolucao:[];
-  if(!itens.length){fcxLimparCanvas(canvas,"Sem dados para o perÃ­odo selecionado.","Desempenho do fluxo de caixa");return}
+  if(!itens.length){fcxLimparCanvas(canvas,"Sem dados para o perÃƒÂ­odo selecionado.","Desempenho do fluxo de caixa");return}
   const ctx=canvas.getContext("2d");
   const w=canvas.width,h=canvas.height;
   ctx.clearRect(0,0,w,h);
@@ -9374,12 +10651,12 @@ function fcxRenderEvolucao(){
   ctx.fillStyle="#3498db";
   ctx.fillRect(w-98,18,12,10);
   ctx.fillStyle="#333";
-  ctx.fillText("SaÃ­das",w-81,27);
+  ctx.fillText("SaÃƒÂ­das",w-81,27);
 }
 function fcxRenderPizza(canvas,titulo,itens,legendaTitulo){
   if(!canvas)return;
   const dados=(Array.isArray(itens)?itens:[]).filter(x=>fcxValorNumerico(x.valor)>0);
-  if(!dados.length){fcxLimparCanvas(canvas,"Sem dados para o perÃ­odo selecionado.",titulo);return}
+  if(!dados.length){fcxLimparCanvas(canvas,"Sem dados para o perÃƒÂ­odo selecionado.",titulo);return}
   const ctx=canvas.getContext("2d");
   const w=canvas.width,h=canvas.height;
   ctx.clearRect(0,0,w,h);
@@ -9442,8 +10719,8 @@ function fcxParams(){
   params.set("mes_fim",String(Number(fcx.mesFim.value||12)));
   params.set("ano_inicio",String(Number(fcx.anoInicio.value||new Date().getFullYear())));
   params.set("ano_fim",String(Number(fcx.anoFim.value||new Date().getFullYear())));
-  params.set("tipo_grupo",fcx.cboTipoGrupo.value||"CRÃ‰DITO");
-  params.set("tipo_categoria",fcx.cboTipoCategoria.value||"CRÃ‰DITO");
+  params.set("tipo_grupo",fcx.cboTipoGrupo.value||"CRÃƒâ€°DITO");
+  params.set("tipo_categoria",fcx.cboTipoCategoria.value||"CRÃƒâ€°DITO");
   return params;
 }
 function fcxCanvasAtivo(){
@@ -9456,20 +10733,20 @@ async function fcxCarregarDados(){
   if(!fcx)return;
   const params=fcxParams();
   const {res,data}=await requestJson("GET",`/financeiro/fluxo-caixa?${params.toString()}`,undefined,true);
-  if(!res.ok){window.alert(data.detail||"Falha ao carregar anÃ¡lise de fluxo de caixa.");return}
+  if(!res.ok){window.alert(data.detail||"Falha ao carregar anÃƒÂ¡lise de fluxo de caixa.");return}
   fcxData=data||{};
   fcxRenderGraficos();
 }
 function fcxImprimir(){
   const ativo=fcxCanvasAtivo();
-  if(!ativo||!ativo.canvas){window.alert("NÃ£o hÃ¡ grÃ¡fico para imprimir.");return}
-  const periodo=`PerÃ­odo: ${fcx.anoInicio.value||""} a ${fcx.anoFim.value||""}`;
+  if(!ativo||!ativo.canvas){window.alert("NÃƒÂ£o hÃƒÂ¡ grÃƒÂ¡fico para imprimir.");return}
+  const periodo=`PerÃƒÂ­odo: ${fcx.anoInicio.value||""} a ${fcx.anoFim.value||""}`;
   const conta=fcx.cboCC.value||"";
   const dataEmissao=new Date().toLocaleString("pt-BR");
   const img=ativo.canvas.toDataURL("image/png");
-  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(ativo.titulo)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:20px}h1{font-size:22px;margin:0 0 8px;text-align:center}.meta{text-align:center;font-size:13px;margin-bottom:16px}.graph{display:flex;justify-content:center}img{max-width:100%;height:auto;border:1px solid #d3dbe5}</style></head><body onload="window.print()"><h1>${esc(ativo.titulo)}</h1><div class="meta">${esc(periodo)} | Conta: ${esc(conta)}<br>Emitido em: ${esc(dataEmissao)}</div><div class="graph"><img src="${img}" alt="GrÃ¡fico"></div></body></html>`;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(ativo.titulo)}</title><style>body{font-family:Arial,sans-serif;color:#111;padding:20px}h1{font-size:22px;margin:0 0 8px;text-align:center}.meta{text-align:center;font-size:13px;margin-bottom:16px}.graph{display:flex;justify-content:center}img{max-width:100%;height:auto;border:1px solid #d3dbe5}</style></head><body onload="window.print()"><h1>${esc(ativo.titulo)}</h1><div class="meta">${esc(periodo)} | Conta: ${esc(conta)}<br>Emitido em: ${esc(dataEmissao)}</div><div class="graph"><img src="${img}" alt="GrÃƒÂ¡fico"></div></body></html>`;
   const w=window.open("","_blank","noopener,noreferrer,width=980,height=720");
-  if(!w){window.alert("NÃ£o foi possÃ­vel abrir a janela de impressÃ£o.");return}
+  if(!w){window.alert("NÃƒÂ£o foi possÃƒÂ­vel abrir a janela de impressÃƒÂ£o.");return}
   w.document.open();
   w.document.write(html);
   w.document.close();
@@ -9487,7 +10764,7 @@ async function fcxAbrir(){
   workspaceEmpty.classList.add("hidden");
   fcx._abrirAba("evolucao");
   await fcxCarregarDados();
-  footerMsg.textContent="MÃ³dulo AnÃ¡lise de fluxo de caixa aberto.";
+  footerMsg.textContent="MÃƒÂ³dulo AnÃƒÂ¡lise de fluxo de caixa aberto.";
 }
 function dashEnsureUI(){
   if(dash)return;
@@ -9540,13 +10817,13 @@ function dashEnsureUI(){
                 <div><label>Selecione filtro desejado</label><select id="dash-cbo-filtro"></select></div>
                 <div><label>Pesquisa procedimento</label><input id="dash-txt-proc" type="text"></div>
               </div>
-              <div class="dash-table-head"><span>Procedimentos</span><span>Lucro lÃ­quido</span><span>Rendimento %</span><span>Tempo / Min</span><span>Custo R$</span></div>
+              <div class="dash-table-head"><span>Procedimentos</span><span>Lucro lÃƒÂ­quido</span><span>Rendimento %</span><span>Tempo / Min</span><span>Custo R$</span></div>
               <div class="dash-table-wrap"><table class="dash-table"><tbody id="dash-tbody"></tbody></table></div>
             </div>
           </section>
           <section class="dash-group grafico">
-            <h3>Painel GrÃ¡fico</h3>
-            <div class="dash-chart-top"><label for="dash-spin-pag">PrÃ³xima pagina</label><input id="dash-spin-pag" type="number" min="1" value="1"></div>
+            <h3>Painel GrÃƒÂ¡fico</h3>
+            <div class="dash-chart-top"><label for="dash-spin-pag">PrÃƒÂ³xima pagina</label><input id="dash-spin-pag" type="number" min="1" value="1"></div>
             <canvas id="dash-canvas-main" class="dash-canvas-main" width="901" height="421"></canvas>
           </section>
         </div>
@@ -9555,16 +10832,16 @@ function dashEnsureUI(){
           <div class="dash-fin-grid">
             <div class="dash-fin-cell"><label>Valor paciente</label><div id="dash-preco" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Tempo / Min</label><div id="dash-tempo" class="dash-fin-val"></div></div>
-            <div class="dash-fin-cell"><label>Custo laboratÃ³rio</label><div id="dash-lab" class="dash-fin-val"></div></div>
+            <div class="dash-fin-cell"><label>Custo laboratÃƒÂ³rio</label><div id="dash-lab" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>CFPH</label><div id="dash-cfph" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Mat. Consumo</label><div id="dash-material" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Custo R$</label><div id="dash-custo-proc" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Imposto</label><div id="dash-ir" class="dash-fin-val"></div></div>
-            <div class="dash-fin-cell"><label>ComissÃ£o CD</label><div id="dash-cd" class="dash-fin-val"></div></div>
-            <div class="dash-fin-cell"><label>Taxa CartÃ£o</label><div id="dash-cartao" class="dash-fin-val"></div></div>
-            <div class="dash-fin-cell"><label>Valor MÃ­nimio</label><div id="dash-valor-min" class="dash-fin-val"></div></div>
+            <div class="dash-fin-cell"><label>ComissÃƒÂ£o CD</label><div id="dash-cd" class="dash-fin-val"></div></div>
+            <div class="dash-fin-cell"><label>Taxa CartÃƒÂ£o</label><div id="dash-cartao" class="dash-fin-val"></div></div>
+            <div class="dash-fin-cell"><label>Valor MÃƒÂ­nimio</label><div id="dash-valor-min" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Lucro Bruto</label><div id="dash-lucro-bruto" class="dash-fin-val"></div></div>
-            <div class="dash-fin-cell"><label>Lucro LÃ­quido</label><div id="dash-lucro-liq" class="dash-fin-val"></div></div>
+            <div class="dash-fin-cell"><label>Lucro LÃƒÂ­quido</label><div id="dash-lucro-liq" class="dash-fin-val"></div></div>
             <div class="dash-fin-cell"><label>Rendimento %</label><div id="dash-rend-proc" class="dash-fin-val perc"></div></div>
             <div class="dash-fin-cell"><label>Bom 30 a 40%</label><div id="dash-rend-3040" class="dash-fin-val perc"></div></div>
             <div class="dash-fin-cell"><label>Bom 10 a 20%</label><div id="dash-rend-1020" class="dash-fin-val perc"></div></div>
@@ -9601,7 +10878,7 @@ function dashEnsureUI(){
     lblRend1020:document.getElementById("dash-rend-1020"),
     lblLucroHora:document.getElementById("dash-lucro-hora")
   };
-  dash.cboFiltro.innerHTML="<option>Procedimentos (Aâ€“Z)</option><option>Lucro LÃ­quido (Maior â†’ Menor)</option><option>Rendimento % (Maior â†’ Menor)</option><option>Tempo / Min (Menor â†’ Maior)</option><option>Custo (Maior â†’ Menor)</option>";
+  dash.cboFiltro.innerHTML="<option>Procedimentos (AÃ¢â‚¬â€œZ)</option><option>Lucro LÃƒÂ­quido (Maior Ã¢â€ â€™ Menor)</option><option>Rendimento % (Maior Ã¢â€ â€™ Menor)</option><option>Tempo / Min (Menor Ã¢â€ â€™ Maior)</option><option>Custo (Maior Ã¢â€ â€™ Menor)</option>";
   dash.cboFiltro.addEventListener("change",dashRenderTabela);
   dash.txtProc.addEventListener("input",dashRenderTabela);
   dash.spin.addEventListener("change",dashRenderGraficoRecompensa);
@@ -9618,10 +10895,10 @@ function dashSetPerc(el,valor,limite){el.textContent=dashRound(valor);el.style.c
 function dashAtualizarPainelSelecionado(){const item=dashData.find(x=>x.id===dashSelecionadoId);if(!item){dashLimparPainel();dashDesenharAlerta(null);return}dash.lblPreco.textContent=dashFmtMoeda(item.preco);dash.lblTempo.textContent=String(Number(item.tempo||0));dash.lblLab.textContent=dashFmtMoeda(item.lab);dash.lblCFPH.textContent=dashFmtMoeda(item.custo_fph);dash.lblMaterial.textContent=dashFmtMoeda(item.custo_material);dash.lblCustoProc.textContent=dashFmtMoeda(item.custo_proc);dash.lblIR.textContent=dashFmtMoeda(item.ir);dash.lblCD.textContent=dashFmtMoeda(item.cd);dash.lblCartao.textContent=dashFmtMoeda(item.cartao);dash.lblValorMin.textContent=dashFmtMoeda(item.valor_minimo);dash.lblLucroBruto.textContent=dashFmtMoeda(item.lucro_bruto);dash.lblLucroLiq.textContent=dashFmtMoeda(item.lucro_liquido);dash.lblRendProc.textContent=`${dashRound(item.rendimento)}%`;dash.lblLucroHora.textContent=dashFmtMoeda(item.lucro_hora);dashSetPerc(dash.lblRend3040,item.rendimento_3040,30);dashSetPerc(dash.lblRend1020,item.rendimento_1020,10);dashDesenharAlerta(item)}
 function dashGetTabelaDados(){let itens=[...dashData];const termo=(dash.txtProc.value||"").toLowerCase().trim();if(termo)itens=itens.filter(x=>String(x.nome||"").toLowerCase().includes(termo));const idx=dash.cboFiltro.selectedIndex||0;if(idx===0)itens.sort((a,b)=>String(a.nome||"").localeCompare(String(b.nome||""),"pt-BR"));if(idx===1)itens.sort((a,b)=>Number(b.lucro_liquido||0)-Number(a.lucro_liquido||0));if(idx===2)itens.sort((a,b)=>Number(b.rendimento||0)-Number(a.rendimento||0));if(idx===3)itens.sort((a,b)=>Number(a.tempo||0)-Number(b.tempo||0));if(idx===4)itens.sort((a,b)=>Number(b.custo_proc||0)-Number(a.custo_proc||0));return itens}
 function dashRenderTabela(){dashTabela=dashGetTabelaDados();dash.tbody.innerHTML=dashTabela.map(x=>`<tr data-id="${x.id}" class="${x.id===dashSelecionadoId?"selected":""}"><td>${esc(x.nome||"")}</td><td>${esc(dashFmtMoeda(x.lucro_liquido))}</td><td>${esc(dashRound(x.rendimento))}</td><td>${esc(String(Number(x.tempo||0)))}</td><td>${esc(dashFmtMoeda(x.custo_proc))}</td></tr>`).join("");if(dashSelecionadoId&&!dashTabela.some(x=>x.id===dashSelecionadoId))dashSelecionadoId=null;dashAtualizarPainelSelecionado()}
-function dashDesenharAlerta(item){const c=dash.chartAlerta;if(!c)return;const ctx=c.getContext("2d");const w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.fillStyle="#333";ctx.font="700 16px Tahoma";ctx.fillText("Alerta de Custo",12,24);if(!item){ctx.font="12px Tahoma";ctx.fillStyle="#666";ctx.fillText("Selecione um procedimento para visualizar.",12,48);return}const custo=Math.max(Number(item.custo_material||0),0);const lucro=Math.max(Number(item.lucro_liquido||0),0);const total=Math.max(custo+lucro,0.0001);const cx=140,cy=185,r=95;let ang=-Math.PI/2;const slices=[{nome:"Custo de Material",valor:custo,cor:"#e74c3c"},{nome:"Lucro LÃ­quido",valor:lucro,cor:(Number(item.lucro_liquido||0)>=Number(item.custo_material||0)?"#2ecc71":"#f39c12")}];slices.forEach(s=>{const frac=s.valor/total;const a2=ang+frac*2*Math.PI;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,ang,a2);ctx.closePath();ctx.fillStyle=s.cor;ctx.fill();const meio=(ang+a2)/2;const tx=cx+Math.cos(meio)*(r*0.55);const ty=cy+Math.sin(meio)*(r*0.55);ctx.fillStyle="#fff";ctx.font="700 11px Tahoma";ctx.textAlign="center";ctx.fillText(`${(frac*100).toFixed(1)}%`,tx,ty);ang=a2});ctx.textAlign="left";ctx.font="12px Tahoma";ctx.fillStyle="#111";ctx.fillRect(250,140,10,10);ctx.fillStyle="#333";ctx.fillText(`Custo de Material: ${dashFmtMoeda(item.custo_material)}`,266,149);ctx.fillStyle=(Number(item.lucro_liquido||0)>=Number(item.custo_material||0)?"#2ecc71":"#f39c12");ctx.fillRect(250,168,10,10);ctx.fillStyle="#333";ctx.fillText(`Lucro LÃ­quido: ${dashFmtMoeda(item.lucro_liquido)}`,266,177)}
-function dashRenderGraficoRecompensa(){const c=dash.chartMain;if(!c)return;const ctx=c.getContext("2d");const w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);const dados=[...dashGrafico];const totalPag=Math.max(1,Math.ceil(dados.length/5));dash.spin.max=String(totalPag);let pag=Number(dash.spin.value||1);if(!Number.isFinite(pag)||pag<1)pag=1;if(pag>totalPag)pag=totalPag;dash.spin.value=String(pag);const itens=dados.slice((pag-1)*5,(pag-1)*5+5);ctx.fillStyle="#111";ctx.font="700 18px Tahoma";ctx.textAlign="center";ctx.fillText("EsforÃ§o vs Recompensa",w/2,26);if(!itens.length){ctx.font="12px Tahoma";ctx.fillStyle="#666";ctx.fillText("Sem dados para exibir.",w/2,h/2);return}const ml=56,mr=110,mt=44,mb=84,pw=w-ml-mr,ph=h-mt-mb;const maxBar=Math.max(...itens.map(x=>Math.max(Number(x.lucro_liquido||0),Number(x.custo_proc||0),Number(x.valor_minimo||0))),1);const tempos=itens.map(x=>Math.max(Number(x.tempo_grafico||0),30));const maxTempo=Math.max(...tempos,30);const maxTempoAdj=Math.ceil(maxTempo/30)*30;for(let i=0;i<=5;i++){const y=mt+ph*(i/5);ctx.strokeStyle="#e3e7ef";ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();const val=maxBar*(1-i/5);ctx.fillStyle="#555";ctx.font="10px Tahoma";ctx.textAlign="right";ctx.fillText(dashAbbrevMoney(val),ml-6,y+3)}for(let i=0;i<=Math.floor(maxTempoAdj/30)-1;i++){const t=30*(i+1);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));ctx.fillStyle="#666";ctx.font="10px Tahoma";ctx.textAlign="left";ctx.fillText(String(t),ml+pw+8,y+3)}const gw=pw/itens.length;const bw=Math.min(22,gw*0.2);const colors=[["#27ae60","lucro_liquido"],["#f39c12","custo_proc"],["#4682b4","valor_minimo"]];itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;colors.forEach((cinfo,cix)=>{const vv=Math.max(Number(it[cinfo[1]]||0),0);const bh=(vv/maxBar)*ph;const bx=x+(-bw*1.5)+(cix*bw*1.6);const by=mt+ph-bh;ctx.fillStyle=cinfo[0];ctx.fillRect(bx,by,bw,bh);ctx.save();ctx.translate(bx+bw/2,by-4);ctx.rotate(-Math.PI/2);ctx.fillStyle="#333";ctx.font="9px Tahoma";ctx.textAlign="right";ctx.fillText(dashFmtMoeda(vv),0,0);ctx.restore()});});ctx.strokeStyle="#f1c40f";ctx.lineWidth=2;ctx.beginPath();itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;const t=Math.max(Number(it.tempo_grafico||0),30);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));if(idx===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;const t=Math.max(Number(it.tempo_grafico||0),30);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle="#f1c40f";ctx.fill();ctx.fillStyle="#9a7d0a";ctx.font="10px Tahoma";ctx.textAlign="center";ctx.fillText(String(Math.round(t)),x,y-7);ctx.fillStyle="#222";ctx.font="10px Tahoma";ctx.fillText(String(it.nome||"").slice(0,18),x,mt+ph+18)});ctx.textAlign="left";ctx.font="11px Tahoma";ctx.fillStyle="#27ae60";ctx.fillRect(w-98,58,12,10);ctx.fillStyle="#333";ctx.fillText("Lucro",w-82,67);ctx.fillStyle="#f39c12";ctx.fillRect(w-98,76,12,10);ctx.fillStyle="#333";ctx.fillText("Custo",w-82,85);ctx.fillStyle="#4682b4";ctx.fillRect(w-98,94,12,10);ctx.fillStyle="#333";ctx.fillText("Valor MÃ­n.",w-82,103);ctx.fillStyle="#f1c40f";ctx.fillRect(w-98,112,12,10);ctx.fillStyle="#333";ctx.fillText("Tempo (min)",w-82,121)}
+function dashDesenharAlerta(item){const c=dash.chartAlerta;if(!c)return;const ctx=c.getContext("2d");const w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.fillStyle="#333";ctx.font="700 16px Tahoma";ctx.fillText("Alerta de Custo",12,24);if(!item){ctx.font="12px Tahoma";ctx.fillStyle="#666";ctx.fillText("Selecione um procedimento para visualizar.",12,48);return}const custo=Math.max(Number(item.custo_material||0),0);const lucro=Math.max(Number(item.lucro_liquido||0),0);const total=Math.max(custo+lucro,0.0001);const cx=140,cy=185,r=95;let ang=-Math.PI/2;const slices=[{nome:"Custo de Material",valor:custo,cor:"#e74c3c"},{nome:"Lucro LÃƒÂ­quido",valor:lucro,cor:(Number(item.lucro_liquido||0)>=Number(item.custo_material||0)?"#2ecc71":"#f39c12")}];slices.forEach(s=>{const frac=s.valor/total;const a2=ang+frac*2*Math.PI;ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,r,ang,a2);ctx.closePath();ctx.fillStyle=s.cor;ctx.fill();const meio=(ang+a2)/2;const tx=cx+Math.cos(meio)*(r*0.55);const ty=cy+Math.sin(meio)*(r*0.55);ctx.fillStyle="#fff";ctx.font="700 11px Tahoma";ctx.textAlign="center";ctx.fillText(`${(frac*100).toFixed(1)}%`,tx,ty);ang=a2});ctx.textAlign="left";ctx.font="12px Tahoma";ctx.fillStyle="#111";ctx.fillRect(250,140,10,10);ctx.fillStyle="#333";ctx.fillText(`Custo de Material: ${dashFmtMoeda(item.custo_material)}`,266,149);ctx.fillStyle=(Number(item.lucro_liquido||0)>=Number(item.custo_material||0)?"#2ecc71":"#f39c12");ctx.fillRect(250,168,10,10);ctx.fillStyle="#333";ctx.fillText(`Lucro LÃƒÂ­quido: ${dashFmtMoeda(item.lucro_liquido)}`,266,177)}
+function dashRenderGraficoRecompensa(){const c=dash.chartMain;if(!c)return;const ctx=c.getContext("2d");const w=c.width,h=c.height;ctx.clearRect(0,0,w,h);ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);const dados=[...dashGrafico];const totalPag=Math.max(1,Math.ceil(dados.length/5));dash.spin.max=String(totalPag);let pag=Number(dash.spin.value||1);if(!Number.isFinite(pag)||pag<1)pag=1;if(pag>totalPag)pag=totalPag;dash.spin.value=String(pag);const itens=dados.slice((pag-1)*5,(pag-1)*5+5);ctx.fillStyle="#111";ctx.font="700 18px Tahoma";ctx.textAlign="center";ctx.fillText("EsforÃƒÂ§o vs Recompensa",w/2,26);if(!itens.length){ctx.font="12px Tahoma";ctx.fillStyle="#666";ctx.fillText("Sem dados para exibir.",w/2,h/2);return}const ml=56,mr=110,mt=44,mb=84,pw=w-ml-mr,ph=h-mt-mb;const maxBar=Math.max(...itens.map(x=>Math.max(Number(x.lucro_liquido||0),Number(x.custo_proc||0),Number(x.valor_minimo||0))),1);const tempos=itens.map(x=>Math.max(Number(x.tempo_grafico||0),30));const maxTempo=Math.max(...tempos,30);const maxTempoAdj=Math.ceil(maxTempo/30)*30;for(let i=0;i<=5;i++){const y=mt+ph*(i/5);ctx.strokeStyle="#e3e7ef";ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+pw,y);ctx.stroke();const val=maxBar*(1-i/5);ctx.fillStyle="#555";ctx.font="10px Tahoma";ctx.textAlign="right";ctx.fillText(dashAbbrevMoney(val),ml-6,y+3)}for(let i=0;i<=Math.floor(maxTempoAdj/30)-1;i++){const t=30*(i+1);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));ctx.fillStyle="#666";ctx.font="10px Tahoma";ctx.textAlign="left";ctx.fillText(String(t),ml+pw+8,y+3)}const gw=pw/itens.length;const bw=Math.min(22,gw*0.2);const colors=[["#27ae60","lucro_liquido"],["#f39c12","custo_proc"],["#4682b4","valor_minimo"]];itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;colors.forEach((cinfo,cix)=>{const vv=Math.max(Number(it[cinfo[1]]||0),0);const bh=(vv/maxBar)*ph;const bx=x+(-bw*1.5)+(cix*bw*1.6);const by=mt+ph-bh;ctx.fillStyle=cinfo[0];ctx.fillRect(bx,by,bw,bh);ctx.save();ctx.translate(bx+bw/2,by-4);ctx.rotate(-Math.PI/2);ctx.fillStyle="#333";ctx.font="9px Tahoma";ctx.textAlign="right";ctx.fillText(dashFmtMoeda(vv),0,0);ctx.restore()});});ctx.strokeStyle="#f1c40f";ctx.lineWidth=2;ctx.beginPath();itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;const t=Math.max(Number(it.tempo_grafico||0),30);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));if(idx===0)ctx.moveTo(x,y);else ctx.lineTo(x,y)});ctx.stroke();itens.forEach((it,idx)=>{const x=ml+gw*idx+gw/2;const t=Math.max(Number(it.tempo_grafico||0),30);const y=mt+ph*(1-(t-30)/Math.max(maxTempoAdj-30,1));ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fillStyle="#f1c40f";ctx.fill();ctx.fillStyle="#9a7d0a";ctx.font="10px Tahoma";ctx.textAlign="center";ctx.fillText(String(Math.round(t)),x,y-7);ctx.fillStyle="#222";ctx.font="10px Tahoma";ctx.fillText(String(it.nome||"").slice(0,18),x,mt+ph+18)});ctx.textAlign="left";ctx.font="11px Tahoma";ctx.fillStyle="#27ae60";ctx.fillRect(w-98,58,12,10);ctx.fillStyle="#333";ctx.fillText("Lucro",w-82,67);ctx.fillStyle="#f39c12";ctx.fillRect(w-98,76,12,10);ctx.fillStyle="#333";ctx.fillText("Custo",w-82,85);ctx.fillStyle="#4682b4";ctx.fillRect(w-98,94,12,10);ctx.fillStyle="#333";ctx.fillText("Valor MÃƒÂ­n.",w-82,103);ctx.fillStyle="#f1c40f";ctx.fillRect(w-98,112,12,10);ctx.fillStyle="#333";ctx.fillText("Tempo (min)",w-82,121)}
 async function dashCarregarDados(){const{res,data}=await requestJson("GET","/procedimentos/dashboard",undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar painel de lucratividade.");return}dashData=Array.isArray(data?.itens)?data.itens:[];dashGrafico=Array.isArray(data?.grafico)?data.grafico:[...dashData].sort((a,b)=>Number(b.lucro_liquido||0)-Number(a.lucro_liquido||0));if(!dashData.some(x=>x.id===dashSelecionadoId))dashSelecionadoId=null;dashRenderTabela();dashRenderGraficoRecompensa();dashAtualizarPainelSelecionado()}
-async function dashAbrir(){dashEnsureUI();hideAllPanels();dash.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await dashCarregarDados();footerMsg.textContent="MÃ³dulo Painel Lucratividade aberto."}
+async function dashAbrir(){dashEnsureUI();hideAllPanels();dash.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await dashCarregarDados();footerMsg.textContent="MÃƒÂ³dulo Painel Lucratividade aberto."}
 const isEditableTarget=(el)=>!!(el&&(el.closest("input,textarea,select")||el.isContentEditable));
 const menuCloseBranch=dd=>{if(!dd)return;dd.classList.remove("open");dd.querySelectorAll(".menu-dd.open").forEach(x=>x.classList.remove("open"))};
 const menuCloseAll=()=>{document.querySelectorAll(".menu-dd.open").forEach(x=>x.classList.remove("open"));const bar=document.querySelector(".menu-bar");if(bar)bar.classList.remove("menus-active")};
@@ -9642,7 +10919,7 @@ const MENU_ACCESS_LEVELS=["desabilitado","protegido","habilitado"];
 const menuActionModule=action=>{const key=String(action||"").trim().toLowerCase();if(!key)return"";if(Object.prototype.hasOwnProperty.call(MENU_ACTION_MODULE_OVERRIDES,key))return MENU_ACTION_MODULE_OVERRIDES[key]||"";if(key.startsWith("financeiro-"))return"financeiro";if(key.startsWith("relatorio-"))return"relatorios";if(key.startsWith("agenda-"))return"agenda";if(key.startsWith("tratamento-"))return"procedimentos";if(key.startsWith("config-"))return"configuracao";if(key.startsWith("cadastro-"))return"configuracao";if(key.startsWith("tabelas-"))return"configuracao";return""};
 const menuActionAccessLevel=action=>{const moduleCode=menuActionModule(action);if(!moduleCode)return"habilitado";if(!sessaoAtual)return"desabilitado";if(sessaoAtual.is_admin||sessaoAtual.is_superadmin)return"habilitado";if(!sessaoAtual.permissoes)return"desabilitado";const nivel=String(sessaoAtual.permissoes[moduleCode]||"").trim().toLowerCase();return MENU_ACCESS_LEVELS.includes(nivel)?nivel:"desabilitado"};
 const menuApplyPermissions=()=>{document.querySelectorAll(".menu-action[data-menu-action]").forEach(btn=>{const action=btn.getAttribute("data-menu-action")||"";const nivel=menuActionAccessLevel(action);const disabled=nivel==="desabilitado";btn.classList.toggle("disabled",disabled);if(disabled){btn.setAttribute("aria-disabled","true");btn.setAttribute("tabindex","-1")}else{btn.removeAttribute("aria-disabled");btn.removeAttribute("tabindex")}})};
-const menuEnsurePermission=async action=>{const moduleCode=menuActionModule(action);if(!moduleCode)return true;const nivel=menuActionAccessLevel(action);if(nivel==="desabilitado"){footerMsg.textContent="Acesso negado para este mÃ³dulo.";return false}if(!preserveProtectedGrantOnHide)clearProtectedGrants();if(nivel==="protegido"){try{await ensureProtectedGrant(moduleCode);preserveProtectedGrantOnHide=true;return true}catch(err){footerMsg.textContent=err?.message||"Acesso protegido cancelado.";return false}}return true};
+const menuEnsurePermission=async action=>{const moduleCode=menuActionModule(action);if(!moduleCode)return true;const nivel=menuActionAccessLevel(action);if(nivel==="desabilitado"){footerMsg.textContent="Acesso negado para este mÃƒÂ³dulo.";return false}if(!preserveProtectedGrantOnHide)clearProtectedGrants();if(nivel==="protegido"){try{await ensureProtectedGrant(moduleCode);preserveProtectedGrantOnHide=true;return true}catch(err){footerMsg.textContent=err?.message||"Acesso protegido cancelado.";return false}}return true};
 function setupMenuBar(){const bar=document.querySelector(".menu-bar");if(!bar)return;const rootMenus=Array.from(bar.children).filter(el=>el.classList&&el.classList.contains("menu-dd"));const openRootMenu=dd=>{rootMenus.forEach(item=>{if(item!==dd)menuCloseBranch(item)});dd.classList.add("open");bar.classList.add("menus-active")};rootMenus.forEach(dd=>{const btn=dd.firstElementChild;if(!btn||!btn.classList.contains("menu-btn"))return;btn.addEventListener("click",ev=>{const open=dd.classList.contains("open");menuCloseAll();if(!open)openRootMenu(dd);ev.stopPropagation()});dd.addEventListener("mouseenter",()=>{if(bar.classList.contains("menus-active"))openRootMenu(dd)})});bar.querySelectorAll(".menu-dd.submenu").forEach(dd=>{const btn=dd.firstElementChild;const pop=dd.querySelector(".menu-pop");const closeSiblings=()=>{Array.from(dd.parentElement?.children||[]).forEach(item=>{if(item!==dd&&item.classList&&item.classList.contains("menu-dd"))menuCloseBranch(item)})};if(btn)btn.addEventListener("click",ev=>{const open=dd.classList.contains("open");closeSiblings();if(!open)dd.classList.add("open");ev.stopPropagation()});dd.addEventListener("mouseenter",()=>{menuClearClose(dd);closeSiblings();dd.classList.add("open")});dd.addEventListener("mouseleave",()=>menuScheduleClose(dd));if(pop){pop.addEventListener("mouseenter",()=>menuClearClose(dd));pop.addEventListener("mouseleave",()=>menuScheduleClose(dd))}});bar.querySelectorAll(".menu-action[data-menu-action]").forEach(btn=>btn.addEventListener("click",ev=>ev.stopPropagation()));document.addEventListener("click",()=>menuCloseAll());document.addEventListener("keydown",ev=>{if(ev.key==="Escape")menuCloseAll()})}
 async function executarAcaoMenu(action){
   if(!action)return;
@@ -9651,7 +10928,7 @@ async function executarAcaoMenu(action){
 
   if(action==="cadastro-conectar"){
     if(getToken()){
-      footerMsg.textContent="SessÃ£o jÃ¡ estÃ¡ ativa.";
+      footerMsg.textContent="SessÃƒÂ£o jÃƒÂ¡ estÃƒÂ¡ ativa.";
       return;
     }
     loginWrap.classList.remove("hidden");
@@ -9681,7 +10958,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="cadastro-ficha-rapida"){
-    footerMsg.textContent="Cadastro > Ficha rÃ¡pida: em planejamento.";
+    footerMsg.textContent="Cadastro > Ficha rÃƒÂ¡pida: em planejamento.";
     return;
   }
   if(action==="cadastro-ficha-anamnese"){
@@ -9689,7 +10966,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="cadastro-ficha-historico"){
-    footerMsg.textContent="Cadastro > Ficha de histÃ³rico: em planejamento.";
+    footerMsg.textContent="Cadastro > Ficha de histÃƒÂ³rico: em planejamento.";
     return;
   }
   if(action==="cadastro-dados-complementares"){
@@ -9701,7 +10978,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="cadastro-restricoes-terapeuticas"){
-    footerMsg.textContent="Cadastro > RestriÃ§Ãµes terapÃªuticas: em planejamento.";
+    footerMsg.textContent="Cadastro > RestriÃƒÂ§ÃƒÂµes terapÃƒÂªuticas: em planejamento.";
     return;
   }
   if(action==="cadastro-medicamentos"){
@@ -9719,7 +10996,7 @@ async function executarAcaoMenu(action){
   if(action==="cadastro-controle-proteticos"){
     await ctrlProtAbrir();
     return;
-    footerMsg.textContent="Cadastro > Controle de protÃ©ticos: em planejamento.";
+    footerMsg.textContent="Cadastro > Controle de protÃƒÂ©ticos: em planejamento.";
     return;
   }
   if(action==="cadastro-prestadores"){
@@ -9752,11 +11029,11 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="tratamento-orcamento"){
-    footerMsg.textContent="OrÃ§amento de tratamento: em planejamento.";
+    footerMsg.textContent="OrÃƒÂ§amento de tratamento: em planejamento.";
     return;
   }
   if(action==="tratamento-imprime"){
-    footerMsg.textContent="ImpressÃ£o de tratamento: em planejamento.";
+    footerMsg.textContent="ImpressÃƒÂ£o de tratamento: em planejamento.";
     return;
   }
 
@@ -9784,11 +11061,11 @@ async function executarAcaoMenu(action){
 
   if(action==="relatorio-pacientes"){
     await fichaMenuPacAbrir("");
-    footerMsg.textContent="RelatÃ³rio > Pesquisa pacientes aberto.";
+    footerMsg.textContent="RelatÃƒÂ³rio > Pesquisa pacientes aberto.";
     return;
   }
   if(action==="relatorio-contatos"){
-    footerMsg.textContent="RelatÃ³rio de contatos: em planejamento.";
+    footerMsg.textContent="RelatÃƒÂ³rio de contatos: em planejamento.";
     return;
   }
   if(action==="relatorio-mala-direta"){
@@ -9796,7 +11073,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="relatorio-tratamentos"){
-    footerMsg.textContent="RelatÃ³rio de tratamentos: em planejamento.";
+    footerMsg.textContent="RelatÃƒÂ³rio de tratamentos: em planejamento.";
     return;
   }
   if(action==="relatorio-financeiro-conta-corrente"){
@@ -9808,15 +11085,15 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="relatorio-agendas"){
-    footerMsg.textContent="RelatÃ³rio de agendas: em planejamento.";
+    footerMsg.textContent="RelatÃƒÂ³rio de agendas: em planejamento.";
     return;
   }
   if(action==="relatorio-estoque"){
-    footerMsg.textContent="RelatÃ³rio de estoque: em planejamento.";
+    footerMsg.textContent="RelatÃƒÂ³rio de estoque: em planejamento.";
     return;
   }
   if(action==="relatorio-proteticos"){
-    footerMsg.textContent="RelatÃ³rio de protÃ©ticos: em planejamento.";
+    footerMsg.textContent="RelatÃƒÂ³rio de protÃƒÂ©ticos: em planejamento.";
     return;
   }
   if(action==="relatorio-fichas-branco"){
@@ -9837,7 +11114,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="tabelas-protetico"){
-    footerMsg.textContent="ServiÃ§os de protÃ©tico: em planejamento.";
+    footerMsg.textContent="ServiÃƒÂ§os de protÃƒÂ©tico: em planejamento.";
     return;
   }
   if(action==="tabelas-cid"){
@@ -9937,7 +11214,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="ferr-usuarios-conectados"){
-    footerMsg.textContent="UsuÃ¡rios conectados: em planejamento.";
+    footerMsg.textContent="UsuÃƒÂ¡rios conectados: em planejamento.";
     return;
   }
   if(action==="ferr-chat"){
@@ -9970,7 +11247,7 @@ async function executarAcaoMenu(action){
     return;
   }
   if(action==="financeiro-comissoes-internas"){
-    footerMsg.textContent="GeraÃ§Ã£o de comissÃµes internas: em planejamento.";
+    footerMsg.textContent="GeraÃƒÂ§ÃƒÂ£o de comissÃƒÂµes internas: em planejamento.";
     return;
   }
   if(action==="plano"){
@@ -10015,32 +11292,32 @@ async function executarAcaoMenu(action){
   }
 }
 function prestSelecionado(){return prestadoresCache.find(item=>Number(item.id||0)===Number(prestadorSelId))||null}
-function prestStatusHtml(ativo){return ativo?'<span style="color:#2fbf2f;font-size:14px;line-height:1;">â—</span>':'<span style="color:#d32f2f;font-size:14px;line-height:1;">â—</span>'}
+function prestStatusHtml(ativo){return ativo?'<span style="color:#2fbf2f;font-size:14px;line-height:1;">Ã¢â€”Â</span>':'<span style="color:#d32f2f;font-size:14px;line-height:1;">Ã¢â€”Â</span>'}
 function prestFmtCodigo(valor,idx=0){const n=Number(valor||0);if(Number.isFinite(n)&&n>0)return String(n).padStart(3,"0");return String(idx+1).padStart(3,"0")}
 function prestFiltrarLista(){const esp=String(prestCfg?.cboEspecialidade?.value||"").trim();const nome=(prestCfg?.txtNome?.value||"").trim().toLowerCase();return prestadoresCache.filter(item=>{const okEsp=!esp||esp==="__todas__"||String(item.especialidade||"").trim()===esp;const alvo=`${String(item.nome||"")} ${String(item.fone1||"")} ${String(item.fone2||"")}`.toLowerCase();const okNome=!nome||alvo.includes(nome);return okEsp&&okNome})}
 function prestRender(){if(!prestCfg)return;const lista=prestFiltrarLista();prestCfg.tbody.innerHTML=lista.map((item,idx)=>`<tr data-id="${item.id}" class="${Number(item.id||0)===Number(prestadorSelId)?"selected":""}"><td>${esc(prestFmtCodigo(item.codigo,idx))}</td><td>${esc(item.nome||"")}</td><td>${esc(item.fone1||"")}</td><td>${esc(item.fone2||"")}</td><td>${prestStatusHtml(item.ativo!==false)}</td></tr>`).join("")||'<tr><td colspan="5">Nenhum prestador encontrado.</td></tr>';prestCfg.total.textContent=`${lista.length} prestadores`}
 function prestSelecionarLinha(tr){prestadorSelId=Number(tr?.dataset.id||0)||null;prestRender()}
-async function prestCarregar(){let itens=[];try{const {res,data}=await requestJson("GET","/cadastros/prestadores",undefined,true);if(res.ok&&data&&Array.isArray(data.itens)){itens=data.itens.map((item,idx)=>({id:Number(item?.id||item?.row_id||idx+1),codigo:String(item?.codigo||String(idx+1).padStart(3,"0")),nome:String(item?.nome||item?.apelido||`Prestador ${idx+1}`),fone1:String(item?.fone1||""),fone2:String(item?.fone2||""),ativo:item?.ativo!==false,especialidade:String(item?.especialidade||""),especialidades_exec:Array.isArray(item?.especialidades_exec)?item.especialidades_exec:[]}))}else{throw new Error("prestadores")}}catch{if(sessaoAtual)itens.push({id:Number(sessaoAtual.user_id||1)||1,codigo:"002",nome:String(sessaoAtual.nome||sessaoAtual.email||"UsuÃ¡rio"),fone1:"",fone2:"",ativo:true,especialidade:""})}if(!itens.length)itens=[{id:-1,codigo:"001",nome:"ClÃ­nica",fone1:"",fone2:"",ativo:true,especialidade:""}];const seen=new Set();prestadoresCache=itens.filter(item=>{const key=String(item.id);if(seen.has(key))return false;seen.add(key);return true});const especialidades=[...new Set(prestadoresCache.map(item=>String(item.especialidade||"").trim()).filter(Boolean))];prestCfg.cboEspecialidade.innerHTML=['<option value="__todas__">&lt;&lt;Todas&gt;&gt;</option>',...especialidades.map(item=>`<option value="${esc(item)}">${esc(item)}</option>`)].join("");if(!prestadoresCache.some(item=>Number(item.id||0)===Number(prestadorSelId)))prestadorSelId=prestadoresCache[0]?.id||null;prestRender()}
-function prestAcoesPlaceholder(rotulo){const item=prestSelecionado();const alvo=item?` '${item.nome}'`:"";footerMsg.textContent=`Prestadores > ${rotulo}${alvo}: prÃ³xima etapa da migraÃ§Ã£o.`}
-function prestEnsureUI(){if(prestCfg)return;const style=document.createElement("style");style.textContent=".prest-panel{width:min(790px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.prest-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.prest-toolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.prest-filtros{display:grid;grid-template-columns:240px 1fr;gap:12px;align-items:end;margin-bottom:8px}.prest-filtros label{display:block;margin-bottom:2px}.prest-filtros input,.prest-filtros select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.prest-grid{border:1px solid #cfd8e3;min-height:410px;background:#fff}.prest-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.prest-grid th,.prest-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prest-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.prest-grid th:nth-child(1),.prest-grid td:nth-child(1),.prest-grid th:nth-child(5),.prest-grid td:nth-child(5){text-align:center}.prest-grid tr.selected{background:#d9e8fb}.prest-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="prestadores-panel" class="prest-panel hidden"><div class="panel-title">Cadastro de prestadores</div><div class="prest-toolbar"><button id="prest-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo prestador...</button><button id="prest-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="prest-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="prest-btn-agenda" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Agenda...</button><button id="prest-btn-convenios" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">ConvÃªnios...</button><button id="prest-btn-comissoes" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">ComissÃµes...</button><span class="sep"></span><button id="prest-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="prest-filtros"><div><label for="prest-cbo-especialidade">Especialidade:</label><select id="prest-cbo-especialidade"></select></div><div><label for="prest-txt-nome">Nome do prestador:</label><input id="prest-txt-nome" type="text"></div></div><div class="prest-grid"><table><colgroup><col style="width:80px"><col><col style="width:150px"><col style="width:150px"><col style="width:60px"></colgroup><thead><tr><th>CÃ³digo</th><th>Nome</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="prest-tbody"></tbody></table></div><div id="prest-total" class="prest-total">0 prestadores</div></section>`);prestCfg={panel:document.getElementById("prestadores-panel"),cboEspecialidade:document.getElementById("prest-cbo-especialidade"),txtNome:document.getElementById("prest-txt-nome"),tbody:document.getElementById("prest-tbody"),total:document.getElementById("prest-total"),btnNovo:document.getElementById("prest-btn-novo"),btnEditar:document.getElementById("prest-btn-editar"),btnExcluir:document.getElementById("prest-btn-excluir"),btnAgenda:document.getElementById("prest-btn-agenda"),btnConvenios:document.getElementById("prest-btn-convenios"),btnComissoes:document.getElementById("prest-btn-comissoes"),btnFechar:document.getElementById("prest-btn-fechar")};ensurePanelChrome(prestCfg.panel);bindStandardGridActivation(prestCfg.tbody,tr=>prestSelecionarLinha(tr),()=>prestAcoesPlaceholder("Altera"));prestCfg.cboEspecialidade.addEventListener("change",prestRender);prestCfg.txtNome.addEventListener("input",prestRender);prestCfg.btnNovo.addEventListener("click",()=>prestAcoesPlaceholder("Novo prestador"));prestCfg.btnEditar.addEventListener("click",()=>prestAcoesPlaceholder("Altera"));prestCfg.btnExcluir.addEventListener("click",()=>prestAcoesPlaceholder("Elimina"));prestCfg.btnAgenda.addEventListener("click",()=>prestAcoesPlaceholder("Agenda"));prestCfg.btnConvenios.addEventListener("click",()=>prestAcoesPlaceholder("ConvÃªnios"));prestCfg.btnComissoes.addEventListener("click",()=>prestAcoesPlaceholder("ComissÃµes"));prestCfg.btnFechar.addEventListener("click",()=>{prestCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Prestadores fechado."})}
+async function prestCarregar(){let itens=[];try{const {res,data}=await requestJson("GET","/cadastros/prestadores",undefined,true);if(res.ok&&data&&Array.isArray(data.itens)){itens=data.itens.map((item,idx)=>({id:Number(item?.id||item?.row_id||idx+1),codigo:String(item?.codigo||String(idx+1).padStart(3,"0")),nome:String(item?.nome||item?.apelido||`Prestador ${idx+1}`),fone1:String(item?.fone1||""),fone2:String(item?.fone2||""),ativo:item?.ativo!==false,especialidade:String(item?.especialidade||""),especialidades_exec:Array.isArray(item?.especialidades_exec)?item.especialidades_exec:[]}))}else{throw new Error("prestadores")}}catch{if(sessaoAtual)itens.push({id:Number(sessaoAtual.user_id||1)||1,codigo:"002",nome:String(sessaoAtual.nome||sessaoAtual.email||"UsuÃƒÂ¡rio"),fone1:"",fone2:"",ativo:true,especialidade:""})}if(!itens.length)itens=[{id:-1,codigo:"001",nome:"ClÃƒÂ­nica",fone1:"",fone2:"",ativo:true,especialidade:""}];const seen=new Set();prestadoresCache=itens.filter(item=>{const key=String(item.id);if(seen.has(key))return false;seen.add(key);return true});const especialidades=[...new Set(prestadoresCache.map(item=>String(item.especialidade||"").trim()).filter(Boolean))];prestCfg.cboEspecialidade.innerHTML=['<option value="__todas__">&lt;&lt;Todas&gt;&gt;</option>',...especialidades.map(item=>`<option value="${esc(item)}">${esc(item)}</option>`)].join("");if(!prestadoresCache.some(item=>Number(item.id||0)===Number(prestadorSelId)))prestadorSelId=prestadoresCache[0]?.id||null;prestRender()}
+function prestAcoesPlaceholder(rotulo){const item=prestSelecionado();const alvo=item?` '${item.nome}'`:"";footerMsg.textContent=`Prestadores > ${rotulo}${alvo}: prÃƒÂ³xima etapa da migraÃƒÂ§ÃƒÂ£o.`}
+function prestEnsureUI(){if(prestCfg)return;const style=document.createElement("style");style.textContent=".prest-panel{width:min(790px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.prest-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 8px}.prest-toolbar .sep{width:1px;height:24px;background:#cfd8e3;margin:0 2px}.prest-filtros{display:grid;grid-template-columns:240px 1fr;gap:12px;align-items:end;margin-bottom:8px}.prest-filtros label{display:block;margin-bottom:2px}.prest-filtros input,.prest-filtros select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.prest-grid{border:1px solid #cfd8e3;min-height:410px;background:#fff}.prest-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.prest-grid th,.prest-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.prest-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.prest-grid th:nth-child(1),.prest-grid td:nth-child(1),.prest-grid th:nth-child(5),.prest-grid td:nth-child(5){text-align:center}.prest-grid tr.selected{background:#d9e8fb}.prest-total{margin-top:5px;color:#5b6b7e}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="prestadores-panel" class="prest-panel hidden"><div class="panel-title">Cadastro de prestadores</div><div class="prest-toolbar"><button id="prest-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo prestador...</button><button id="prest-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="prest-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="prest-btn-agenda" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Agenda...</button><button id="prest-btn-convenios" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">ConvÃƒÂªnios...</button><button id="prest-btn-comissoes" class="materiais-btn" type="button"><img src="/desktop-assets/imprimir.png" alt="">ComissÃƒÂµes...</button><span class="sep"></span><button id="prest-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="prest-filtros"><div><label for="prest-cbo-especialidade">Especialidade:</label><select id="prest-cbo-especialidade"></select></div><div><label for="prest-txt-nome">Nome do prestador:</label><input id="prest-txt-nome" type="text"></div></div><div class="prest-grid"><table><colgroup><col style="width:80px"><col><col style="width:150px"><col style="width:150px"><col style="width:60px"></colgroup><thead><tr><th>CÃƒÂ³digo</th><th>Nome</th><th>Fone 1</th><th>Fone 2</th><th>Status</th></tr></thead><tbody id="prest-tbody"></tbody></table></div><div id="prest-total" class="prest-total">0 prestadores</div></section>`);prestCfg={panel:document.getElementById("prestadores-panel"),cboEspecialidade:document.getElementById("prest-cbo-especialidade"),txtNome:document.getElementById("prest-txt-nome"),tbody:document.getElementById("prest-tbody"),total:document.getElementById("prest-total"),btnNovo:document.getElementById("prest-btn-novo"),btnEditar:document.getElementById("prest-btn-editar"),btnExcluir:document.getElementById("prest-btn-excluir"),btnAgenda:document.getElementById("prest-btn-agenda"),btnConvenios:document.getElementById("prest-btn-convenios"),btnComissoes:document.getElementById("prest-btn-comissoes"),btnFechar:document.getElementById("prest-btn-fechar")};ensurePanelChrome(prestCfg.panel);bindStandardGridActivation(prestCfg.tbody,tr=>prestSelecionarLinha(tr),()=>prestAcoesPlaceholder("Altera"));prestCfg.cboEspecialidade.addEventListener("change",prestRender);prestCfg.txtNome.addEventListener("input",prestRender);prestCfg.btnNovo.addEventListener("click",()=>prestAcoesPlaceholder("Novo prestador"));prestCfg.btnEditar.addEventListener("click",()=>prestAcoesPlaceholder("Altera"));prestCfg.btnExcluir.addEventListener("click",()=>prestAcoesPlaceholder("Elimina"));prestCfg.btnAgenda.addEventListener("click",()=>prestAcoesPlaceholder("Agenda"));prestCfg.btnConvenios.addEventListener("click",()=>prestAcoesPlaceholder("ConvÃƒÂªnios"));prestCfg.btnComissoes.addEventListener("click",()=>prestAcoesPlaceholder("ComissÃƒÂµes"));prestCfg.btnFechar.addEventListener("click",()=>{prestCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Prestadores fechado."})}
 async function prestAbrir(){prestEnsureUI();hideAllPanels();prestCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");ensurePanelChrome(prestCfg.panel);await prestCarregar();footerMsg.textContent="Cadastro > Prestadores aberto."}
 function unidadeSelecionada(){return unidadesCache.find(item=>Number(item.id||0)===Number(unidadeSelId))||null}
-function unidadeStatusHtml(ativo){return ativo?'<span style="color:#2fbf2f;font-size:14px;line-height:1;">â—</span>':'<span style="color:#c0c8d2;font-size:14px;line-height:1;">â—</span>'}
+function unidadeStatusHtml(ativo){return ativo?'<span style="color:#2fbf2f;font-size:14px;line-height:1;">Ã¢â€”Â</span>':'<span style="color:#c0c8d2;font-size:14px;line-height:1;">Ã¢â€”Â</span>'}
 function unidadeFmtCodigo(valor,idx=0){const n=Number(valor||0);if(Number.isFinite(n)&&n>0)return String(n).padStart(4,"0");const txt=String(valor||"").trim();if(txt)return txt;return String(idx+1).padStart(4,"0")}
 function unidadeSetOptions(selectEl,itens=[],placeholder=""){if(!selectEl)return;const list=(Array.isArray(itens)?itens:[]).map(x=>String(x||"").trim()).filter(Boolean);const options=[];if(placeholder)options.push(`<option value="">${esc(placeholder)}</option>`);list.forEach(item=>options.push(`<option value="${esc(item)}">${esc(item)}</option>`));selectEl.innerHTML=options.join("")}
 function unidadeRender(){if(!unidadeCfg)return;unidadeCfg.tbody.innerHTML=unidadesCache.map((item,idx)=>`<tr data-id="${item.id}" class="${Number(item.id||0)===Number(unidadeSelId)?"selected":""}"><td>${esc(unidadeFmtCodigo(item.codigo,idx))}</td><td>${esc(item.nome||"")}</td><td>${esc(item.fone1||"")}</td><td>${esc(item.fone2||"")}</td><td>${unidadeStatusHtml(item.ativo!==false)}</td></tr>`).join("")||'<tr><td colspan="5">Nenhuma unidade cadastrada.</td></tr>';unidadeCfg.total.textContent=`${unidadesCache.length} unidades`}
 function unidadeSelecionarLinha(tr){unidadeSelId=Number(tr?.dataset.id||0)||null;unidadeRender()}
 async function unidadeCarregar(){if(!unidadeCfg)return;const {res,data}=await requestJson("GET","/cadastros/unidades-atendimento",undefined,true);if(!res.ok){footerMsg.textContent=data.detail||"Falha ao carregar unidades de atendimento.";unidadesCache=[];unidadeSelId=null;unidadeRender();return}unidadesCache=Array.isArray(data?.itens)?data.itens:[];if(!unidadesCache.some(item=>Number(item.id||0)===Number(unidadeSelId)))unidadeSelId=unidadesCache[0]?.id||null;unidadeRender()}
 function unidadeTelefonePadrao(idx,tipos){const fallback=[["Comercial 1","Comercial"],["Comercial 2","Comercial"],["Comercial 3","Comercial"],["Fax","Fax"]][idx-1]||["",""];for(const item of fallback){if(tipos.some(t=>String(t).toLowerCase()===String(item).toLowerCase()))return item}return tipos[0]||""}
-async function unidadeAbrirModal(ed=null){if(!unidadeCfg)return;unidadeCfg.modalEditId=ed?Number(ed.id||0):null;const [logradouros,tiposContato,proximoResp,bairros,cidades]=await Promise.all([materiaisCarregarAuxTipo("Tipos de logradouro"),materiaisCarregarAuxTipo("Tipos de contato"),requestJson("GET","/cadastros/unidades-atendimento/proximo-codigo",undefined,true),materiaisCarregarAuxTipo("Bairro"),materiaisCarregarAuxTipo("Cidade")]);unidadeSetOptions(unidadeCfg.mLogradouro,logradouros,"");unidadeSetOptions(unidadeCfg.mBairro,bairros,"");unidadeSetOptions(unidadeCfg.mCidade,cidades,"");[unidadeCfg.mFoneTipo1,unidadeCfg.mFoneTipo2,unidadeCfg.mFoneTipo3,unidadeCfg.mFoneTipo4].forEach((el,idx)=>unidadeSetOptions(el,tiposContato,""));unidadeSetOptions(unidadeCfg.mUf,FICHA_UFS_PADRAO,"");if(ed){unidadeCfg.mTitulo.textContent="Altera unidade";unidadeCfg.mCodigo.value=String(ed.codigo||"");unidadeCfg.mNome.value=String(ed.nome||"");unidadeCfg.mLogradouro.value=String(ed.logradouro_tipo||"");unidadeCfg.mEndereco.value=String(ed.endereco||"");unidadeCfg.mNumero.value=String(ed.numero||"");unidadeCfg.mComplemento.value=String(ed.complemento||"");unidadeCfg.mBairro.value=String(ed.bairro||"");unidadeCfg.mCidade.value=String(ed.cidade||"");unidadeCfg.mCep.value=String(ed.cep||"");unidadeCfg.mUf.value=String(ed.uf||"SP")||"SP";unidadeCfg.mFoneTipo1.value=String(ed.fone1_tipo||"");unidadeCfg.mFone1.value=String(ed.fone1||"");unidadeCfg.mContato1.value=String(ed.contato1||"");unidadeCfg.mFoneTipo2.value=String(ed.fone2_tipo||"");unidadeCfg.mFone2.value=String(ed.fone2||"");unidadeCfg.mContato2.value=String(ed.contato2||"");unidadeCfg.mFoneTipo3.value=String(ed.fone3_tipo||"");unidadeCfg.mFone3.value=String(ed.fone3||"");unidadeCfg.mContato3.value=String(ed.contato3||"");unidadeCfg.mFoneTipo4.value=String(ed.fone4_tipo||"");unidadeCfg.mFone4.value=String(ed.fone4||"");unidadeCfg.mContato4.value=String(ed.contato4||"");unidadeCfg.mInativa.checked=ed.ativo===false;unidadeCfg.mInclusao.value=String(ed.inclusao||"");unidadeCfg.mAlteracao.value=String(ed.alteracao||"")}else{unidadeCfg.mTitulo.textContent="Nova unidade";unidadeCfg.mCodigo.value=(proximoResp?.res?.ok?String(proximoResp?.data?.codigo||"0001"):"0001");unidadeCfg.mNome.value="";unidadeCfg.mLogradouro.value="";unidadeCfg.mEndereco.value="";unidadeCfg.mNumero.value="";unidadeCfg.mComplemento.value="";unidadeCfg.mBairro.value="";unidadeCfg.mCidade.value=(cidades.includes("SÃ£o JosÃ© do Rio Preto")?"SÃ£o JosÃ© do Rio Preto":"");unidadeCfg.mCep.value="";unidadeCfg.mUf.value="SP";unidadeCfg.mFoneTipo1.value=unidadeTelefonePadrao(1,tiposContato);unidadeCfg.mFone1.value="";unidadeCfg.mContato1.value="";unidadeCfg.mFoneTipo2.value=unidadeTelefonePadrao(2,tiposContato);unidadeCfg.mFone2.value="";unidadeCfg.mContato2.value="";unidadeCfg.mFoneTipo3.value=unidadeTelefonePadrao(3,tiposContato);unidadeCfg.mFone3.value="";unidadeCfg.mContato3.value="";unidadeCfg.mFoneTipo4.value=unidadeTelefonePadrao(4,tiposContato);unidadeCfg.mFone4.value="";unidadeCfg.mContato4.value="";unidadeCfg.mInativa.checked=false;const hoje=(new Date()).toLocaleDateString("pt-BR");unidadeCfg.mInclusao.value=hoje;unidadeCfg.mAlteracao.value=hoje}unidadeCfg.modal.classList.remove("hidden")}
+async function unidadeAbrirModal(ed=null){if(!unidadeCfg)return;unidadeCfg.modalEditId=ed?Number(ed.id||0):null;const [logradouros,tiposContato,proximoResp,bairros,cidades]=await Promise.all([materiaisCarregarAuxTipo("Tipos de logradouro"),materiaisCarregarAuxTipo("Tipos de contato"),requestJson("GET","/cadastros/unidades-atendimento/proximo-codigo",undefined,true),materiaisCarregarAuxTipo("Bairro"),materiaisCarregarAuxTipo("Cidade")]);unidadeSetOptions(unidadeCfg.mLogradouro,logradouros,"");unidadeSetOptions(unidadeCfg.mBairro,bairros,"");unidadeSetOptions(unidadeCfg.mCidade,cidades,"");[unidadeCfg.mFoneTipo1,unidadeCfg.mFoneTipo2,unidadeCfg.mFoneTipo3,unidadeCfg.mFoneTipo4].forEach((el,idx)=>unidadeSetOptions(el,tiposContato,""));unidadeSetOptions(unidadeCfg.mUf,FICHA_UFS_PADRAO,"");if(ed){unidadeCfg.mTitulo.textContent="Altera unidade";unidadeCfg.mCodigo.value=String(ed.codigo||"");unidadeCfg.mNome.value=String(ed.nome||"");unidadeCfg.mLogradouro.value=String(ed.logradouro_tipo||"");unidadeCfg.mEndereco.value=String(ed.endereco||"");unidadeCfg.mNumero.value=String(ed.numero||"");unidadeCfg.mComplemento.value=String(ed.complemento||"");unidadeCfg.mBairro.value=String(ed.bairro||"");unidadeCfg.mCidade.value=String(ed.cidade||"");unidadeCfg.mCep.value=String(ed.cep||"");unidadeCfg.mUf.value=String(ed.uf||"SP")||"SP";unidadeCfg.mFoneTipo1.value=String(ed.fone1_tipo||"");unidadeCfg.mFone1.value=String(ed.fone1||"");unidadeCfg.mContato1.value=String(ed.contato1||"");unidadeCfg.mFoneTipo2.value=String(ed.fone2_tipo||"");unidadeCfg.mFone2.value=String(ed.fone2||"");unidadeCfg.mContato2.value=String(ed.contato2||"");unidadeCfg.mFoneTipo3.value=String(ed.fone3_tipo||"");unidadeCfg.mFone3.value=String(ed.fone3||"");unidadeCfg.mContato3.value=String(ed.contato3||"");unidadeCfg.mFoneTipo4.value=String(ed.fone4_tipo||"");unidadeCfg.mFone4.value=String(ed.fone4||"");unidadeCfg.mContato4.value=String(ed.contato4||"");unidadeCfg.mInativa.checked=ed.ativo===false;unidadeCfg.mInclusao.value=String(ed.inclusao||"");unidadeCfg.mAlteracao.value=String(ed.alteracao||"")}else{unidadeCfg.mTitulo.textContent="Nova unidade";unidadeCfg.mCodigo.value=(proximoResp?.res?.ok?String(proximoResp?.data?.codigo||"0001"):"0001");unidadeCfg.mNome.value="";unidadeCfg.mLogradouro.value="";unidadeCfg.mEndereco.value="";unidadeCfg.mNumero.value="";unidadeCfg.mComplemento.value="";unidadeCfg.mBairro.value="";unidadeCfg.mCidade.value=(cidades.includes("SÃƒÂ£o JosÃƒÂ© do Rio Preto")?"SÃƒÂ£o JosÃƒÂ© do Rio Preto":"");unidadeCfg.mCep.value="";unidadeCfg.mUf.value="SP";unidadeCfg.mFoneTipo1.value=unidadeTelefonePadrao(1,tiposContato);unidadeCfg.mFone1.value="";unidadeCfg.mContato1.value="";unidadeCfg.mFoneTipo2.value=unidadeTelefonePadrao(2,tiposContato);unidadeCfg.mFone2.value="";unidadeCfg.mContato2.value="";unidadeCfg.mFoneTipo3.value=unidadeTelefonePadrao(3,tiposContato);unidadeCfg.mFone3.value="";unidadeCfg.mContato3.value="";unidadeCfg.mFoneTipo4.value=unidadeTelefonePadrao(4,tiposContato);unidadeCfg.mFone4.value="";unidadeCfg.mContato4.value="";unidadeCfg.mInativa.checked=false;const hoje=(new Date()).toLocaleDateString("pt-BR");unidadeCfg.mInclusao.value=hoje;unidadeCfg.mAlteracao.value=hoje}unidadeCfg.modal.classList.remove("hidden")}
 function unidadeFecharModal(){if(!unidadeCfg)return;unidadeCfg.modal.classList.add("hidden")}
 function unidadeModalPayload(){const txt=el=>String(el?.value||"").trim();return{codigo:txt(unidadeCfg.mCodigo),nome:txt(unidadeCfg.mNome),logradouro_tipo:txt(unidadeCfg.mLogradouro),endereco:txt(unidadeCfg.mEndereco),numero:txt(unidadeCfg.mNumero),complemento:txt(unidadeCfg.mComplemento),bairro:txt(unidadeCfg.mBairro),cidade:txt(unidadeCfg.mCidade),cep:txt(unidadeCfg.mCep),uf:txt(unidadeCfg.mUf),fone1_tipo:txt(unidadeCfg.mFoneTipo1),fone1:txt(unidadeCfg.mFone1),contato1:txt(unidadeCfg.mContato1),fone2_tipo:txt(unidadeCfg.mFoneTipo2),fone2:txt(unidadeCfg.mFone2),contato2:txt(unidadeCfg.mContato2),fone3_tipo:txt(unidadeCfg.mFoneTipo3),fone3:txt(unidadeCfg.mFone3),contato3:txt(unidadeCfg.mContato3),fone4_tipo:txt(unidadeCfg.mFoneTipo4),fone4:txt(unidadeCfg.mFone4),contato4:txt(unidadeCfg.mContato4),ativo:!unidadeCfg.mInativa.checked,inclusao:txt(unidadeCfg.mInclusao),alteracao:txt(unidadeCfg.mAlteracao)}}
 async function unidadeSalvarModal(){if(!unidadeCfg)return;const payload=unidadeModalPayload();if(!payload.nome){window.alert("Informe o nome da unidade.");return}const isEdit=Number(unidadeCfg.modalEditId||0)>0;const path=isEdit?`/cadastros/unidades-atendimento/${unidadeCfg.modalEditId}`:"/cadastros/unidades-atendimento";const {res,data}=await requestJson(isEdit?"PUT":"POST",path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar unidade.");return}unidadeFecharModal();await unidadeCarregar();footerMsg.textContent=isEdit?"Unidade alterada com sucesso.":"Unidade criada com sucesso."}
 async function unidadeExcluirSelecionada(){const item=unidadeSelecionada();if(!item){window.alert("Selecione uma unidade.");return}if(!window.confirm(`Deseja eliminar a unidade ${item.nome}?`))return;const {res,data}=await requestJson("DELETE",`/cadastros/unidades-atendimento/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar unidade.");return}await unidadeCarregar();footerMsg.textContent="Unidade eliminada com sucesso."}
-function unidadeEnsureUI(){if(unidadeCfg)return;const style=document.createElement("style");style.textContent=".unidade-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 8px;flex-wrap:wrap}.unidade-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.unidade-grid{border:1px solid #cfd8e3;height:430px;overflow:auto;background:#fff}.unidade-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.unidade-grid th,.unidade-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.unidade-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.unidade-grid th:nth-child(1),.unidade-grid td:nth-child(1),.unidade-grid th:nth-child(5),.unidade-grid td:nth-child(5){text-align:center}.unidade-grid tr.selected{background:#d9e8fb}.unidade-total{margin-top:5px;color:#5b6b7e}.unidade-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1400}.unidade-modal{width:min(760px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-modal .row{display:grid;gap:8px;margin-bottom:6px}.unidade-modal .r3{grid-template-columns:100px 1fr 170px}.unidade-modal .r4{grid-template-columns:70px 1fr 84px 120px}.unidade-modal .r5{grid-template-columns:1fr 1fr 90px 60px}.unidade-modal .rfone{grid-template-columns:110px 1fr 1fr 26px}.unidade-modal .r2{grid-template-columns:1fr 1fr}.unidade-modal label{display:block;margin-bottom:2px}.unidade-modal input,.unidade-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.unidade-modal .check{display:inline-flex;align-items:center;gap:6px;margin:2px 0}.unidade-modal .check input{width:auto;height:auto}.unidade-modal .foot{border-top:1px solid #d3dbe5;padding-top:6px;margin-top:2px}.unidade-modal .acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.unidade-phone-icon{color:#cc0000;line-height:24px;text-align:center;font-size:14px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="unidades-atendimento-panel" class="unidade-panel hidden"><div class="panel-title">Unidades de atendimento</div><div class="unidade-toolbar"><button id="unidade-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova unidade...</button><button id="unidade-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="unidade-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="unidade-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="unidade-grid"><table><colgroup><col style="width:70px"><col><col style="width:180px"><col style="width:180px"><col style="width:60px"></colgroup><thead><tr><th>CÃ³digo</th><th>Nome da unidade</th><th>Telefone 1</th><th>Telefone 2</th><th>Status</th></tr></thead><tbody id="unidade-tbody"></tbody></table></div><div id="unidade-total" class="unidade-total">0 unidades</div></section><div id="unidade-modal-backdrop" class="unidade-modal-backdrop hidden"><div class="unidade-modal"><div class="modal-header"><div id="unidade-modal-titulo" class="modal-title">Nova unidade</div></div><div class="row r3"><div><label>CÃ³digo:</label><input id="unidade-codigo"></div><div style="grid-column:2 / span 2"><label>Nome da unidade de atendimento:</label><input id="unidade-nome"></div></div><div class="row r4"><div><label>EndereÃ§o:</label><select id="unidade-logradouro"></select></div><div><label>&nbsp;</label><input id="unidade-endereco"></div><div><label>NÂº:</label><input id="unidade-numero"></div><div><label>Complemento:</label><input id="unidade-complemento"></div></div><div class="row r5"><div><label>Bairro:</label><select id="unidade-bairro"></select></div><div><label>Cidade:</label><select id="unidade-cidade"></select></div><div><label>CEP:</label><input id="unidade-cep"></div><div><label>UF:</label><select id="unidade-uf"></select></div></div><div class="row rfone"><div><label>Telefones</label><select id="unidade-fone1-tipo"></select></div><div><label>NÃºmero</label><input id="unidade-fone1"></div><div><label>Contato</label><input id="unidade-contato1"></div><div class="unidade-phone-icon">â˜Ž</div></div><div class="row rfone"><div><select id="unidade-fone2-tipo"></select></div><div><input id="unidade-fone2"></div><div><input id="unidade-contato2"></div><div class="unidade-phone-icon">â˜Ž</div></div><div class="row rfone"><div><select id="unidade-fone3-tipo"></select></div><div><input id="unidade-fone3"></div><div><input id="unidade-contato3"></div><div class="unidade-phone-icon">â˜Ž</div></div><div class="row rfone"><div><select id="unidade-fone4-tipo"></select></div><div><input id="unidade-fone4"></div><div><input id="unidade-contato4"></div><div class="unidade-phone-icon">â˜Ž</div></div><label class="check"><input id="unidade-inativa" type="checkbox">Inativar unidade</label><div class="foot row r2"><div><label>InclusÃ£o:</label><input id="unidade-inclusao"></div><div><label>AlteraÃ§Ã£o:</label><input id="unidade-alteracao"></div></div><div class="acoes"><button id="unidade-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="unidade-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);unidadeCfg={panel:document.getElementById("unidades-atendimento-panel"),tbody:document.getElementById("unidade-tbody"),total:document.getElementById("unidade-total"),btnNovo:document.getElementById("unidade-btn-novo"),btnEditar:document.getElementById("unidade-btn-editar"),btnExcluir:document.getElementById("unidade-btn-excluir"),btnFechar:document.getElementById("unidade-btn-fechar"),modal:document.getElementById("unidade-modal-backdrop"),mTitulo:document.getElementById("unidade-modal-titulo"),mCodigo:document.getElementById("unidade-codigo"),mNome:document.getElementById("unidade-nome"),mLogradouro:document.getElementById("unidade-logradouro"),mEndereco:document.getElementById("unidade-endereco"),mNumero:document.getElementById("unidade-numero"),mComplemento:document.getElementById("unidade-complemento"),mBairro:document.getElementById("unidade-bairro"),mCidade:document.getElementById("unidade-cidade"),mCep:document.getElementById("unidade-cep"),mUf:document.getElementById("unidade-uf"),mFoneTipo1:document.getElementById("unidade-fone1-tipo"),mFone1:document.getElementById("unidade-fone1"),mContato1:document.getElementById("unidade-contato1"),mFoneTipo2:document.getElementById("unidade-fone2-tipo"),mFone2:document.getElementById("unidade-fone2"),mContato2:document.getElementById("unidade-contato2"),mFoneTipo3:document.getElementById("unidade-fone3-tipo"),mFone3:document.getElementById("unidade-fone3"),mContato3:document.getElementById("unidade-contato3"),mFoneTipo4:document.getElementById("unidade-fone4-tipo"),mFone4:document.getElementById("unidade-fone4"),mContato4:document.getElementById("unidade-contato4"),mInativa:document.getElementById("unidade-inativa"),mInclusao:document.getElementById("unidade-inclusao"),mAlteracao:document.getElementById("unidade-alteracao"),mOk:document.getElementById("unidade-modal-ok"),mCancelar:document.getElementById("unidade-modal-cancelar"),modalEditId:null};ensurePanelChrome(unidadeCfg.panel);ensureModalChrome(unidadeCfg.modal.querySelector(".unidade-modal"));bindStandardGridActivation(unidadeCfg.tbody,tr=>unidadeSelecionarLinha(tr),()=>{const item=unidadeSelecionada();if(item)unidadeAbrirModal(item)});unidadeCfg.btnNovo.addEventListener("click",()=>unidadeAbrirModal(null));unidadeCfg.btnEditar.addEventListener("click",()=>{const item=unidadeSelecionada();if(!item){window.alert("Selecione uma unidade.");return}unidadeAbrirModal(item)});unidadeCfg.btnExcluir.addEventListener("click",unidadeExcluirSelecionada);unidadeCfg.btnFechar.addEventListener("click",()=>{unidadeCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Unidades de atendimento fechado."});unidadeCfg.mOk.addEventListener("click",unidadeSalvarModal);unidadeCfg.mCancelar.addEventListener("click",unidadeFecharModal);unidadeCfg.modal.addEventListener("click",ev=>{if(ev.target===unidadeCfg.modal)unidadeFecharModal()})}
+function unidadeEnsureUI(){if(unidadeCfg)return;const style=document.createElement("style");style.textContent=".unidade-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 8px;flex-wrap:wrap}.unidade-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.unidade-grid{border:1px solid #cfd8e3;height:430px;overflow:auto;background:#fff}.unidade-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.unidade-grid th,.unidade-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.unidade-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.unidade-grid th:nth-child(1),.unidade-grid td:nth-child(1),.unidade-grid th:nth-child(5),.unidade-grid td:nth-child(5){text-align:center}.unidade-grid tr.selected{background:#d9e8fb}.unidade-total{margin-top:5px;color:#5b6b7e}.unidade-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1400}.unidade-modal{width:min(760px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-modal .row{display:grid;gap:8px;margin-bottom:6px}.unidade-modal .r3{grid-template-columns:100px 1fr 170px}.unidade-modal .r4{grid-template-columns:70px 1fr 84px 120px}.unidade-modal .r5{grid-template-columns:1fr 1fr 90px 60px}.unidade-modal .rfone{grid-template-columns:110px 1fr 1fr 26px}.unidade-modal .r2{grid-template-columns:1fr 1fr}.unidade-modal label{display:block;margin-bottom:2px}.unidade-modal input,.unidade-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.unidade-modal .check{display:inline-flex;align-items:center;gap:6px;margin:2px 0}.unidade-modal .check input{width:auto;height:auto}.unidade-modal .foot{border-top:1px solid #d3dbe5;padding-top:6px;margin-top:2px}.unidade-modal .acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.unidade-phone-icon{color:#cc0000;line-height:24px;text-align:center;font-size:14px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="unidades-atendimento-panel" class="unidade-panel hidden"><div class="panel-title">Unidades de atendimento</div><div class="unidade-toolbar"><button id="unidade-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova unidade...</button><button id="unidade-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="unidade-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="unidade-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="unidade-grid"><table><colgroup><col style="width:70px"><col><col style="width:180px"><col style="width:180px"><col style="width:60px"></colgroup><thead><tr><th>CÃƒÂ³digo</th><th>Nome da unidade</th><th>Telefone 1</th><th>Telefone 2</th><th>Status</th></tr></thead><tbody id="unidade-tbody"></tbody></table></div><div id="unidade-total" class="unidade-total">0 unidades</div></section><div id="unidade-modal-backdrop" class="unidade-modal-backdrop hidden"><div class="unidade-modal"><div class="modal-header"><div id="unidade-modal-titulo" class="modal-title">Nova unidade</div></div><div class="row r3"><div><label>CÃƒÂ³digo:</label><input id="unidade-codigo"></div><div style="grid-column:2 / span 2"><label>Nome da unidade de atendimento:</label><input id="unidade-nome"></div></div><div class="row r4"><div><label>EndereÃƒÂ§o:</label><select id="unidade-logradouro"></select></div><div><label>&nbsp;</label><input id="unidade-endereco"></div><div><label>NÃ‚Âº:</label><input id="unidade-numero"></div><div><label>Complemento:</label><input id="unidade-complemento"></div></div><div class="row r5"><div><label>Bairro:</label><select id="unidade-bairro"></select></div><div><label>Cidade:</label><select id="unidade-cidade"></select></div><div><label>CEP:</label><input id="unidade-cep"></div><div><label>UF:</label><select id="unidade-uf"></select></div></div><div class="row rfone"><div><label>Telefones</label><select id="unidade-fone1-tipo"></select></div><div><label>NÃƒÂºmero</label><input id="unidade-fone1"></div><div><label>Contato</label><input id="unidade-contato1"></div><div class="unidade-phone-icon">Ã¢ËœÅ½</div></div><div class="row rfone"><div><select id="unidade-fone2-tipo"></select></div><div><input id="unidade-fone2"></div><div><input id="unidade-contato2"></div><div class="unidade-phone-icon">Ã¢ËœÅ½</div></div><div class="row rfone"><div><select id="unidade-fone3-tipo"></select></div><div><input id="unidade-fone3"></div><div><input id="unidade-contato3"></div><div class="unidade-phone-icon">Ã¢ËœÅ½</div></div><div class="row rfone"><div><select id="unidade-fone4-tipo"></select></div><div><input id="unidade-fone4"></div><div><input id="unidade-contato4"></div><div class="unidade-phone-icon">Ã¢ËœÅ½</div></div><label class="check"><input id="unidade-inativa" type="checkbox">Inativar unidade</label><div class="foot row r2"><div><label>InclusÃƒÂ£o:</label><input id="unidade-inclusao"></div><div><label>AlteraÃƒÂ§ÃƒÂ£o:</label><input id="unidade-alteracao"></div></div><div class="acoes"><button id="unidade-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="unidade-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);unidadeCfg={panel:document.getElementById("unidades-atendimento-panel"),tbody:document.getElementById("unidade-tbody"),total:document.getElementById("unidade-total"),btnNovo:document.getElementById("unidade-btn-novo"),btnEditar:document.getElementById("unidade-btn-editar"),btnExcluir:document.getElementById("unidade-btn-excluir"),btnFechar:document.getElementById("unidade-btn-fechar"),modal:document.getElementById("unidade-modal-backdrop"),mTitulo:document.getElementById("unidade-modal-titulo"),mCodigo:document.getElementById("unidade-codigo"),mNome:document.getElementById("unidade-nome"),mLogradouro:document.getElementById("unidade-logradouro"),mEndereco:document.getElementById("unidade-endereco"),mNumero:document.getElementById("unidade-numero"),mComplemento:document.getElementById("unidade-complemento"),mBairro:document.getElementById("unidade-bairro"),mCidade:document.getElementById("unidade-cidade"),mCep:document.getElementById("unidade-cep"),mUf:document.getElementById("unidade-uf"),mFoneTipo1:document.getElementById("unidade-fone1-tipo"),mFone1:document.getElementById("unidade-fone1"),mContato1:document.getElementById("unidade-contato1"),mFoneTipo2:document.getElementById("unidade-fone2-tipo"),mFone2:document.getElementById("unidade-fone2"),mContato2:document.getElementById("unidade-contato2"),mFoneTipo3:document.getElementById("unidade-fone3-tipo"),mFone3:document.getElementById("unidade-fone3"),mContato3:document.getElementById("unidade-contato3"),mFoneTipo4:document.getElementById("unidade-fone4-tipo"),mFone4:document.getElementById("unidade-fone4"),mContato4:document.getElementById("unidade-contato4"),mInativa:document.getElementById("unidade-inativa"),mInclusao:document.getElementById("unidade-inclusao"),mAlteracao:document.getElementById("unidade-alteracao"),mOk:document.getElementById("unidade-modal-ok"),mCancelar:document.getElementById("unidade-modal-cancelar"),modalEditId:null};ensurePanelChrome(unidadeCfg.panel);ensureModalChrome(unidadeCfg.modal.querySelector(".unidade-modal"));bindStandardGridActivation(unidadeCfg.tbody,tr=>unidadeSelecionarLinha(tr),()=>{const item=unidadeSelecionada();if(item)unidadeAbrirModal(item)});unidadeCfg.btnNovo.addEventListener("click",()=>unidadeAbrirModal(null));unidadeCfg.btnEditar.addEventListener("click",()=>{const item=unidadeSelecionada();if(!item){window.alert("Selecione uma unidade.");return}unidadeAbrirModal(item)});unidadeCfg.btnExcluir.addEventListener("click",unidadeExcluirSelecionada);unidadeCfg.btnFechar.addEventListener("click",()=>{unidadeCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Unidades de atendimento fechado."});unidadeCfg.mOk.addEventListener("click",unidadeSalvarModal);unidadeCfg.mCancelar.addEventListener("click",unidadeFecharModal);unidadeCfg.modal.addEventListener("click",ev=>{if(ev.target===unidadeCfg.modal)unidadeFecharModal()})}
 async function unidadeAbrir(){unidadeEnsureUI();hideAllPanels();unidadeCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");ensurePanelChrome(unidadeCfg.panel);await unidadeCarregar();footerMsg.textContent="Cadastro > Unidades de atendimento aberto."}
 async function unidadeCarregarTiposLogradouroV2(){
-  const tiposTeste=["Tipos de logradouro","Tipo de logradouro","Logradouro","EndereÃ§o","Endereco"];
+  const tiposTeste=["Tipos de logradouro","Tipo de logradouro","Logradouro","EndereÃƒÂ§o","Endereco"];
   for(const tipo of tiposTeste){
     try{
       const {res,data}=await requestJson("GET",`/cadastros/auxiliares?tipo=${encodeURIComponent(tipo)}`,undefined,true);
@@ -10059,8 +11336,8 @@ async function unidadeCarregarTiposLogradouroV2(){
   return [];
 }
 function unidadeTelefonePadrao(idx){return FICHA_TIPOS_FONE_PADRAO[idx-1]||""}
-async function unidadeAbrirModal(ed=null){if(!unidadeCfg)return;unidadeCfg.modalEditId=ed?Number(ed.id||0):null;const [logradouros,proximoResp,bairros,cidades]=await Promise.all([unidadeCarregarTiposLogradouroV2(),requestJson("GET","/cadastros/unidades-atendimento/proximo-codigo",undefined,true),materiaisCarregarAuxTipo("Bairro"),materiaisCarregarAuxTipo("Cidade")]);unidadeSetOptions(unidadeCfg.mLogradouro,logradouros,"");unidadeSetOptions(unidadeCfg.mBairro,bairros,"");unidadeSetOptions(unidadeCfg.mCidade,cidades,"");[unidadeCfg.mFoneTipo1,unidadeCfg.mFoneTipo2,unidadeCfg.mFoneTipo3,unidadeCfg.mFoneTipo4].forEach(el=>unidadeSetOptions(el,FICHA_TIPOS_FONE_PADRAO,""));unidadeSetOptions(unidadeCfg.mUf,FICHA_UFS_PADRAO,"");if(ed){unidadeCfg.mTitulo.textContent="Altera unidade";unidadeCfg.mCodigo.value=String(ed.codigo||"");unidadeCfg.mNome.value=String(ed.nome||"");const lograd=String(ed.logradouro_tipo||"").trim();if(lograd&&!logradouros.includes(lograd)){unidadeCfg.mLogradouro.insertAdjacentHTML("beforeend",`<option value="${esc(lograd)}">${esc(lograd)}</option>`)}unidadeCfg.mLogradouro.value=lograd;unidadeCfg.mEndereco.value=String(ed.endereco||"");unidadeCfg.mNumero.value=String(ed.numero||"");unidadeCfg.mComplemento.value=String(ed.complemento||"");unidadeCfg.mBairro.value=String(ed.bairro||"");unidadeCfg.mCidade.value=String(ed.cidade||"");unidadeCfg.mCep.value=String(ed.cep||"");unidadeCfg.mUf.value=String(ed.uf||"SP")||"SP";unidadeCfg.mFoneTipo1.value=String(ed.fone1_tipo||"");unidadeCfg.mFone1.value=String(ed.fone1||"");unidadeCfg.mContato1.value=String(ed.contato1||"");unidadeCfg.mFoneTipo2.value=String(ed.fone2_tipo||"");unidadeCfg.mFone2.value=String(ed.fone2||"");unidadeCfg.mContato2.value=String(ed.contato2||"");unidadeCfg.mFoneTipo3.value=String(ed.fone3_tipo||"");unidadeCfg.mFone3.value=String(ed.fone3||"");unidadeCfg.mContato3.value=String(ed.contato3||"");unidadeCfg.mFoneTipo4.value=String(ed.fone4_tipo||"");unidadeCfg.mFone4.value=String(ed.fone4||"");unidadeCfg.mContato4.value=String(ed.contato4||"");unidadeCfg.mInativa.checked=ed.ativo===false;unidadeCfg.mInclusao.value=String(ed.inclusao||"");unidadeCfg.mAlteracao.value=String(ed.alteracao||"")}else{unidadeCfg.mTitulo.textContent="Nova unidade";unidadeCfg.mCodigo.value=(proximoResp?.res?.ok?String(proximoResp?.data?.codigo||"0001"):"0001");unidadeCfg.mNome.value="";unidadeCfg.mLogradouro.value="";unidadeCfg.mEndereco.value="";unidadeCfg.mNumero.value="";unidadeCfg.mComplemento.value="";unidadeCfg.mBairro.value="";unidadeCfg.mCidade.value=(cidades.includes("SÃ£o JosÃ© do Rio Preto")?"SÃ£o JosÃ© do Rio Preto":"");unidadeCfg.mCep.value="";unidadeCfg.mUf.value="SP";unidadeCfg.mFoneTipo1.value=unidadeTelefonePadrao(1);unidadeCfg.mFone1.value="";unidadeCfg.mContato1.value="";unidadeCfg.mFoneTipo2.value=unidadeTelefonePadrao(2);unidadeCfg.mFone2.value="";unidadeCfg.mContato2.value="";unidadeCfg.mFoneTipo3.value=unidadeTelefonePadrao(3);unidadeCfg.mFone3.value="";unidadeCfg.mContato3.value="";unidadeCfg.mFoneTipo4.value=unidadeTelefonePadrao(4);unidadeCfg.mFone4.value="";unidadeCfg.mContato4.value="";unidadeCfg.mInativa.checked=false;const hoje=(new Date()).toLocaleDateString("pt-BR");unidadeCfg.mInclusao.value=hoje;unidadeCfg.mAlteracao.value=hoje}unidadeCfg.modal.classList.remove("hidden")}
-function unidadeEnsureUI(){if(unidadeCfg)return;const style=document.createElement("style");style.textContent=".unidade-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 8px;flex-wrap:wrap}.unidade-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.unidade-grid{border:1px solid #cfd8e3;height:430px;overflow:auto;background:#fff}.unidade-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.unidade-grid th,.unidade-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.unidade-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.unidade-grid th:nth-child(1),.unidade-grid td:nth-child(1),.unidade-grid th:nth-child(5),.unidade-grid td:nth-child(5){text-align:center}.unidade-grid tr.selected{background:#d9e8fb}.unidade-total{margin-top:5px;color:#5b6b7e}.unidade-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1400}.unidade-modal{width:min(760px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-modal .row{display:grid;gap:8px;margin-bottom:6px}.unidade-modal .r3{grid-template-columns:100px 1fr 170px}.unidade-modal .r4{grid-template-columns:70px 1fr 84px 120px}.unidade-modal .r5{grid-template-columns:1fr 1fr 90px 60px}.unidade-modal .rfone{grid-template-columns:110px 1fr 1fr 34px}.unidade-modal .r2{grid-template-columns:1fr 1fr}.unidade-modal label{display:block;margin-bottom:2px}.unidade-modal input,.unidade-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.unidade-modal .check{display:inline-flex;align-items:center;gap:6px;margin:2px 0}.unidade-modal .check input{width:auto;height:auto}.unidade-modal .foot{border-top:1px solid #d3dbe5;padding-top:6px;margin-top:2px}.unidade-modal .acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.unidade-wa{width:30px;height:24px;border:1px solid #57b765;border-radius:4px;background:#e9f8ec;color:#0f8a2a;font:700 11px Tahoma,sans-serif;cursor:pointer}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="unidades-atendimento-panel" class="unidade-panel hidden"><div class="panel-title">Unidades de atendimento</div><div class="unidade-toolbar"><button id="unidade-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova unidade...</button><button id="unidade-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="unidade-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="unidade-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="unidade-grid"><table><colgroup><col style="width:70px"><col><col style="width:180px"><col style="width:180px"><col style="width:60px"></colgroup><thead><tr><th>CÃ³digo</th><th>Nome da unidade</th><th>Telefone 1</th><th>Telefone 2</th><th>Status</th></tr></thead><tbody id="unidade-tbody"></tbody></table></div><div id="unidade-total" class="unidade-total">0 unidades</div></section><div id="unidade-modal-backdrop" class="unidade-modal-backdrop hidden"><div class="unidade-modal"><div class="modal-header"><div id="unidade-modal-titulo" class="modal-title">Nova unidade</div></div><div class="row r3"><div><label>CÃ³digo:</label><input id="unidade-codigo"></div><div style="grid-column:2 / span 2"><label>Nome da unidade de atendimento:</label><input id="unidade-nome"></div></div><div class="row r4"><div><label>EndereÃ§o:</label><select id="unidade-logradouro"></select></div><div><label>&nbsp;</label><input id="unidade-endereco"></div><div><label>NÂº:</label><input id="unidade-numero"></div><div><label>Complemento:</label><input id="unidade-complemento"></div></div><div class="row r5"><div><label>Bairro:</label><select id="unidade-bairro"></select></div><div><label>Cidade:</label><select id="unidade-cidade"></select></div><div><label>CEP:</label><input id="unidade-cep"></div><div><label>UF:</label><select id="unidade-uf"></select></div></div><div class="row rfone"><div><label>Telefones</label><select id="unidade-fone1-tipo"></select></div><div><label>NÃºmero</label><input id="unidade-fone1"></div><div><label>Contato</label><input id="unidade-contato1"></div><button id="unidade-wa1" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone2-tipo"></select></div><div><input id="unidade-fone2"></div><div><input id="unidade-contato2"></div><button id="unidade-wa2" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone3-tipo"></select></div><div><input id="unidade-fone3"></div><div><input id="unidade-contato3"></div><button id="unidade-wa3" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone4-tipo"></select></div><div><input id="unidade-fone4"></div><div><input id="unidade-contato4"></div><button id="unidade-wa4" class="unidade-wa" type="button">WA</button></div><label class="check"><input id="unidade-inativa" type="checkbox">Inativar unidade</label><div class="foot row r2"><div><label>InclusÃ£o:</label><input id="unidade-inclusao"></div><div><label>AlteraÃ§Ã£o:</label><input id="unidade-alteracao"></div></div><div class="acoes"><button id="unidade-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="unidade-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);unidadeCfg={panel:document.getElementById("unidades-atendimento-panel"),tbody:document.getElementById("unidade-tbody"),total:document.getElementById("unidade-total"),btnNovo:document.getElementById("unidade-btn-novo"),btnEditar:document.getElementById("unidade-btn-editar"),btnExcluir:document.getElementById("unidade-btn-excluir"),btnFechar:document.getElementById("unidade-btn-fechar"),modal:document.getElementById("unidade-modal-backdrop"),mTitulo:document.getElementById("unidade-modal-titulo"),mCodigo:document.getElementById("unidade-codigo"),mNome:document.getElementById("unidade-nome"),mLogradouro:document.getElementById("unidade-logradouro"),mEndereco:document.getElementById("unidade-endereco"),mNumero:document.getElementById("unidade-numero"),mComplemento:document.getElementById("unidade-complemento"),mBairro:document.getElementById("unidade-bairro"),mCidade:document.getElementById("unidade-cidade"),mCep:document.getElementById("unidade-cep"),mUf:document.getElementById("unidade-uf"),mFoneTipo1:document.getElementById("unidade-fone1-tipo"),mFone1:document.getElementById("unidade-fone1"),mContato1:document.getElementById("unidade-contato1"),mFoneTipo2:document.getElementById("unidade-fone2-tipo"),mFone2:document.getElementById("unidade-fone2"),mContato2:document.getElementById("unidade-contato2"),mFoneTipo3:document.getElementById("unidade-fone3-tipo"),mFone3:document.getElementById("unidade-fone3"),mContato3:document.getElementById("unidade-contato3"),mFoneTipo4:document.getElementById("unidade-fone4-tipo"),mFone4:document.getElementById("unidade-fone4"),mContato4:document.getElementById("unidade-contato4"),mInativa:document.getElementById("unidade-inativa"),mInclusao:document.getElementById("unidade-inclusao"),mAlteracao:document.getElementById("unidade-alteracao"),mOk:document.getElementById("unidade-modal-ok"),mCancelar:document.getElementById("unidade-modal-cancelar"),wa1:document.getElementById("unidade-wa1"),wa2:document.getElementById("unidade-wa2"),wa3:document.getElementById("unidade-wa3"),wa4:document.getElementById("unidade-wa4"),modalEditId:null};ensurePanelChrome(unidadeCfg.panel);ensureModalChrome(unidadeCfg.modal.querySelector(".unidade-modal"));bindStandardGridActivation(unidadeCfg.tbody,tr=>unidadeSelecionarLinha(tr),()=>{const item=unidadeSelecionada();if(item)unidadeAbrirModal(item)});unidadeCfg.btnNovo.addEventListener("click",()=>unidadeAbrirModal(null));unidadeCfg.btnEditar.addEventListener("click",()=>{const item=unidadeSelecionada();if(!item){window.alert("Selecione uma unidade.");return}unidadeAbrirModal(item)});unidadeCfg.btnExcluir.addEventListener("click",unidadeExcluirSelecionada);unidadeCfg.btnFechar.addEventListener("click",()=>{unidadeCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Unidades de atendimento fechado."});unidadeCfg.mOk.addEventListener("click",unidadeSalvarModal);unidadeCfg.mCancelar.addEventListener("click",unidadeFecharModal);if(unidadeCfg.wa1)unidadeCfg.wa1.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone1));if(unidadeCfg.wa2)unidadeCfg.wa2.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone2));if(unidadeCfg.wa3)unidadeCfg.wa3.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone3));if(unidadeCfg.wa4)unidadeCfg.wa4.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone4));unidadeCfg.modal.addEventListener("click",ev=>{if(ev.target===unidadeCfg.modal)unidadeFecharModal()})}
+async function unidadeAbrirModal(ed=null){if(!unidadeCfg)return;unidadeCfg.modalEditId=ed?Number(ed.id||0):null;const [logradouros,proximoResp,bairros,cidades]=await Promise.all([unidadeCarregarTiposLogradouroV2(),requestJson("GET","/cadastros/unidades-atendimento/proximo-codigo",undefined,true),materiaisCarregarAuxTipo("Bairro"),materiaisCarregarAuxTipo("Cidade")]);unidadeSetOptions(unidadeCfg.mLogradouro,logradouros,"");unidadeSetOptions(unidadeCfg.mBairro,bairros,"");unidadeSetOptions(unidadeCfg.mCidade,cidades,"");[unidadeCfg.mFoneTipo1,unidadeCfg.mFoneTipo2,unidadeCfg.mFoneTipo3,unidadeCfg.mFoneTipo4].forEach(el=>unidadeSetOptions(el,FICHA_TIPOS_FONE_PADRAO,""));unidadeSetOptions(unidadeCfg.mUf,FICHA_UFS_PADRAO,"");if(ed){unidadeCfg.mTitulo.textContent="Altera unidade";unidadeCfg.mCodigo.value=String(ed.codigo||"");unidadeCfg.mNome.value=String(ed.nome||"");const lograd=String(ed.logradouro_tipo||"").trim();if(lograd&&!logradouros.includes(lograd)){unidadeCfg.mLogradouro.insertAdjacentHTML("beforeend",`<option value="${esc(lograd)}">${esc(lograd)}</option>`)}unidadeCfg.mLogradouro.value=lograd;unidadeCfg.mEndereco.value=String(ed.endereco||"");unidadeCfg.mNumero.value=String(ed.numero||"");unidadeCfg.mComplemento.value=String(ed.complemento||"");unidadeCfg.mBairro.value=String(ed.bairro||"");unidadeCfg.mCidade.value=String(ed.cidade||"");unidadeCfg.mCep.value=String(ed.cep||"");unidadeCfg.mUf.value=String(ed.uf||"SP")||"SP";unidadeCfg.mFoneTipo1.value=String(ed.fone1_tipo||"");unidadeCfg.mFone1.value=String(ed.fone1||"");unidadeCfg.mContato1.value=String(ed.contato1||"");unidadeCfg.mFoneTipo2.value=String(ed.fone2_tipo||"");unidadeCfg.mFone2.value=String(ed.fone2||"");unidadeCfg.mContato2.value=String(ed.contato2||"");unidadeCfg.mFoneTipo3.value=String(ed.fone3_tipo||"");unidadeCfg.mFone3.value=String(ed.fone3||"");unidadeCfg.mContato3.value=String(ed.contato3||"");unidadeCfg.mFoneTipo4.value=String(ed.fone4_tipo||"");unidadeCfg.mFone4.value=String(ed.fone4||"");unidadeCfg.mContato4.value=String(ed.contato4||"");unidadeCfg.mInativa.checked=ed.ativo===false;unidadeCfg.mInclusao.value=String(ed.inclusao||"");unidadeCfg.mAlteracao.value=String(ed.alteracao||"")}else{unidadeCfg.mTitulo.textContent="Nova unidade";unidadeCfg.mCodigo.value=(proximoResp?.res?.ok?String(proximoResp?.data?.codigo||"0001"):"0001");unidadeCfg.mNome.value="";unidadeCfg.mLogradouro.value="";unidadeCfg.mEndereco.value="";unidadeCfg.mNumero.value="";unidadeCfg.mComplemento.value="";unidadeCfg.mBairro.value="";unidadeCfg.mCidade.value=(cidades.includes("SÃƒÂ£o JosÃƒÂ© do Rio Preto")?"SÃƒÂ£o JosÃƒÂ© do Rio Preto":"");unidadeCfg.mCep.value="";unidadeCfg.mUf.value="SP";unidadeCfg.mFoneTipo1.value=unidadeTelefonePadrao(1);unidadeCfg.mFone1.value="";unidadeCfg.mContato1.value="";unidadeCfg.mFoneTipo2.value=unidadeTelefonePadrao(2);unidadeCfg.mFone2.value="";unidadeCfg.mContato2.value="";unidadeCfg.mFoneTipo3.value=unidadeTelefonePadrao(3);unidadeCfg.mFone3.value="";unidadeCfg.mContato3.value="";unidadeCfg.mFoneTipo4.value=unidadeTelefonePadrao(4);unidadeCfg.mFone4.value="";unidadeCfg.mContato4.value="";unidadeCfg.mInativa.checked=false;const hoje=(new Date()).toLocaleDateString("pt-BR");unidadeCfg.mInclusao.value=hoje;unidadeCfg.mAlteracao.value=hoje}unidadeCfg.modal.classList.remove("hidden")}
+function unidadeEnsureUI(){if(unidadeCfg)return;const style=document.createElement("style");style.textContent=".unidade-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 8px;flex-wrap:wrap}.unidade-toolbar .sep{width:1px;height:24px;background:#cfd8e3}.unidade-grid{border:1px solid #cfd8e3;height:430px;overflow:auto;background:#fff}.unidade-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.unidade-grid th,.unidade-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.unidade-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.unidade-grid th:nth-child(1),.unidade-grid td:nth-child(1),.unidade-grid th:nth-child(5),.unidade-grid td:nth-child(5){text-align:center}.unidade-grid tr.selected{background:#d9e8fb}.unidade-total{margin-top:5px;color:#5b6b7e}.unidade-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.24);display:grid;place-items:center;z-index:1400}.unidade-modal{width:min(760px,96vw);background:#f2f2f2;border:1px solid #bfc9d6;border-radius:10px;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}.unidade-modal .row{display:grid;gap:8px;margin-bottom:6px}.unidade-modal .r3{grid-template-columns:100px 1fr 170px}.unidade-modal .r4{grid-template-columns:70px 1fr 84px 120px}.unidade-modal .r5{grid-template-columns:1fr 1fr 90px 60px}.unidade-modal .rfone{grid-template-columns:110px 1fr 1fr 34px}.unidade-modal .r2{grid-template-columns:1fr 1fr}.unidade-modal label{display:block;margin-bottom:2px}.unidade-modal input,.unidade-modal select{width:100%;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}.unidade-modal .check{display:inline-flex;align-items:center;gap:6px;margin:2px 0}.unidade-modal .check input{width:auto;height:auto}.unidade-modal .foot{border-top:1px solid #d3dbe5;padding-top:6px;margin-top:2px}.unidade-modal .acoes{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}.unidade-wa{width:30px;height:24px;border:1px solid #57b765;border-radius:4px;background:#e9f8ec;color:#0f8a2a;font:700 11px Tahoma,sans-serif;cursor:pointer}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="unidades-atendimento-panel" class="unidade-panel hidden"><div class="panel-title">Unidades de atendimento</div><div class="unidade-toolbar"><button id="unidade-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova unidade...</button><button id="unidade-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="unidade-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="unidade-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div><div class="unidade-grid"><table><colgroup><col style="width:70px"><col><col style="width:180px"><col style="width:180px"><col style="width:60px"></colgroup><thead><tr><th>CÃƒÂ³digo</th><th>Nome da unidade</th><th>Telefone 1</th><th>Telefone 2</th><th>Status</th></tr></thead><tbody id="unidade-tbody"></tbody></table></div><div id="unidade-total" class="unidade-total">0 unidades</div></section><div id="unidade-modal-backdrop" class="unidade-modal-backdrop hidden"><div class="unidade-modal"><div class="modal-header"><div id="unidade-modal-titulo" class="modal-title">Nova unidade</div></div><div class="row r3"><div><label>CÃƒÂ³digo:</label><input id="unidade-codigo"></div><div style="grid-column:2 / span 2"><label>Nome da unidade de atendimento:</label><input id="unidade-nome"></div></div><div class="row r4"><div><label>EndereÃƒÂ§o:</label><select id="unidade-logradouro"></select></div><div><label>&nbsp;</label><input id="unidade-endereco"></div><div><label>NÃ‚Âº:</label><input id="unidade-numero"></div><div><label>Complemento:</label><input id="unidade-complemento"></div></div><div class="row r5"><div><label>Bairro:</label><select id="unidade-bairro"></select></div><div><label>Cidade:</label><select id="unidade-cidade"></select></div><div><label>CEP:</label><input id="unidade-cep"></div><div><label>UF:</label><select id="unidade-uf"></select></div></div><div class="row rfone"><div><label>Telefones</label><select id="unidade-fone1-tipo"></select></div><div><label>NÃƒÂºmero</label><input id="unidade-fone1"></div><div><label>Contato</label><input id="unidade-contato1"></div><button id="unidade-wa1" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone2-tipo"></select></div><div><input id="unidade-fone2"></div><div><input id="unidade-contato2"></div><button id="unidade-wa2" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone3-tipo"></select></div><div><input id="unidade-fone3"></div><div><input id="unidade-contato3"></div><button id="unidade-wa3" class="unidade-wa" type="button">WA</button></div><div class="row rfone"><div><select id="unidade-fone4-tipo"></select></div><div><input id="unidade-fone4"></div><div><input id="unidade-contato4"></div><button id="unidade-wa4" class="unidade-wa" type="button">WA</button></div><label class="check"><input id="unidade-inativa" type="checkbox">Inativar unidade</label><div class="foot row r2"><div><label>InclusÃƒÂ£o:</label><input id="unidade-inclusao"></div><div><label>AlteraÃƒÂ§ÃƒÂ£o:</label><input id="unidade-alteracao"></div></div><div class="acoes"><button id="unidade-modal-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="unidade-modal-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`);unidadeCfg={panel:document.getElementById("unidades-atendimento-panel"),tbody:document.getElementById("unidade-tbody"),total:document.getElementById("unidade-total"),btnNovo:document.getElementById("unidade-btn-novo"),btnEditar:document.getElementById("unidade-btn-editar"),btnExcluir:document.getElementById("unidade-btn-excluir"),btnFechar:document.getElementById("unidade-btn-fechar"),modal:document.getElementById("unidade-modal-backdrop"),mTitulo:document.getElementById("unidade-modal-titulo"),mCodigo:document.getElementById("unidade-codigo"),mNome:document.getElementById("unidade-nome"),mLogradouro:document.getElementById("unidade-logradouro"),mEndereco:document.getElementById("unidade-endereco"),mNumero:document.getElementById("unidade-numero"),mComplemento:document.getElementById("unidade-complemento"),mBairro:document.getElementById("unidade-bairro"),mCidade:document.getElementById("unidade-cidade"),mCep:document.getElementById("unidade-cep"),mUf:document.getElementById("unidade-uf"),mFoneTipo1:document.getElementById("unidade-fone1-tipo"),mFone1:document.getElementById("unidade-fone1"),mContato1:document.getElementById("unidade-contato1"),mFoneTipo2:document.getElementById("unidade-fone2-tipo"),mFone2:document.getElementById("unidade-fone2"),mContato2:document.getElementById("unidade-contato2"),mFoneTipo3:document.getElementById("unidade-fone3-tipo"),mFone3:document.getElementById("unidade-fone3"),mContato3:document.getElementById("unidade-contato3"),mFoneTipo4:document.getElementById("unidade-fone4-tipo"),mFone4:document.getElementById("unidade-fone4"),mContato4:document.getElementById("unidade-contato4"),mInativa:document.getElementById("unidade-inativa"),mInclusao:document.getElementById("unidade-inclusao"),mAlteracao:document.getElementById("unidade-alteracao"),mOk:document.getElementById("unidade-modal-ok"),mCancelar:document.getElementById("unidade-modal-cancelar"),wa1:document.getElementById("unidade-wa1"),wa2:document.getElementById("unidade-wa2"),wa3:document.getElementById("unidade-wa3"),wa4:document.getElementById("unidade-wa4"),modalEditId:null};ensurePanelChrome(unidadeCfg.panel);ensureModalChrome(unidadeCfg.modal.querySelector(".unidade-modal"));bindStandardGridActivation(unidadeCfg.tbody,tr=>unidadeSelecionarLinha(tr),()=>{const item=unidadeSelecionada();if(item)unidadeAbrirModal(item)});unidadeCfg.btnNovo.addEventListener("click",()=>unidadeAbrirModal(null));unidadeCfg.btnEditar.addEventListener("click",()=>{const item=unidadeSelecionada();if(!item){window.alert("Selecione uma unidade.");return}unidadeAbrirModal(item)});unidadeCfg.btnExcluir.addEventListener("click",unidadeExcluirSelecionada);unidadeCfg.btnFechar.addEventListener("click",()=>{unidadeCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden");footerMsg.textContent="Cadastro > Unidades de atendimento fechado."});unidadeCfg.mOk.addEventListener("click",unidadeSalvarModal);unidadeCfg.mCancelar.addEventListener("click",unidadeFecharModal);if(unidadeCfg.wa1)unidadeCfg.wa1.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone1));if(unidadeCfg.wa2)unidadeCfg.wa2.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone2));if(unidadeCfg.wa3)unidadeCfg.wa3.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone3));if(unidadeCfg.wa4)unidadeCfg.wa4.addEventListener("click",()=>fichaAbrirWhatsAppComTelefone(unidadeCfg.mFone4));unidadeCfg.modal.addEventListener("click",ev=>{if(ev.target===unidadeCfg.modal)unidadeFecharModal()})}
 function unidadeAplicarAjustesVisuaisV2(){
   if(document.getElementById("unidade-ajustes-v2"))return;
   const style=document.createElement("style");
@@ -10073,7 +11350,7 @@ const unidadeEnsureUIBaseV3=unidadeEnsureUI;unidadeEnsureUI=function(){unidadeEn
 setupMenuBar();initPanelCloseButtons();initModalChrome();document.querySelectorAll("[data-menu-action]").forEach(el=>el.addEventListener("click",async()=>{await executarAcaoMenu(el.getAttribute("data-menu-action")||"")}));
 document.addEventListener("keydown",async(ev)=>{if(!ev.ctrlKey||ev.altKey||ev.shiftKey||ev.metaKey||isEditableTarget(ev.target))return;const key=String(ev.key||"").toLowerCase();if(key==="n"){ev.preventDefault();await executarAcaoMenu("cadastro-novo-paciente");return}if(key==="t"){ev.preventDefault();await executarAcaoMenu("tratamento-novo");return}if(key==="o"){ev.preventDefault();await executarAcaoMenu("tratamento-orcamento");return}if(key==="p"){ev.preventDefault();await executarAcaoMenu("financeiro-cc-paciente");return}if(key==="c"){ev.preventDefault();await executarAcaoMenu("financeiro-cc-cirurgiao");return}});
 sobreDlg.btnFechar.addEventListener("click",fecharSobreModal);sobreDlg.backdrop.addEventListener("click",ev=>{if(ev.target===sobreDlg.backdrop)fecharSobreModal()});
-licDlg.btnFechar.addEventListener("click",fecharLicencaModal);licDlg.backdrop.addEventListener("click",ev=>{if(ev.target===licDlg.backdrop)fecharLicencaModal()});licDlg.btnCopiar.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(licDlg.machine.value||"");licSetStatus("ID copiado.",false,true)}catch{licSetStatus("NÃ£o foi possÃ­vel copiar o ID.",true,false)}});licDlg.btnMensal.addEventListener("click",()=>licIniciarCheckout("MENSAL"));licDlg.btnAnual.addEventListener("click",()=>licIniciarCheckout("ANUAL"));if(licDlg.btnAtualizar)licDlg.btnAtualizar.addEventListener("click",licSincronizarStatus);
+licDlg.btnFechar.addEventListener("click",fecharLicencaModal);licDlg.backdrop.addEventListener("click",ev=>{if(ev.target===licDlg.backdrop)fecharLicencaModal()});licDlg.btnCopiar.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(licDlg.machine.value||"");licSetStatus("ID copiado.",false,true)}catch{licSetStatus("NÃƒÂ£o foi possÃƒÂ­vel copiar o ID.",true,false)}});licDlg.btnMensal.addEventListener("click",()=>licIniciarCheckout("MENSAL"));licDlg.btnAnual.addEventListener("click",()=>licIniciarCheckout("ANUAL"));if(licDlg.btnAtualizar)licDlg.btnAtualizar.addEventListener("click",licSincronizarStatus);
 document.getElementById("btn-login").addEventListener("click",login);emailEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();login()}});senhaEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();login()}});document.getElementById("btn-open-signup").addEventListener("click",()=>showPanel(panelSignup));document.getElementById("btn-open-forgot").addEventListener("click",()=>showPanel(panelForgot));document.getElementById("btn-signup-code").addEventListener("click",signupRequestCode);document.getElementById("btn-signup-confirm").addEventListener("click",signupConfirm);document.getElementById("btn-forgot-code").addEventListener("click",forgotRequestCode);document.getElementById("btn-forgot-reset").addEventListener("click",forgotResetPassword);document.getElementById("btn-back-login-from-signup").addEventListener("click",()=>showPanel(panelLogin));document.getElementById("btn-back-login-from-forgot").addEventListener("click",()=>showPanel(panelLogin));
 document.getElementById("btn-google-login").addEventListener("click",()=>{window.location.href="/auth/google/login"});
 document.getElementById("btn-sair").addEventListener("click",async()=>{try{if(getToken())await requestJson("POST","/logout",{},true)}catch{}setToken("");mpReturnPaymentId="";sessaoAtual=null;menuApplyPermissions();usersCache=[];usersSelecionadoId=null;usersStopRefresh();usersPermSchema=null;usersPermEditId=null;materiaisCache=[];materialSelecionadoId=null;materialModalId=null;materiaisAuxTiposCache=[];materiaisAuxUndsCache=[];materiaisListasCache=[];materiaisIndicesCache=[];materiaisTabelaModalModo="nova";materiaisTabelaModalListaId=0;procedimentosCache=[];procedimentoSelecionadoId=null;procedimentoAtualId=null;procedimentoLinks=[];procMaterialSelecionadoId=null;procFiltros={tabelas:[],especialidades:[],tipos_tiss:[],indices:[]};pgenCache=[];pgenSelId=null;unidadesCache=[];unidadeSelId=null;fichaPacienteAtualId=null;fichaPacientesBuscaCache=[];fichaCodigoUltimoResolvido="";if(fichaMenuPac)fichaMenuPacFechar();fcxData=null;dashData=[];dashGrafico=[];dashTabela=[];dashSelecionadoId=null;gruposCache=[];grupoSelId=null;catSelId=null;auxItensCache=[];auxSelId=null;licInfoCache=null;saClinicasCache=[];saUsuariosCache=[];if(btnOpenUsers)btnOpenUsers.classList.add("hidden");if(menuSuperAdminAction)menuSuperAdminAction.classList.add("hidden");if(menuSuperAdminSep)menuSuperAdminSep.classList.add("hidden");userRole.textContent="Perfil: -";licUpdateBadge(null);hideAllPanels();materiaisFecharModal();materiaisTabelaFecharModal();procFecharVincular();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();if(prefCfg?.backdrop)prefCfg.backdrop.classList.add("hidden");if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");fecharSobreModal();fecharLicencaModal();const cadMb=document.getElementById("cad-modal-backdrop");if(cadMb)cadMb.classList.add("hidden");loginWrap.classList.remove("hidden");shell.classList.add("hidden");showPanel(panelLogin);setLoginStatus("Sessao encerrada.",false)});
@@ -10093,15 +11370,15 @@ if(materiaisTabelaModal.btnCancelar)materiaisTabelaModal.btnCancelar.addEventLis
 if(materiaisTabelaModal.btnClose)materiaisTabelaModal.btnClose.addEventListener("click",materiaisTabelaFecharModal);
 if(materiaisTabelaModal.backdrop)materiaisTabelaModal.backdrop.addEventListener("click",ev=>{if(ev.target===materiaisTabelaModal.backdrop)materiaisTabelaFecharModal()});
 if(materiaisTabelaModal.hotkeys)materiaisTabelaModal.hotkeys.forEach(el=>el.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();materiaisTabelaSalvarModal()}else if(ev.key==="Escape"){ev.preventDefault();materiaisTabelaFecharModal()}}));
-const PROC_FORMAS_COBRANCA=[{codigo:"ELEMENTO_FACE",descricao:"Elemento / Face"},{codigo:"INTERVENCAO",descricao:"IntervenÃ§Ã£o"}];
-const procNormalizarFormaCobranca=(valor)=>{const base=String(valor??"").trim();if(!base)return"";const chave=base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim().toUpperCase();if(["INTERVENCAO","INTERVENÃ‡ÃƒO"].includes(chave))return"INTERVENCAO";if(["ELEMENTO / FACE","ELEMENTO/FACE","ELEMENTO FACE","ELEMENTO_FACE"].includes(chave))return"ELEMENTO_FACE";return base.toUpperCase()};
-function procCorrigirRotulosEditor(){const menuSimbolos=document.querySelector('[data-menu-action="config-simbolos-graficos"]');if(menuSimbolos)menuSimbolos.textContent="SÃ­mbolos grÃ¡ficos...";const defs=[["label[for='nproc-nome']","Nome da intervenÃ§Ã£o / procedimento"],["label[for='nproc-generico']","Procedimento genÃ©rico"]];defs.forEach(()=>{});const bySelector=[[ '#novo-proc-panel .nproc-field label',"Nome da intervenÃ§Ã£o / procedimento"],['#nproc-generico.closest-label',"Procedimento genÃ©rico"]];const nomeLabel=document.querySelector('#novo-proc-panel .nproc-field label');if(nomeLabel)nomeLabel.textContent="Nome da intervenÃ§Ã£o / procedimento";const labels=[...document.querySelectorAll("#novo-proc-panel label")];const trocas=new Map([["Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento","Nome da intervenÃ§Ã£o / procedimento"],["Procedimento genÃƒÂ©rico","Procedimento genÃ©rico"],["CÃƒÂ³digo","CÃ³digo"],["SÃƒÂ­mbolo grÃƒÂ¡fico","SÃ­mbolo grÃ¡fico"],["Forma de cobranÃƒÂ§a","Forma de cobranÃ§a"],["Custo de laboratÃƒÂ³rio","Custo de laboratÃ³rio"],["Tempo de execuÃƒÂ§ÃƒÂ£o (min)","Tempo de execuÃ§Ã£o (min)"],["Inativar intervenÃƒÂ§ÃƒÂ£o","Inativar intervenÃ§Ã£o"],["ObservaÃƒÂ§ÃƒÂµes","ObservaÃ§Ãµes"],["InclusÃƒÂ£o","InclusÃ£o"],["AlteraÃƒÂ§ÃƒÂ£o","AlteraÃ§Ã£o"],["ComissÃƒÂ£o CD","ComissÃ£o CD"],["Taxa CartÃƒÂ£o","Taxa CartÃ£o"],["Valor MÃƒÂ­nimo","Valor MÃ­nimo"],["Lucro LÃƒÂ­quido","Lucro LÃ­quido"]]);labels.forEach(label=>{const texto=String(label.textContent||"").trim();if(trocas.has(texto))label.textContent=trocas.get(texto)});const simboloImg=document.getElementById("nproc-simbolo-img");if(simboloImg&&simboloImg.alt!=="SÃ­mbolo grÃ¡fico do procedimento")simboloImg.alt="SÃ­mbolo grÃ¡fico do procedimento";const simboloFrameTitulo=document.querySelector("#nproc-simbolo-frame span");if(simboloFrameTitulo)simboloFrameTitulo.textContent="SÃ­mbolo";const spans=[...document.querySelectorAll(".nproc-table-head span")];["CÃ³digo","Material vinculado ao procedimento","RelaÃ§Ã£o","PreÃ§o R$","Custo / UND","Quantidade","Custo R$"].forEach((texto,idx)=>{if(spans[idx])spans[idx].textContent=texto});const ths=[...document.querySelectorAll(".nproc-table thead th")];["CÃ³digo","Material vinculado ao procedimento","RelaÃ§Ã£o","PreÃ§o R$","Custo / UND","Quantidade","Custo R$"].forEach((texto,idx)=>{if(ths[idx])ths[idx].textContent=texto})}
+const PROC_FORMAS_COBRANCA=[{codigo:"ELEMENTO_FACE",descricao:"Elemento / Face"},{codigo:"INTERVENCAO",descricao:"IntervenÃƒÂ§ÃƒÂ£o"}];
+const procNormalizarFormaCobranca=(valor)=>{const base=String(valor??"").trim();if(!base)return"";const chave=base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim().toUpperCase();if(["INTERVENCAO","INTERVENÃƒâ€¡ÃƒÆ’O"].includes(chave))return"INTERVENCAO";if(["ELEMENTO / FACE","ELEMENTO/FACE","ELEMENTO FACE","ELEMENTO_FACE"].includes(chave))return"ELEMENTO_FACE";return base.toUpperCase()};
+function procCorrigirRotulosEditor(){const menuSimbolos=document.querySelector('[data-menu-action="config-simbolos-graficos"]');if(menuSimbolos)menuSimbolos.textContent="SÃƒÂ­mbolos grÃƒÂ¡ficos...";const defs=[["label[for='nproc-nome']","Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento"],["label[for='nproc-generico']","Procedimento genÃƒÂ©rico"]];defs.forEach(()=>{});const bySelector=[[ '#novo-proc-panel .nproc-field label',"Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento"],['#nproc-generico.closest-label',"Procedimento genÃƒÂ©rico"]];const nomeLabel=document.querySelector('#novo-proc-panel .nproc-field label');if(nomeLabel)nomeLabel.textContent="Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento";const labels=[...document.querySelectorAll("#novo-proc-panel label")];const trocas=new Map([["Nome da intervenÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o / procedimento","Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento"],["Procedimento genÃƒÆ’Ã‚Â©rico","Procedimento genÃƒÂ©rico"],["CÃƒÆ’Ã‚Â³digo","CÃƒÂ³digo"],["SÃƒÆ’Ã‚Â­mbolo grÃƒÆ’Ã‚Â¡fico","SÃƒÂ­mbolo grÃƒÂ¡fico"],["Forma de cobranÃƒÆ’Ã‚Â§a","Forma de cobranÃƒÂ§a"],["Custo de laboratÃƒÆ’Ã‚Â³rio","Custo de laboratÃƒÂ³rio"],["Tempo de execuÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o (min)","Tempo de execuÃƒÂ§ÃƒÂ£o (min)"],["Inativar intervenÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o","Inativar intervenÃƒÂ§ÃƒÂ£o"],["ObservaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes","ObservaÃƒÂ§ÃƒÂµes"],["InclusÃƒÆ’Ã‚Â£o","InclusÃƒÂ£o"],["AlteraÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o","AlteraÃƒÂ§ÃƒÂ£o"],["ComissÃƒÆ’Ã‚Â£o CD","ComissÃƒÂ£o CD"],["Taxa CartÃƒÆ’Ã‚Â£o","Taxa CartÃƒÂ£o"],["Valor MÃƒÆ’Ã‚Â­nimo","Valor MÃƒÂ­nimo"],["Lucro LÃƒÆ’Ã‚Â­quido","Lucro LÃƒÂ­quido"]]);labels.forEach(label=>{const texto=String(label.textContent||"").trim();if(trocas.has(texto))label.textContent=trocas.get(texto)});const simboloImg=document.getElementById("nproc-simbolo-img");if(simboloImg&&simboloImg.alt!=="SÃƒÂ­mbolo grÃƒÂ¡fico do procedimento")simboloImg.alt="SÃƒÂ­mbolo grÃƒÂ¡fico do procedimento";const simboloFrameTitulo=document.querySelector("#nproc-simbolo-frame span");if(simboloFrameTitulo)simboloFrameTitulo.textContent="SÃƒÂ­mbolo";const spans=[...document.querySelectorAll(".nproc-table-head span")];["CÃƒÂ³digo","Material vinculado ao procedimento","RelaÃƒÂ§ÃƒÂ£o","PreÃƒÂ§o R$","Custo / UND","Quantidade","Custo R$"].forEach((texto,idx)=>{if(spans[idx])spans[idx].textContent=texto});const ths=[...document.querySelectorAll(".nproc-table thead th")];["CÃƒÂ³digo","Material vinculado ao procedimento","RelaÃƒÂ§ÃƒÂ£o","PreÃƒÂ§o R$","Custo / UND","Quantidade","Custo R$"].forEach((texto,idx)=>{if(ths[idx])ths[idx].textContent=texto})}
 async function procCarregarCombosEditor(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET","/cadastros/simbolos-graficos?scope=procedimentos",undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];procSimbolosCache=simbolos;procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,PROC_FORMAS_COBRANCA,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>item?.descricao??""})}
 function procAplicarDadosEditor(data={},resetLinks=false){procCorrigirRotulosEditor();proc.txtCodigo.value=String(data?.codigo??"");proc.txtNome.value=String(data?.nome??"");proc.txtTempo.value=String(data?.tempo??0);proc.txtPreco.value=procFmtBr(data?.preco??0);proc.txtLab.value=procFmtBr(data?.custo_lab??0);if(proc.txtGarantia)proc.txtGarantia.value=String(data?.garantia_meses??0);if(proc.txtRepasse)proc.txtRepasse.value=procFmtBr(data?.valor_repasse??0);if(proc.chkInativar)proc.chkInativar.checked=Boolean(data?.inativo);if(proc.chkPreferidos)proc.chkPreferidos.checked=Boolean(data?.preferido);if(proc.txtObs)proc.txtObs.value=String(data?.observacoes??"");if(proc.lblInclusao)proc.lblInclusao.textContent=String(data?.data_inclusao??"");if(proc.lblAlteracao)proc.lblAlteracao.textContent=String(data?.data_alteracao??"");procPreencherEspecialidadesEditor();const genericoAtual=data?.procedimento_generico_id==null?"":String(data.procedimento_generico_id);procGarantirOpcaoSelect(proc.cboGenerico,genericoAtual,genericoAtual?`Registro atual (${genericoAtual})`:"");procSetSelectValue(proc.cboGenerico,genericoAtual);const especialidadeAtual=String(data?.especialidade??"").trim();procGarantirOpcaoSelect(proc.cboEditorEspecialidade,especialidadeAtual,especialidadeAtual);procSetSelectValue(proc.cboEditorEspecialidade,especialidadeAtual);const simboloAtual=String(data?.simbolo_grafico??"").trim();procGarantirOpcaoSelect(proc.cboSimbolo,simboloAtual,procSimboloDescricao(simboloAtual));procSetSelectValue(proc.cboSimbolo,simboloAtual);procAtualizarPreviewSimbolo(simboloAtual);const cobrancaAtual=procNormalizarFormaCobranca(data?.forma_cobranca);procGarantirOpcaoSelect(proc.cboCobranca,cobrancaAtual,PROC_FORMAS_COBRANCA.find(item=>item.codigo===cobrancaAtual)?.descricao||cobrancaAtual);procSetSelectValue(proc.cboCobranca,cobrancaAtual);if(Object.prototype.hasOwnProperty.call(data,"materiais_vinculados"))procRenderLinks(data.materiais_vinculados||procEditorLinksVazio);else if(resetLinks)procRenderLinks(procEditorLinksVazio);procAtualizarFinanceiro()}
-async function procSalvar(){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de gravar procedimentos.");return}let codigo=0,tempo=0,preco=0,lab=0,repasse=0,garantia=0;const nome=proc.txtNome.value.trim();try{codigo=parseInt(proc.txtCodigo.value||"0",10);tempo=parseInt(proc.txtTempo.value||"0",10);preco=procParse(proc.txtPreco.value);lab=procParse(proc.txtLab.value);repasse=procParse(proc.txtRepasse?.value||"0");garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0)}catch{window.alert("Valores numÃ©ricos invÃ¡lidos.");return}if(!nome){window.alert("Informe o nome.");return}const genericoValue=String(proc.cboGenerico?.value||"").trim();const simboloSelecionado=String(proc.cboSimbolo?.value||"").trim();const payload={codigo,nome,tempo,preco,custo_lab:lab,custo:0,tabela_id:String(proc.cboTabela?.value||"1"),especialidade:String(proc.cboEditorEspecialidade?.value||"").trim(),procedimento_generico_id:genericoValue?Number(genericoValue):null,simbolo_grafico:simboloSelecionado,mostrar_simbolo:!!simboloSelecionado,garantia_meses:garantia,forma_cobranca:procNormalizarFormaCobranca(proc.cboCobranca?.value||""),valor_repasse:repasse,preferido:!!proc.chkPreferidos?.checked,inativo:!!proc.chkInativar?.checked,observacoes:String(proc.txtObs?.value||"").trim()};const method=procedimentoAtualId?"PUT":"POST";const path=procedimentoAtualId?`/procedimentos/${procedimentoAtualId}`:"/procedimentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento.");return}if(!procedimentoAtualId)procedimentoAtualId=data.id;procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks();window.alert("Procedimento salvo.");await procCarregarLista()}
+async function procSalvar(){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de gravar procedimentos.");return}let codigo=0,tempo=0,preco=0,lab=0,repasse=0,garantia=0;const nome=proc.txtNome.value.trim();try{codigo=parseInt(proc.txtCodigo.value||"0",10);tempo=parseInt(proc.txtTempo.value||"0",10);preco=procParse(proc.txtPreco.value);lab=procParse(proc.txtLab.value);repasse=procParse(proc.txtRepasse?.value||"0");garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0)}catch{window.alert("Valores numÃƒÂ©ricos invÃƒÂ¡lidos.");return}if(!nome){window.alert("Informe o nome.");return}const genericoValue=String(proc.cboGenerico?.value||"").trim();const simboloSelecionado=String(proc.cboSimbolo?.value||"").trim();const payload={codigo,nome,tempo,preco,custo_lab:lab,custo:0,tabela_id:String(proc.cboTabela?.value||"1"),especialidade:String(proc.cboEditorEspecialidade?.value||"").trim(),procedimento_generico_id:genericoValue?Number(genericoValue):null,simbolo_grafico:simboloSelecionado,mostrar_simbolo:!!simboloSelecionado,garantia_meses:garantia,forma_cobranca:procNormalizarFormaCobranca(proc.cboCobranca?.value||""),valor_repasse:repasse,preferido:!!proc.chkPreferidos?.checked,inativo:!!proc.chkInativar?.checked,observacoes:String(proc.txtObs?.value||"").trim()};const method=procedimentoAtualId?"PUT":"POST";const path=procedimentoAtualId?`/procedimentos/${procedimentoAtualId}`:"/procedimentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento.");return}if(!procedimentoAtualId)procedimentoAtualId=data.id;procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks();window.alert("Procedimento salvo.");await procCarregarLista()}
 const PROC_FORMAS_COBRANCA_V2=[{codigo:"ELEMENTO_FACE",descricao:"Elemento / Face"},{codigo:"INTERVENCAO",descricao:"Interven\u00e7\u00e3o"}];
 const procNormalizarFormaCobrancaV2=(valor)=>{const base=String(valor??"").trim();if(!base)return"";const chave=base.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim().toUpperCase();if(chave==="INTERVENCAO")return"INTERVENCAO";if(["ELEMENTO / FACE","ELEMENTO/FACE","ELEMENTO FACE","ELEMENTO_FACE"].includes(chave))return"ELEMENTO_FACE";return base.toUpperCase()};
-procCorrigirRotulosEditor=function(){const menuSimbolos=document.querySelector('[data-menu-action="config-simbolos-graficos"]');if(menuSimbolos)menuSimbolos.textContent="S\u00edmbolos gr\u00e1ficos...";const trocas=new Map([["Nome da intervenÃƒÂ§ÃƒÂ£o / procedimento","Nome da interven\u00e7\u00e3o / procedimento"],["Procedimento genÃƒÂ©rico","Procedimento gen\u00e9rico"],["CÃƒÂ³digo","C\u00f3digo"],["SÃƒÂ­mbolo grÃƒÂ¡fico","S\u00edmbolo gr\u00e1fico"],["Forma de cobranÃƒÂ§a","Forma de cobran\u00e7a"],["Custo de laboratÃƒÂ³rio","Custo de laborat\u00f3rio"],["Tempo de execuÃƒÂ§ÃƒÂ£o (min)","Tempo de execu\u00e7\u00e3o (min)"],["Inativar intervenÃƒÂ§ÃƒÂ£o","Inativar interven\u00e7\u00e3o"],["ObservaÃƒÂ§ÃƒÂµes","Observa\u00e7\u00f5es"],["InclusÃƒÂ£o","Inclus\u00e3o"],["AlteraÃƒÂ§ÃƒÂ£o","Altera\u00e7\u00e3o"],["ComissÃƒÂ£o CD","Comiss\u00e3o CD"],["Taxa CartÃƒÂ£o","Taxa Cart\u00e3o"],["Valor MÃƒÂ­nimo","Valor M\u00ednimo"],["Lucro LÃƒÂ­quido","Lucro L\u00edquido"]]);[...document.querySelectorAll("#novo-proc-panel label")].forEach(label=>{const texto=String(label.textContent||"").trim();if(trocas.has(texto))label.textContent=trocas.get(texto)});const simboloImg=document.getElementById("nproc-simbolo-img");if(simboloImg)simboloImg.alt="S\u00edmbolo gr\u00e1fico do procedimento";const simboloFrameTitulo=document.querySelector("#nproc-simbolo-frame span");if(simboloFrameTitulo)simboloFrameTitulo.textContent="S\u00edmbolo";const colunas=["C\u00f3digo","Material vinculado ao procedimento","Rela\u00e7\u00e3o","Pre\u00e7o R$","Custo / UND","Quantidade","Custo R$"];[...document.querySelectorAll(".nproc-table-head span")].forEach((el,idx)=>{if(colunas[idx])el.textContent=colunas[idx]});[...document.querySelectorAll(".nproc-table thead th")].forEach((el,idx)=>{if(colunas[idx])el.textContent=colunas[idx]})};
+procCorrigirRotulosEditor=function(){const menuSimbolos=document.querySelector('[data-menu-action="config-simbolos-graficos"]');if(menuSimbolos)menuSimbolos.textContent="S\u00edmbolos gr\u00e1ficos...";const trocas=new Map([["Nome da intervenÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o / procedimento","Nome da interven\u00e7\u00e3o / procedimento"],["Procedimento genÃƒÆ’Ã‚Â©rico","Procedimento gen\u00e9rico"],["CÃƒÆ’Ã‚Â³digo","C\u00f3digo"],["SÃƒÆ’Ã‚Â­mbolo grÃƒÆ’Ã‚Â¡fico","S\u00edmbolo gr\u00e1fico"],["Forma de cobranÃƒÆ’Ã‚Â§a","Forma de cobran\u00e7a"],["Custo de laboratÃƒÆ’Ã‚Â³rio","Custo de laborat\u00f3rio"],["Tempo de execuÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o (min)","Tempo de execu\u00e7\u00e3o (min)"],["Inativar intervenÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o","Inativar interven\u00e7\u00e3o"],["ObservaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes","Observa\u00e7\u00f5es"],["InclusÃƒÆ’Ã‚Â£o","Inclus\u00e3o"],["AlteraÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o","Altera\u00e7\u00e3o"],["ComissÃƒÆ’Ã‚Â£o CD","Comiss\u00e3o CD"],["Taxa CartÃƒÆ’Ã‚Â£o","Taxa Cart\u00e3o"],["Valor MÃƒÆ’Ã‚Â­nimo","Valor M\u00ednimo"],["Lucro LÃƒÆ’Ã‚Â­quido","Lucro L\u00edquido"]]);[...document.querySelectorAll("#novo-proc-panel label")].forEach(label=>{const texto=String(label.textContent||"").trim();if(trocas.has(texto))label.textContent=trocas.get(texto)});const simboloImg=document.getElementById("nproc-simbolo-img");if(simboloImg)simboloImg.alt="S\u00edmbolo gr\u00e1fico do procedimento";const simboloFrameTitulo=document.querySelector("#nproc-simbolo-frame span");if(simboloFrameTitulo)simboloFrameTitulo.textContent="S\u00edmbolo";const colunas=["C\u00f3digo","Material vinculado ao procedimento","Rela\u00e7\u00e3o","Pre\u00e7o R$","Custo / UND","Quantidade","Custo R$"];[...document.querySelectorAll(".nproc-table-head span")].forEach((el,idx)=>{if(colunas[idx])el.textContent=colunas[idx]});[...document.querySelectorAll(".nproc-table thead th")].forEach((el,idx)=>{if(colunas[idx])el.textContent=colunas[idx]})};
 procCarregarCombosEditor=async function(){procPreencherEspecialidadesEditor();const [genericosResp,simbolosResp]=await Promise.all([requestJson("GET","/cadastros/procedimentos-genericos?q=",undefined,true),requestJson("GET","/cadastros/simbolos-graficos?scope=procedimentos",undefined,true)]);const genericos=genericosResp.res.ok&&Array.isArray(genericosResp.data)?genericosResp.data:[];const simbolos=simbolosResp.res.ok&&Array.isArray(simbolosResp.data)?simbolosResp.data:[];procSimbolosCache=simbolos;procPreencherSelect(proc.cboGenerico,genericos,{valueFrom:(item)=>item?.id??"",labelFrom:(item)=>procFmtAuxLabel(item)});procPreencherSelect(proc.cboSimbolo,simbolos,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>procFmtSimboloLabel(item)});procPreencherSelect(proc.cboCobranca,PROC_FORMAS_COBRANCA_V2,{valueFrom:(item)=>item?.codigo??"",labelFrom:(item)=>item?.descricao??""})};
 procAplicarDadosEditor=function(data={},resetLinks=false){procCorrigirRotulosEditor();proc.txtCodigo.value=String(data?.codigo??"");proc.txtNome.value=String(data?.nome??"");proc.txtTempo.value=String(data?.tempo??0);proc.txtPreco.value=procFmtBr(data?.preco??0);proc.txtLab.value=procFmtBr(data?.custo_lab??0);if(proc.txtGarantia)proc.txtGarantia.value=String(data?.garantia_meses??0);if(proc.txtRepasse)proc.txtRepasse.value=procFmtBr(data?.valor_repasse??0);if(proc.chkInativar)proc.chkInativar.checked=Boolean(data?.inativo);if(proc.chkPreferidos)proc.chkPreferidos.checked=Boolean(data?.preferido);if(proc.txtObs)proc.txtObs.value=String(data?.observacoes??"");if(proc.lblInclusao)proc.lblInclusao.textContent=String(data?.data_inclusao??"");if(proc.lblAlteracao)proc.lblAlteracao.textContent=String(data?.data_alteracao??"");procPreencherEspecialidadesEditor();const genericoAtual=data?.procedimento_generico_id==null?"":String(data.procedimento_generico_id);procGarantirOpcaoSelect(proc.cboGenerico,genericoAtual,genericoAtual?`Registro atual (${genericoAtual})`:"");procSetSelectValue(proc.cboGenerico,genericoAtual);const especialidadeAtual=String(data?.especialidade??"").trim();procGarantirOpcaoSelect(proc.cboEditorEspecialidade,especialidadeAtual,especialidadeAtual);procSetSelectValue(proc.cboEditorEspecialidade,especialidadeAtual);const simboloAtual=String(data?.simbolo_grafico??"").trim();procGarantirOpcaoSelect(proc.cboSimbolo,simboloAtual,procSimboloDescricao(simboloAtual));procSetSelectValue(proc.cboSimbolo,simboloAtual);procAtualizarPreviewSimbolo(simboloAtual);const cobrancaAtual=procNormalizarFormaCobrancaV2(data?.forma_cobranca);procGarantirOpcaoSelect(proc.cboCobranca,cobrancaAtual,PROC_FORMAS_COBRANCA_V2.find(item=>item.codigo===cobrancaAtual)?.descricao||cobrancaAtual);procSetSelectValue(proc.cboCobranca,cobrancaAtual);if(Object.prototype.hasOwnProperty.call(data,"materiais_vinculados"))procRenderLinks(data.materiais_vinculados||procEditorLinksVazio);else if(resetLinks)procRenderLinks(procEditorLinksVazio);procAtualizarFinanceiro()};
 procSalvar=async function(){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de gravar procedimentos.");return}let codigo=0,tempo=0,preco=0,lab=0,repasse=0,garantia=0;const nome=proc.txtNome.value.trim();try{codigo=parseInt(proc.txtCodigo.value||"0",10);tempo=parseInt(proc.txtTempo.value||"0",10);preco=procParse(proc.txtPreco.value);lab=procParse(proc.txtLab.value);repasse=procParse(proc.txtRepasse?.value||"0");garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0)}catch{window.alert("Valores num\u00e9ricos inv\u00e1lidos.");return}if(!nome){window.alert("Informe o nome.");return}const genericoValue=String(proc.cboGenerico?.value||"").trim();const simboloSelecionado=String(proc.cboSimbolo?.value||"").trim();const payload={codigo,nome,tempo,preco,custo_lab:lab,custo:0,tabela_id:String(proc.cboTabela?.value||"1"),especialidade:String(proc.cboEditorEspecialidade?.value||"").trim(),procedimento_generico_id:genericoValue?Number(genericoValue):null,simbolo_grafico:simboloSelecionado,mostrar_simbolo:!!simboloSelecionado,garantia_meses:garantia,forma_cobranca:procNormalizarFormaCobrancaV2(proc.cboCobranca?.value||""),valor_repasse:repasse,preferido:!!proc.chkPreferidos?.checked,inativo:!!proc.chkInativar?.checked,observacoes:String(proc.txtObs?.value||"").trim()};const method=procedimentoAtualId?"PUT":"POST";const path=procedimentoAtualId?`/procedimentos/${procedimentoAtualId}`:"/procedimentos";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao gravar procedimento.");return}if(!procedimentoAtualId)procedimentoAtualId=data.id;procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks();window.alert("Procedimento salvo.");await procCarregarLista()};
@@ -10124,8 +11401,8 @@ procPreencherEspecialidadesEditor=function(){const especialidades=Array.isArray(
 procCarregarFiltros=async function(){const tabAtual=String(proc.cboTabela?.value||"1");const espAtual=String(proc.cboEspecialidade?.value||"");const{res,data}=await requestJson("GET","/procedimentos/filtros",undefined,true);if(!res.ok){procFiltros={tabelas:[],especialidades:[],tipos_tiss:[],indices:[]};if(proc.cboTabela){proc.cboTabela.innerHTML='<option value="1">Tabela Exemplo</option>';proc.cboTabela.value="1"}if(proc.cboEspecialidade){proc.cboEspecialidade.innerHTML='<option value="">Todas</option>';proc.cboEspecialidade.value=""}procPreencherEspecialidadesEditor();procAplicarRegrasTabelaSelecionada();return}const tabelas=Array.isArray(data?.tabelas)?data.tabelas:[];const especialidades=Array.isArray(data?.especialidades)?data.especialidades:[];const tipos_tiss=Array.isArray(data?.tipos_tiss)?data.tipos_tiss:[];const indices=Array.isArray(data?.indices)?data.indices:[];procFiltros={tabelas,especialidades,tipos_tiss,indices};if(proc.cboTabela){const base=tabelas.length?tabelas:[{id:"1",nome:"Tabela Exemplo"}];proc.cboTabela.innerHTML=base.map(x=>`<option value="${esc(String(x.id??""))}">${esc(String(x.nome??""))}</option>`).join("");procSetSelectValue(proc.cboTabela,tabAtual||"1")}if(proc.cboEspecialidade){proc.cboEspecialidade.innerHTML=['<option value="">Todas</option>',...especialidades.map(x=>`<option value="${esc(String(x.codigo??""))}">${esc(String(x.nome??""))}</option>`)].join("");procSetSelectValue(proc.cboEspecialidade,espAtual)}procPreencherEspecialidadesEditor();procAplicarRegrasTabelaSelecionada()};
 procAplicarDadosEditor=function(data={},resetLinks=false){procCorrigirRotulosEditor();proc.txtCodigo.value=String(data?.codigo??"");proc.txtNome.value=String(data?.nome??"");proc.txtTempo.value=String(data?.tempo??0);proc.txtPreco.value=procFmtBr(data?.preco??0);proc.txtLab.value=procFmtBr(data?.custo_lab??0);if(proc.txtGarantia)proc.txtGarantia.value=String(data?.garantia_meses??0);if(proc.txtRepasse)proc.txtRepasse.value=procFmtBr(data?.valor_repasse??0);if(proc.chkInativar)proc.chkInativar.checked=Boolean(data?.inativo);if(proc.chkPreferidos)proc.chkPreferidos.checked=Boolean(data?.preferido);if(proc.txtObs)proc.txtObs.value=String(data?.observacoes??"");if(proc.lblInclusao)proc.lblInclusao.textContent=String(data?.data_inclusao??"");if(proc.lblAlteracao)proc.lblAlteracao.textContent=String(data?.data_alteracao??"");procPreencherEspecialidadesEditor();const genericoAtual=data?.procedimento_generico_id==null?"":String(data.procedimento_generico_id);procGarantirOpcaoSelect(proc.cboGenerico,genericoAtual,genericoAtual?`Registro atual (${genericoAtual})`:"");procSetSelectValue(proc.cboGenerico,genericoAtual);const especialidadeAtual=String(data?.especialidade??"").trim();procGarantirOpcaoSelect(proc.cboEditorEspecialidade,especialidadeAtual,procEspecialidadeNomeV2(especialidadeAtual));procSetSelectValue(proc.cboEditorEspecialidade,especialidadeAtual);const simboloAtual=String(data?.simbolo_grafico??"").trim();procGarantirOpcaoSelect(proc.cboSimbolo,simboloAtual,procSimboloDescricao(simboloAtual));procSetSelectValue(proc.cboSimbolo,simboloAtual);procAtualizarPreviewSimbolo(simboloAtual);const cobrancaAtual=procNormalizarFormaCobrancaV2(data?.forma_cobranca);procGarantirOpcaoSelect(proc.cboCobranca,cobrancaAtual,PROC_FORMAS_COBRANCA_V2.find(item=>item.codigo===cobrancaAtual)?.descricao||cobrancaAtual);procSetSelectValue(proc.cboCobranca,cobrancaAtual);if(Object.prototype.hasOwnProperty.call(data,"materiais_vinculados"))procRenderLinks(data.materiais_vinculados||procEditorLinksVazio);else if(resetLinks)procRenderLinks(procEditorLinksVazio);procAtualizarFinanceiro()};
 abrirProcedimentos=async function(){hideAllPanels();ensurePanelChrome(proc.panel);proc.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await procCarregarFiltros();await procCarregarLista();footerMsg.textContent="Modulo Configura tabela de pre\u00e7os aberto."};
-procAbrirEditor=async function(id=null){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de alterar procedimentos.");return}hideAllPanels();ensurePanelChrome(proc.novoPanel);proc.novoPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");procedimentoAtualId=id;procMaterialSelecionadoId=null;await Promise.all([procCarregarCenario(),procCarregarCombosEditor()]);if(id){const{res,data}=await requestJson("GET",`/procedimentos/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Procedimento nÃ£o encontrado.");return}procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks()}else{const tabela=encodeURIComponent(String(proc.cboTabela?.value||"1"));const{res,data}=await requestJson("GET",`/procedimentos/proximo-codigo?tabela_id=${tabela}`,undefined,true);procAplicarDadosEditor({codigo:res?String(data.codigo||1):"1",nome:"",tempo:0,preco:0,custo_lab:0,garantia_meses:0,valor_repasse:0,especialidade:"",procedimento_generico_id:null,simbolo_grafico:"",forma_cobranca:"",preferido:false,inativo:false,observacoes:"",data_inclusao:"",data_alteracao:""},true)}};
-pgenAbrir=async function(){pgenEnsureUI();ensurePanelChrome(pgen.panel);await pgenCarregarEspecialidades();const especialidades=Array.isArray(procFiltros?.especialidades)?procFiltros.especialidades:[];pgen.cboEspecialidade.innerHTML=['<option value="">&lt;&lt;Todas&gt;&gt;</option>',...especialidades.map(item=>`<option value="${esc(String(item.codigo||""))}">${esc(String(item.nome||""))}</option>`)].join("");pgenCorrigirRotulos();hideAllPanels();pgen.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await pgenCarregar();footerMsg.textContent="MÃ³dulo Procedimentos genÃ©ricos aberto."};
+procAbrirEditor=async function(id=null){const tabSel=procTabelaSelecionadaAtual();if(tabSel?.inativo){window.alert("Tabela inativa. Reative a tabela antes de alterar procedimentos.");return}hideAllPanels();ensurePanelChrome(proc.novoPanel);proc.novoPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");procedimentoAtualId=id;procMaterialSelecionadoId=null;await Promise.all([procCarregarCenario(),procCarregarCombosEditor()]);if(id){const{res,data}=await requestJson("GET",`/procedimentos/${id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Procedimento nÃƒÂ£o encontrado.");return}procAplicarDadosEditor(data);if(!Object.prototype.hasOwnProperty.call(data||{},"materiais_vinculados"))await procRecarregarLinks()}else{const tabela=encodeURIComponent(String(proc.cboTabela?.value||"1"));const{res,data}=await requestJson("GET",`/procedimentos/proximo-codigo?tabela_id=${tabela}`,undefined,true);procAplicarDadosEditor({codigo:res?String(data.codigo||1):"1",nome:"",tempo:0,preco:0,custo_lab:0,garantia_meses:0,valor_repasse:0,especialidade:"",procedimento_generico_id:null,simbolo_grafico:"",forma_cobranca:"",preferido:false,inativo:false,observacoes:"",data_inclusao:"",data_alteracao:""},true)}};
+pgenAbrir=async function(){pgenEnsureUI();ensurePanelChrome(pgen.panel);await pgenCarregarEspecialidades();const especialidades=Array.isArray(procFiltros?.especialidades)?procFiltros.especialidades:[];pgen.cboEspecialidade.innerHTML=['<option value="">&lt;&lt;Todas&gt;&gt;</option>',...especialidades.map(item=>`<option value="${esc(String(item.codigo||""))}">${esc(String(item.nome||""))}</option>`)].join("");pgenCorrigirRotulos();hideAllPanels();pgen.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await pgenCarregar();footerMsg.textContent="MÃƒÂ³dulo Procedimentos genÃƒÂ©ricos aberto."};
 if(proc.novoPanel)ensurePanelChrome(proc.novoPanel);
 if(proc.panel)ensurePanelChrome(proc.panel);
 procRelatorioEnsureUI();
@@ -10161,7 +11438,7 @@ if(proc.vinculaQ)proc.vinculaQ.addEventListener("input",procVinculaCarregarMater
 proc.vinculaMateriais.addEventListener("change",procVinculaMaterialSelecionado);
 proc.vinculaQuantidade.addEventListener("input",procVinculaAtualizarCustoTotal);
 proc.vinculaBtnOk.addEventListener("click",procConfirmarVinculo);
-ccEnsureUI();rccEnsureUI();ensurePanelChrome(cc?.panel);if(cc&&cc.btnOpen){cc.btnOpen.addEventListener("click",ccAbrir);cc.btnND.addEventListener("click",()=>ccAbrirModal("debito"));cc.btnNC.addEventListener("click",()=>ccAbrirModal("credito"));cc.btnEditar.addEventListener("click",()=>{const l=ccSelecionado();if(!l){window.alert("Selecione um lanÃ§amento.");return}ccAbrirModal(l.tipo||"debito",l)});cc.btnExcluir.addEventListener("click",ccExcluirSelecionado);cc.btnImprime.addEventListener("click",()=>rccAbrir("cc"));cc.btnFechar.addEventListener("click",()=>{cc.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});cc.mes.addEventListener("change",ccCarregar);cc.ano.addEventListener("change",ccCarregar);cc.conta.addEventListener("change",ccCarregar);cc.filtro.addEventListener("change",ccCarregar);cc.tbody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-id]");if(!tr)return;ccSelecionadoId=Number(tr.dataset.id);cc.tbody.querySelectorAll("tr").forEach(x=>x.classList.remove("selected"));tr.classList.add("selected")});cc.tbody.addEventListener("dblclick",()=>{const l=ccSelecionado();if(l)ccAbrirModal(l.tipo||"debito",l)});cc.mOk.addEventListener("click",ccSalvarModal);cc.mCancel.addEventListener("click",ccFecharModal)}
+ccEnsureUI();rccEnsureUI();ensurePanelChrome(cc?.panel);if(cc&&cc.btnOpen){cc.btnOpen.addEventListener("click",ccAbrir);cc.btnND.addEventListener("click",()=>ccAbrirModal("debito"));cc.btnNC.addEventListener("click",()=>ccAbrirModal("credito"));cc.btnEditar.addEventListener("click",()=>{const l=ccSelecionado();if(!l){window.alert("Selecione um lanÃƒÂ§amento.");return}ccAbrirModal(l.tipo||"debito",l)});cc.btnExcluir.addEventListener("click",ccExcluirSelecionado);cc.btnImprime.addEventListener("click",()=>rccAbrir("cc"));cc.btnFechar.addEventListener("click",()=>{cc.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});cc.mes.addEventListener("change",ccCarregar);cc.ano.addEventListener("change",ccCarregar);cc.conta.addEventListener("change",ccCarregar);cc.filtro.addEventListener("change",ccCarregar);cc.tbody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-id]");if(!tr)return;ccSelecionadoId=Number(tr.dataset.id);cc.tbody.querySelectorAll("tr").forEach(x=>x.classList.remove("selected"));tr.classList.add("selected")});cc.tbody.addEventListener("dblclick",()=>{const l=ccSelecionado();if(l)ccAbrirModal(l.tipo||"debito",l)});cc.mOk.addEventListener("click",ccSalvarModal);cc.mCancel.addEventListener("click",ccFecharModal)}
 planoEnsureUI();if(plano){ensurePanelChrome(plano.panel);ensurePanelChrome(aux.panel);if(plano.btnOpen)plano.btnOpen.addEventListener("click",planoAbrir);plano.btnFechar.addEventListener("click",()=>{plano.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});plano.btnNovoGrupo.addEventListener("click",()=>planoDialogGrupo());plano.btnAlteraGrupo.addEventListener("click",()=>{const g=planoGrupoSel();if(!g){window.alert("Selecione um grupo.");return}planoDialogGrupo(g)});plano.btnEliminaGrupo.addEventListener("click",planoExcluirGrupo);plano.btnNovaCat.addEventListener("click",()=>planoDialogCategoria());plano.btnAlteraCat.addEventListener("click",()=>{const c=planoCatSel();if(!c){window.alert("Selecione uma categoria.");return}planoDialogCategoria(c)});plano.btnEliminaCat.addEventListener("click",planoExcluirCategoria);bindStandardGridActivation(plano.tbGrupos,tr=>{grupoSelId=Number(tr.dataset.id||0)||null;catSelId=null;planoRenderGrupos();planoRenderCats()},()=>{const g=planoGrupoSel();if(g)planoDialogGrupo(g)});bindStandardGridActivation(plano.tbCats,tr=>{catSelId=Number(tr.dataset.id||0)||null;planoRenderCats()},()=>{const c=planoCatSel();if(c)planoDialogCategoria(c)})}
 if(aux){if(aux.btnOpen)aux.btnOpen.addEventListener("click",auxAbrir);aux.btnFechar.addEventListener("click",()=>{aux.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});aux.btnNovo.addEventListener("click",()=>auxDialogItem());aux.btnAltera.addEventListener("click",()=>{const it=auxSel();if(!it){window.alert("Selecione um item.");return}auxDialogItem(it)});aux.btnElimina.addEventListener("click",auxExcluirItem);if(aux.tbTipos){aux.tbTipos.tabIndex=0;aux.tbTipos.addEventListener("keydown",auxTecladoTipos);aux.tbTipos.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-tipo]");if(!tr)return;auxSelecionarTipoLinha(tr,true);aux.tbTipos.focus()})}if(aux.tbItens){aux.tbItens.tabIndex=0;aux.tbItens.addEventListener("keydown",auxTecladoItens);bindStandardGridActivation(aux.tbItens,tr=>{auxSelecionarItemLinha(tr);aux.tbItens.focus()},()=>{const it=auxSel();if(it)auxDialogItem(it)})}}
 document.querySelectorAll('[data-menu-action="tabelas-protetico"]').forEach(btn=>btn.addEventListener("click",async ev=>{ev.preventDefault();ev.stopImmediatePropagation();await protAbrir()},true));
@@ -10299,7 +11576,7 @@ procSalvar=async function(){
     repasse=procParse(proc.txtRepasse?.value||"0");
     garantia=Math.max(0,parseInt(proc.txtGarantia?.value||"0",10)||0);
   }catch{
-    window.alert("Valores numÃ©ricos invÃ¡lidos.");
+    window.alert("Valores numÃƒÂ©ricos invÃƒÂ¡lidos.");
     return;
   }
   if(!nome){window.alert("Informe o nome.");return}
@@ -10322,9 +11599,9 @@ procSalvar=async function(){
 document.querySelectorAll("[data-modulo]").forEach(el=>el.addEventListener("click",()=>{if(el.id==="btn-open-materiais"||el.id==="btn-open-procedimentos"||el.id==="btn-open-plano"||el.id==="btn-open-aux"||el.id==="btn-open-dashboard"||el.getAttribute("data-modulo")==="Conta corrente")return;hideAllPanels();footerMsg.textContent="Modulo \""+el.getAttribute("data-modulo")+"\" pronto para integrar."}));document.querySelectorAll(".tab-btn").forEach(btn=>btn.addEventListener("click",()=>setTab(btn.getAttribute("data-tab"))));
 c.txtMesestrabalhados.addEventListener("input",atualizarDiasAno);c.txtDiasUteisMes.addEventListener("input",atualizarDiasAno);c.txtHorasAtendimentoDia.addEventListener("input",atualizarTotaisFixo);c.txtNumConsultorios.addEventListener("input",atualizarTotaisFixo);c.txtNumConsultorios.addEventListener("change",atualizarTotaisFixo);c.txtNumConsultorios_2.addEventListener("input",atualizarTotaisFlex);c.txtNumConsultorios_2.addEventListener("change",atualizarTotaisFlex);
 for(let i=1;i<=6;i++){c[`txtManha${i}`].addEventListener("input",()=>atualizarTotalDiaIndex(i));c[`txtTarde${i}`].addEventListener("input",()=>atualizarTotalDiaIndex(i));c[`txtNoite${i}`].addEventListener("input",()=>atualizarTotalDiaIndex(i));c[`txtDiasAno${i}`].addEventListener("input",()=>atualizarTotalDiaIndex(i));}
-c.cboHorasAno.addEventListener("change",cboHorasAnoChange);c.txtGastoAnualParticular.addEventListener("input",atualizarCustos);c.txtGastoAnualEmpresa.addEventListener("input",atualizarCustos);c.txtGastoAnualParticular.addEventListener("blur",()=>{c.txtGastoAnualParticular.value=formatMoney(toFloat(c.txtGastoAnualParticular.value));atualizarCustos()});c.txtGastoAnualEmpresa.addEventListener("blur",()=>{c.txtGastoAnualEmpresa.value=formatMoney(toFloat(c.txtGastoAnualEmpresa.value));atualizarCustos()});c.txtCartao.addEventListener("input",atualizarCustos);c.txtIR.addEventListener("input",atualizarCustos);c.txtCD.addEventListener("input",atualizarCustos);c.box_Ano.value=String(new Date().getFullYear());bootstrapOauthFromUrl();carregarSessao();
+c.cboHorasAno.addEventListener("change",cboHorasAnoChange);c.txtGastoAnualParticular.addEventListener("input",atualizarCustos);c.txtGastoAnualEmpresa.addEventListener("input",atualizarCustos);c.txtGastoAnualParticular.addEventListener("blur",()=>{c.txtGastoAnualParticular.value=formatMoney(toFloat(c.txtGastoAnualParticular.value));atualizarCustos()});c.txtGastoAnualEmpresa.addEventListener("blur",()=>{c.txtGastoAnualEmpresa.value=formatMoney(toFloat(c.txtGastoAnualEmpresa.value));atualizarCustos()});c.txtCartao.addEventListener("input",atualizarCustos);c.txtIR.addEventListener("input",atualizarCustos);c.txtCD.addEventListener("input",atualizarCustos);c.box_Ano.value=String(new Date().getFullYear());bootstrapOauthFromUrl();carregarSessao();initMojibakeAutoFix();
 
-// Overrides - Ficha anamnese respostas + impressÃ£o
+// Overrides - Ficha anamnese respostas + impressÃƒÂ£o
 let fichaAnamneseCache=[];
 let fichaAnamneseSelId=null;
 let fichaAnamneseQuestionarioId=null;
@@ -10338,7 +11615,7 @@ function fichaAnamneseRender(){
   ficha.anamneseList.innerHTML=fichaAnamneseCache.map(item=>{
     const resp=String(item.resposta||"").trim();
     const cls=item.pergunta_id===fichaAnamneseSelId?"selected":"";
-    const badge=resp?"<span style=\"color:#0f766e;font-weight:700\">â€¢</span> ":"";
+    const badge=resp?"<span style=\"color:#0f766e;font-weight:700\">Ã¢â‚¬Â¢</span> ":"";
     return`<tr data-id="${item.pergunta_id}" class="${cls}"><td>${badge}${esc(item.texto||"")}</td></tr>`;
   }).join("");
   if(ficha.anamneseAlerta){
@@ -10414,7 +11691,7 @@ function fichaAnamneseImprimir(){
   </style></head><body>
     <h1>Ficha de anamnese</h1>
     <div class="meta">Paciente: ${esc(nome)}<br>Data: ${dataHoje}</div>
-    <table><thead><tr><th style="width:40px">NÂº</th><th>Pergunta</th><th>Resposta</th></tr></thead><tbody>${linhas}</tbody></table>
+    <table><thead><tr><th style="width:40px">NÃ‚Âº</th><th>Pergunta</th><th>Resposta</th></tr></thead><tbody>${linhas}</tbody></table>
   </body></html>`;
   const win=window.open("","anamnese-print");
   if(!win){window.alert("Nao foi possivel abrir a janela de impressao.");return}
@@ -10432,10 +11709,10 @@ fichaSetTab=function(tab){_fichaSetTabOrig(tab);if(tab==="anamnese")fichaAnamnes
 
 // Overrides - Simbolos graficos CRUD
 const SIMBOLOS_TIPO_MARCA_OPCOES=[
-  {value:1,label:"Face (ex: RestauraÃ§Ã£o)"},
+  {value:1,label:"Face (ex: RestauraÃƒÂ§ÃƒÂ£o)"},
   {value:2,label:"Dente (ex: Coroa)"},
-  {value:3,label:"Grupo (ex: PrÃ³tese-fixa)"},
-  {value:4,label:"Arcada (ex: PrÃ³tese-total)"},
+  {value:3,label:"Grupo (ex: PrÃƒÂ³tese-fixa)"},
+  {value:4,label:"Arcada (ex: PrÃƒÂ³tese-total)"},
   {value:5,label:"Geral (ex: Profilaxia)"},
   {value:6,label:"Segmento[ex: Bracket]"},
 ];
@@ -10583,7 +11860,7 @@ function simbolosDialogInfo(texto){
     simbolosCfg.msgBackdrop._resolver=()=>resolve();
   }).finally(()=>{
     if(simbolosCfg.msgSim){simbolosCfg.msgSim.classList.remove("hidden")}
-    if(simbolosCfg.msgNao){simbolosCfg.msgNao.textContent="NÃ£o"}
+    if(simbolosCfg.msgNao){simbolosCfg.msgNao.textContent="NÃƒÂ£o"}
   });
 }
 function simbolosItemModalAtual(){
@@ -10771,22 +12048,24 @@ simbolosSelecionarLinha=function(tr){if(!simbolosCfg||!(tr instanceof HTMLElemen
 simbolosCarregar=async function(){const[listaResp,bibliotecaResp]=await Promise.all([requestJson("GET","/cadastros/simbolos-graficos",undefined,true),requestJson("GET","/cadastros/simbolos-graficos?scope=biblioteca",undefined,true)]);if(!listaResp.res.ok){footerMsg.textContent=listaResp.data.detail||"Falha ao carregar simbolos.";return}simbolosCache=Array.isArray(listaResp.data)?listaResp.data:[];const bibliotecaBruta=bibliotecaResp.res.ok&&Array.isArray(bibliotecaResp.data)?bibliotecaResp.data:[...simbolosCache];simbolosBibliotecaCache=bibliotecaBruta.filter(x=>!simbolosEhSistema(x)&&!simbolosBibliotecaOculta(x)).sort(simbolosCompararBiblioteca);simbolosSelId=simbolosCache.some(x=>x.id===simbolosSelId)?simbolosSelId:(simbolosCache[0]?.id||null);simbolosRender();simbolosRenderBiblioteca();simbolosAtualizarAcoesPainel()};
 
 // Overrides - Anamnese CRUD
-function anamneseEnsureUI(){const existingPanel=document.getElementById("anamnese-panel");if(!existingPanel){const style=document.createElement("style");style.textContent=".anamnese-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.anamnese-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-toolbar .sep{width:1px;height:26px;background:#cfd8e3;margin:0 4px}.anamnese-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.anamnese-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.anamnese-grid th,.anamnese-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.anamnese-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.anamnese-grid tr.selected{background:#d9e8fb}.anamnese-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.anamnese-top label{white-space:nowrap}.anamnese-top select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.anamnese-subtoolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-total{margin-top:6px;color:#5b6b7e}.anamnese-modal .f{margin-bottom:6px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="anamnese-panel" class="anamnese-panel hidden"><div class="panel-title">Configura questionÃƒÂ¡rios de anamnese</div><div class="anamnese-top"><label for="anamnese-questionario">QuestionÃƒÂ¡rio:</label><select id="anamnese-questionario"></select><div class="anamnese-toolbar"><button id="anamnese-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="anamnese-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprime.png" alt="">Imprime...</button><button id="anamnese-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div class="anamnese-subtoolbar"><button id="anamnese-btn-nova-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova pergunta...</button><button id="anamnese-btn-alterar-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-renumerar" class="materiais-btn" type="button">1,2... Renumera perguntas</button></div><div class="anamnese-grid"><table><colgroup><col style="width:46px"><col></colgroup><thead><tr><th>NÃ‚Âº</th><th>Texto da pergunta</th></tr></thead><tbody id="anamnese-tbody"></tbody></table></div><div id="anamnese-total" class="anamnese-total">0 perguntas</div></section>`)}if(!document.getElementById("anamnese-modal-questionario-backdrop")){workspaceEmpty.insertAdjacentHTML("afterend",`<div id="anamnese-modal-questionario-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal anamnese-modal"><div class="modal-header"><div id="anamnese-modal-questionario-title" class="modal-title">QuestionÃƒÂ¡rio</div></div><div class="f"><label>Nome</label><input id="anamnese-modal-questionario-nome"></div><div class="cad-modal-actions"><button id="anamnese-modal-questionario-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="anamnese-modal-questionario-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><div id="anamnese-modal-pergunta-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal anamnese-modal"><div class="modal-header"><div id="anamnese-modal-pergunta-title" class="modal-title">Pergunta</div></div><div class="f"><label>NÃ‚Âº</label><input id="anamnese-modal-pergunta-numero" type="number" min="1" step="1"></div><div class="f"><label>Texto</label><input id="anamnese-modal-pergunta-texto"></div><div class="cad-modal-actions"><button id="anamnese-modal-pergunta-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="anamnese-modal-pergunta-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`)}anamneseCfg={panel:document.getElementById("anamnese-panel"),tbody:document.getElementById("anamnese-tbody"),total:document.getElementById("anamnese-total"),cboQuestionario:document.getElementById("anamnese-questionario"),btnNovo:document.getElementById("anamnese-btn-novo"),btnEditar:document.getElementById("anamnese-btn-editar"),btnExcluir:document.getElementById("anamnese-btn-excluir"),btnImprimir:document.getElementById("anamnese-btn-imprimir"),btnFechar:document.getElementById("anamnese-btn-fechar"),btnNovaPergunta:document.getElementById("anamnese-btn-nova-pergunta"),btnAlterarPergunta:document.getElementById("anamnese-btn-alterar-pergunta"),btnExcluirPergunta:document.getElementById("anamnese-btn-excluir-pergunta"),btnRenumera:document.getElementById("anamnese-btn-renumerar"),modalQBackdrop:document.getElementById("anamnese-modal-questionario-backdrop"),modalQTitle:document.getElementById("anamnese-modal-questionario-title"),modalQNome:document.getElementById("anamnese-modal-questionario-nome"),modalQOk:document.getElementById("anamnese-modal-questionario-ok"),modalQCancelar:document.getElementById("anamnese-modal-questionario-cancelar"),modalPBackdrop:document.getElementById("anamnese-modal-pergunta-backdrop"),modalPTitle:document.getElementById("anamnese-modal-pergunta-title"),modalPNumero:document.getElementById("anamnese-modal-pergunta-numero"),modalPTexto:document.getElementById("anamnese-modal-pergunta-texto"),modalPOk:document.getElementById("anamnese-modal-pergunta-ok"),modalPCancelar:document.getElementById("anamnese-modal-pergunta-cancelar")};if(anamneseCfg.modalQBackdrop)ensureModalChrome(anamneseCfg.modalQBackdrop.querySelector(".cad-modal"));if(anamneseCfg.modalPBackdrop)ensureModalChrome(anamneseCfg.modalPBackdrop.querySelector(".cad-modal"))}
+function anamneseEnsureUI(){const existingPanel=document.getElementById("anamnese-panel");if(!existingPanel){const style=document.createElement("style");style.textContent=".anamnese-panel{width:min(760px,100%);min-height:0;height:fit-content;align-self:start;padding:10px 10px 8px;background:#fff;border:1px solid #cfd8e3;box-sizing:border-box;font:12px Tahoma,sans-serif}.anamnese-toolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-toolbar .sep{width:1px;height:26px;background:#cfd8e3;margin:0 4px}.anamnese-grid{border:1px solid #cfd8e3;height:420px;overflow:auto;background:#fff}.anamnese-grid table{width:100%;border-collapse:collapse;table-layout:fixed}.anamnese-grid th,.anamnese-grid td{border-bottom:1px solid #edf1f6;padding:3px 6px;height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.anamnese-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}.anamnese-grid tr.selected{background:#d9e8fb}.anamnese-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.anamnese-top label{white-space:nowrap}.anamnese-top select{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box}.anamnese-subtoolbar{display:flex;gap:8px;align-items:center;margin:6px 0 6px;flex-wrap:wrap}.anamnese-total{margin-top:6px;color:#5b6b7e}.anamnese-modal .f{margin-bottom:6px}";document.head.appendChild(style);workspaceEmpty.insertAdjacentHTML("afterend",`<section id="anamnese-panel" class="anamnese-panel hidden"><div class="panel-title">Configura questionÃƒÆ’Ã‚Â¡rios de anamnese</div><div class="anamnese-top"><label for="anamnese-questionario">QuestionÃƒÆ’Ã‚Â¡rio:</label><select id="anamnese-questionario"></select><div class="anamnese-toolbar"><button id="anamnese-btn-novo" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Novo...</button><button id="anamnese-btn-editar" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-imprimir" class="materiais-btn" type="button"><img src="/desktop-assets/imprime.png" alt="">Imprime...</button><button id="anamnese-btn-fechar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Fecha</button></div></div><div class="anamnese-subtoolbar"><button id="anamnese-btn-nova-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/novo.png" alt="">Nova pergunta...</button><button id="anamnese-btn-alterar-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/editar.png" alt="">Altera...</button><button id="anamnese-btn-excluir-pergunta" class="materiais-btn" type="button"><img src="/desktop-assets/eliminar.png" alt="">Elimina</button><span class="sep"></span><button id="anamnese-btn-renumerar" class="materiais-btn" type="button">1,2... Renumera perguntas</button></div><div class="anamnese-grid"><table><colgroup><col style="width:46px"><col></colgroup><thead><tr><th>NÃƒâ€šÃ‚Âº</th><th>Texto da pergunta</th></tr></thead><tbody id="anamnese-tbody"></tbody></table></div><div id="anamnese-total" class="anamnese-total">0 perguntas</div></section>`)}if(!document.getElementById("anamnese-modal-questionario-backdrop")){workspaceEmpty.insertAdjacentHTML("afterend",`<div id="anamnese-modal-questionario-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal anamnese-modal"><div class="modal-header"><div id="anamnese-modal-questionario-title" class="modal-title">QuestionÃƒÆ’Ã‚Â¡rio</div></div><div class="f"><label>Nome</label><input id="anamnese-modal-questionario-nome"></div><div class="cad-modal-actions"><button id="anamnese-modal-questionario-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="anamnese-modal-questionario-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div><div id="anamnese-modal-pergunta-backdrop" class="cad-modal-backdrop hidden"><div class="cad-modal anamnese-modal"><div class="modal-header"><div id="anamnese-modal-pergunta-title" class="modal-title">Pergunta</div></div><div class="f"><label>NÃƒâ€šÃ‚Âº</label><input id="anamnese-modal-pergunta-numero" type="number" min="1" step="1"></div><div class="f"><label>Texto</label><input id="anamnese-modal-pergunta-texto"></div><div class="cad-modal-actions"><button id="anamnese-modal-pergunta-ok" class="materiais-btn" type="button"><img src="/desktop-assets/gravar.png" alt="">Ok</button><button id="anamnese-modal-pergunta-cancelar" class="materiais-btn" type="button"><img src="/desktop-assets/cancela.png" alt="">Cancela</button></div></div></div>`)}anamneseCfg={panel:document.getElementById("anamnese-panel"),tbody:document.getElementById("anamnese-tbody"),total:document.getElementById("anamnese-total"),cboQuestionario:document.getElementById("anamnese-questionario"),btnNovo:document.getElementById("anamnese-btn-novo"),btnEditar:document.getElementById("anamnese-btn-editar"),btnExcluir:document.getElementById("anamnese-btn-excluir"),btnImprimir:document.getElementById("anamnese-btn-imprimir"),btnFechar:document.getElementById("anamnese-btn-fechar"),btnNovaPergunta:document.getElementById("anamnese-btn-nova-pergunta"),btnAlterarPergunta:document.getElementById("anamnese-btn-alterar-pergunta"),btnExcluirPergunta:document.getElementById("anamnese-btn-excluir-pergunta"),btnRenumera:document.getElementById("anamnese-btn-renumerar"),modalQBackdrop:document.getElementById("anamnese-modal-questionario-backdrop"),modalQTitle:document.getElementById("anamnese-modal-questionario-title"),modalQNome:document.getElementById("anamnese-modal-questionario-nome"),modalQOk:document.getElementById("anamnese-modal-questionario-ok"),modalQCancelar:document.getElementById("anamnese-modal-questionario-cancelar"),modalPBackdrop:document.getElementById("anamnese-modal-pergunta-backdrop"),modalPTitle:document.getElementById("anamnese-modal-pergunta-title"),modalPNumero:document.getElementById("anamnese-modal-pergunta-numero"),modalPTexto:document.getElementById("anamnese-modal-pergunta-texto"),modalPOk:document.getElementById("anamnese-modal-pergunta-ok"),modalPCancelar:document.getElementById("anamnese-modal-pergunta-cancelar")};if(anamneseCfg.modalQBackdrop)ensureModalChrome(anamneseCfg.modalQBackdrop.querySelector(".cad-modal"));if(anamneseCfg.modalPBackdrop)ensureModalChrome(anamneseCfg.modalPBackdrop.querySelector(".cad-modal"))}
 function anamneseRender(){if(!anamneseCfg)return;anamneseCfg.tbody.innerHTML=anamneseCache.map(x=>`<tr data-id="${x.id}" class="${x.id===anamneseSelId?"selected":""}"><td>${x.numero}</td><td>${esc(x.texto)}</td></tr>`).join("");anamneseCfg.total.textContent=`${anamneseCache.length} perguntas`}
 function anamneseSelecionado(){return anamneseCache.find(x=>x.id===anamneseSelId)||null}
 function anamneseQuestionarioSelecionado(){return anamneseQuestionariosCache.find(x=>x.id===anamneseQuestionarioSelId)||null}
-function anamneseRenderQuestionarios(){if(!anamneseCfg)return;anamneseCfg.cboQuestionario.innerHTML=anamneseQuestionariosCache.map(q=>`<option value="${q.id}">${esc(q.nome||"")}</option>`).join("");if(!anamneseQuestionariosCache.length){anamneseCfg.cboQuestionario.innerHTML="<option value=\"\">Sem questionÃƒÂ¡rio</option>";anamneseQuestionarioSelId=null;return}const existe=anamneseQuestionariosCache.some(x=>x.id===anamneseQuestionarioSelId);if(!existe)anamneseQuestionarioSelId=anamneseQuestionariosCache[0].id;anamneseCfg.cboQuestionario.value=String(anamneseQuestionarioSelId)}
-async function anamneseCarregarQuestionarios(){const{res,data}=await requestJson("GET","/anamnese/questionarios",undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar questionÃƒÂ¡rios.");return}anamneseQuestionariosCache=Array.isArray(data)?data:[];anamneseRenderQuestionarios()}
+function anamneseRenderQuestionarios(){if(!anamneseCfg)return;anamneseCfg.cboQuestionario.innerHTML=anamneseQuestionariosCache.map(q=>`<option value="${q.id}">${esc(q.nome||"")}</option>`).join("");if(!anamneseQuestionariosCache.length){anamneseCfg.cboQuestionario.innerHTML="<option value=\"\">Sem questionÃƒÆ’Ã‚Â¡rio</option>";anamneseQuestionarioSelId=null;return}const existe=anamneseQuestionariosCache.some(x=>x.id===anamneseQuestionarioSelId);if(!existe)anamneseQuestionarioSelId=anamneseQuestionariosCache[0].id;anamneseCfg.cboQuestionario.value=String(anamneseQuestionarioSelId)}
+async function anamneseCarregarQuestionarios(){const{res,data}=await requestJson("GET","/anamnese/questionarios",undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar questionÃƒÆ’Ã‚Â¡rios.");return}anamneseQuestionariosCache=Array.isArray(data)?data:[];anamneseRenderQuestionarios()}
 async function anamneseCarregarPerguntas(){if(!anamneseQuestionarioSelId){anamneseCache=[];anamneseSelId=null;anamneseRender();return}const{res,data}=await requestJson("GET",`/anamnese/questionarios/${anamneseQuestionarioSelId}/perguntas`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao carregar perguntas.");return}anamneseCache=Array.isArray(data)?data:[];anamneseSelId=anamneseCache[0]?.id||null;anamneseRender()}
-function anamneseAbrirModalQuestionario(modo){if(!anamneseCfg)return;const editar=modo==="editar";const item=editar?anamneseQuestionarioSelecionado():null;anamneseCfg.modalQBackdrop.dataset.editId=editar&&item?String(item.id):"";anamneseCfg.modalQTitle.textContent=editar?"Alterar questionÃƒÂ¡rio":"Novo questionÃƒÂ¡rio";anamneseCfg.modalQNome.value=item?.nome||"";anamneseCfg.modalQBackdrop.classList.remove("hidden")}
+function anamneseAbrirModalQuestionario(modo){if(!anamneseCfg)return;const editar=modo==="editar";const item=editar?anamneseQuestionarioSelecionado():null;anamneseCfg.modalQBackdrop.dataset.editId=editar&&item?String(item.id):"";anamneseCfg.modalQTitle.textContent=editar?"Alterar questionÃƒÆ’Ã‚Â¡rio":"Novo questionÃƒÆ’Ã‚Â¡rio";anamneseCfg.modalQNome.value=item?.nome||"";anamneseCfg.modalQBackdrop.classList.remove("hidden")}
 function anamneseFecharModalQuestionario(){if(!anamneseCfg)return;anamneseCfg.modalQBackdrop.classList.add("hidden")}
-async function anamneseSalvarQuestionario(){const nome=(anamneseCfg.modalQNome.value||"").trim();if(!nome){window.alert("Informe o nome do questionÃƒÂ¡rio.");return}const editId=Number(anamneseCfg.modalQBackdrop.dataset.editId||0)||null;const payload={nome,ativo:true};const method=editId?"PUT":"POST";const path=editId?`/anamnese/questionarios/${editId}`:"/anamnese/questionarios";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar questionÃƒÂ¡rio.");return}await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas();anamneseFecharModalQuestionario()}
-async function anamneseExcluirQuestionario(){const item=anamneseQuestionarioSelecionado();if(!item){window.alert("Selecione um questionÃƒÂ¡rio.");return}if(!window.confirm(`Deseja eliminar o questionÃƒÂ¡rio \"${item.nome}\"?`))return;const{res,data}=await requestJson("DELETE",`/anamnese/questionarios/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar questionÃƒÂ¡rio.");return}anamneseQuestionarioSelId=null;await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas()}
+async function anamneseSalvarQuestionario(){const nome=(anamneseCfg.modalQNome.value||"").trim();if(!nome){window.alert("Informe o nome do questionÃƒÆ’Ã‚Â¡rio.");return}const editId=Number(anamneseCfg.modalQBackdrop.dataset.editId||0)||null;const payload={nome,ativo:true};const method=editId?"PUT":"POST";const path=editId?`/anamnese/questionarios/${editId}`:"/anamnese/questionarios";const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar questionÃƒÆ’Ã‚Â¡rio.");return}await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas();anamneseFecharModalQuestionario()}
+async function anamneseExcluirQuestionario(){const item=anamneseQuestionarioSelecionado();if(!item){window.alert("Selecione um questionÃƒÆ’Ã‚Â¡rio.");return}if(!window.confirm(`Deseja eliminar o questionÃƒÆ’Ã‚Â¡rio \"${item.nome}\"?`))return;const{res,data}=await requestJson("DELETE",`/anamnese/questionarios/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar questionÃƒÆ’Ã‚Â¡rio.");return}anamneseQuestionarioSelId=null;await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas()}
 function anamneseAbrirModalPergunta(modo){if(!anamneseCfg)return;const editar=modo==="editar";const item=editar?anamneseSelecionado():null;anamneseCfg.modalPBackdrop.dataset.editId=editar&&item?String(item.id):"";anamneseCfg.modalPTitle.textContent=editar?"Alterar pergunta":"Nova pergunta";anamneseCfg.modalPNumero.value=item?.numero||"";anamneseCfg.modalPTexto.value=item?.texto||"";anamneseCfg.modalPBackdrop.classList.remove("hidden")}
 function anamneseFecharModalPergunta(){if(!anamneseCfg)return;anamneseCfg.modalPBackdrop.classList.add("hidden")}
-async function anamneseSalvarPergunta(){if(!anamneseQuestionarioSelId){window.alert("Selecione um questionÃƒÂ¡rio.");return}const numeroTxt=(anamneseCfg.modalPNumero.value||"").trim();const numero=numeroTxt?Number(numeroTxt):null;const texto=(anamneseCfg.modalPTexto.value||"").trim();if(!texto){window.alert("Informe o texto da pergunta.");return}const editId=Number(anamneseCfg.modalPBackdrop.dataset.editId||0)||null;const payload={numero,texto,ativo:true};const method=editId?"PUT":"POST";const path=editId?`/anamnese/perguntas/${editId}`:`/anamnese/questionarios/${anamneseQuestionarioSelId}/perguntas`;const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar pergunta.");return}await anamneseCarregarPerguntas();anamneseFecharModalPergunta()}
+async function anamneseSalvarPergunta(){if(!anamneseQuestionarioSelId){window.alert("Selecione um questionÃƒÆ’Ã‚Â¡rio.");return}const numeroTxt=(anamneseCfg.modalPNumero.value||"").trim();const numero=numeroTxt?Number(numeroTxt):null;const texto=(anamneseCfg.modalPTexto.value||"").trim();if(!texto){window.alert("Informe o texto da pergunta.");return}const editId=Number(anamneseCfg.modalPBackdrop.dataset.editId||0)||null;const payload={numero,texto,ativo:true};const method=editId?"PUT":"POST";const path=editId?`/anamnese/perguntas/${editId}`:`/anamnese/questionarios/${anamneseQuestionarioSelId}/perguntas`;const{res,data}=await requestJson(method,path,payload,true);if(!res.ok){window.alert(data.detail||"Falha ao salvar pergunta.");return}await anamneseCarregarPerguntas();anamneseFecharModalPergunta()}
 async function anamneseExcluirPergunta(){const item=anamneseSelecionado();if(!item){window.alert("Selecione uma pergunta.");return}if(!window.confirm(`Eliminar a pergunta ${item.numero}?`))return;const{res,data}=await requestJson("DELETE",`/anamnese/perguntas/${item.id}`,undefined,true);if(!res.ok){window.alert(data.detail||"Falha ao eliminar pergunta.");return}await anamneseCarregarPerguntas()}
-async function anamneseRenumeraPerguntas(){if(!anamneseQuestionarioSelId){window.alert("Selecione um questionÃƒÂ¡rio.");return}const{res,data}=await requestJson("POST",`/anamnese/questionarios/${anamneseQuestionarioSelId}/renumerar`,{},true);if(!res.ok){window.alert(data.detail||"Falha ao renumerar perguntas.");return}await anamneseCarregarPerguntas()}
-function anamneseVincularEventos(){if(!anamneseCfg||anamneseCfg.panel.dataset.bound==="1")return;anamneseCfg.panel.dataset.bound="1";anamneseCfg.tbody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-id]");if(!tr)return;anamneseSelId=Number(tr.dataset.id||0)||null;anamneseRender()});anamneseCfg.cboQuestionario.addEventListener("change",async ev=>{anamneseQuestionarioSelId=Number(ev.target.value||0)||null;await anamneseCarregarPerguntas()});anamneseCfg.btnNovo.addEventListener("click",()=>anamneseAbrirModalQuestionario("novo"));anamneseCfg.btnEditar.addEventListener("click",()=>{if(!anamneseQuestionarioSelecionado()){window.alert("Selecione um questionÃƒÂ¡rio.");return}anamneseAbrirModalQuestionario("editar")});anamneseCfg.btnExcluir.addEventListener("click",anamneseExcluirQuestionario);anamneseCfg.btnImprimir.addEventListener("click",()=>window.alert("Imprimir questionÃƒÂ¡rio: em planejamento."));anamneseCfg.btnFechar.addEventListener("click",()=>{anamneseCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});anamneseCfg.btnNovaPergunta.addEventListener("click",()=>anamneseAbrirModalPergunta("novo"));anamneseCfg.btnAlterarPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}anamneseAbrirModalPergunta("editar")});anamneseCfg.btnExcluirPergunta.addEventListener("click",anamneseExcluirPergunta);anamneseCfg.btnRenumera.addEventListener("click",anamneseRenumeraPerguntas);anamneseCfg.modalQCancelar.addEventListener("click",anamneseFecharModalQuestionario);anamneseCfg.modalQOk.addEventListener("click",anamneseSalvarQuestionario);anamneseCfg.modalQBackdrop.addEventListener("click",ev=>{if(ev.target===anamneseCfg.modalQBackdrop)anamneseFecharModalQuestionario()});anamneseCfg.modalPCancelar.addEventListener("click",anamneseFecharModalPergunta);anamneseCfg.modalPOk.addEventListener("click",anamneseSalvarPergunta);anamneseCfg.modalPBackdrop.addEventListener("click",ev=>{if(ev.target===anamneseCfg.modalPBackdrop)anamneseFecharModalPergunta()})}
-async function anamneseAbrir(){anamneseEnsureUI();anamneseVincularEventos();hideAllPanels();ensurePanelChrome(anamneseCfg.panel);anamneseCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas();footerMsg.textContent="ConfiguraÃƒÂ§ÃƒÂ£o de anamnese aberta."}
+async function anamneseRenumeraPerguntas(){if(!anamneseQuestionarioSelId){window.alert("Selecione um questionÃƒÆ’Ã‚Â¡rio.");return}const{res,data}=await requestJson("POST",`/anamnese/questionarios/${anamneseQuestionarioSelId}/renumerar`,{},true);if(!res.ok){window.alert(data.detail||"Falha ao renumerar perguntas.");return}await anamneseCarregarPerguntas()}
+function anamneseVincularEventos(){if(!anamneseCfg||anamneseCfg.panel.dataset.bound==="1")return;anamneseCfg.panel.dataset.bound="1";anamneseCfg.tbody.addEventListener("click",ev=>{const tr=ev.target.closest("tr[data-id]");if(!tr)return;anamneseSelId=Number(tr.dataset.id||0)||null;anamneseRender()});anamneseCfg.cboQuestionario.addEventListener("change",async ev=>{anamneseQuestionarioSelId=Number(ev.target.value||0)||null;await anamneseCarregarPerguntas()});anamneseCfg.btnNovo.addEventListener("click",()=>anamneseAbrirModalQuestionario("novo"));anamneseCfg.btnEditar.addEventListener("click",()=>{if(!anamneseQuestionarioSelecionado()){window.alert("Selecione um questionÃƒÆ’Ã‚Â¡rio.");return}anamneseAbrirModalQuestionario("editar")});anamneseCfg.btnExcluir.addEventListener("click",anamneseExcluirQuestionario);anamneseCfg.btnImprimir.addEventListener("click",()=>window.alert("Imprimir questionÃƒÆ’Ã‚Â¡rio: em planejamento."));anamneseCfg.btnFechar.addEventListener("click",()=>{anamneseCfg.panel.classList.add("hidden");workspaceEmpty.classList.remove("hidden")});anamneseCfg.btnNovaPergunta.addEventListener("click",()=>anamneseAbrirModalPergunta("novo"));anamneseCfg.btnAlterarPergunta.addEventListener("click",()=>{if(!anamneseSelecionado()){window.alert("Selecione uma pergunta.");return}anamneseAbrirModalPergunta("editar")});anamneseCfg.btnExcluirPergunta.addEventListener("click",anamneseExcluirPergunta);anamneseCfg.btnRenumera.addEventListener("click",anamneseRenumeraPerguntas);anamneseCfg.modalQCancelar.addEventListener("click",anamneseFecharModalQuestionario);anamneseCfg.modalQOk.addEventListener("click",anamneseSalvarQuestionario);anamneseCfg.modalQBackdrop.addEventListener("click",ev=>{if(ev.target===anamneseCfg.modalQBackdrop)anamneseFecharModalQuestionario()});anamneseCfg.modalPCancelar.addEventListener("click",anamneseFecharModalPergunta);anamneseCfg.modalPOk.addEventListener("click",anamneseSalvarPergunta);anamneseCfg.modalPBackdrop.addEventListener("click",ev=>{if(ev.target===anamneseCfg.modalPBackdrop)anamneseFecharModalPergunta()})}
+async function anamneseAbrir(){anamneseEnsureUI();anamneseVincularEventos();hideAllPanels();ensurePanelChrome(anamneseCfg.panel);anamneseCfg.panel.classList.remove("hidden");workspaceEmpty.classList.add("hidden");await anamneseCarregarQuestionarios();await anamneseCarregarPerguntas();footerMsg.textContent="ConfiguraÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Â£o de anamnese aberta."}
+
+
 

@@ -1,3 +1,4 @@
+﻿import json
 import re
 import unicodedata
 from datetime import date, datetime
@@ -20,6 +21,7 @@ from models.procedimento_generico import (
     ProcedimentoGenericoMaterial,
 )
 from models.procedimento_tabela import ProcedimentoTabela
+from models.prestador_odonto import PrestadorOdonto
 from models.simbolo_grafico import SimboloGrafico
 from models.usuario import Usuario
 from security.dependencies import get_current_user, require_module_access
@@ -84,6 +86,20 @@ TIPOS_PRESTADOR_PADRAO = [
 AUX_TIPO_STORAGE_ALIASES = {
     "Índices de moeda": ["Índices de moeda", "Indices de moeda"],
     "CBO-S": ["CBO-S", "CBOS", "Cbos"],
+    "Situação do paciente": ["Situação do paciente", "SituaÃ§Ã£o do paciente"],
+    "Situação do agendamento": ["Situação do agendamento", "SituaÃ§Ã£o do agendamento"],
+    "Tipos de cobrança": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
+    "Tipos de apresentação": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
+    "Tipos de indicação": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
+    "Tipos de usuário": ["Tipos de usuário", "Tipos de usuÃ¡rio"],
+    "Símbolo gráfico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
+    "SituaÃ§Ã£o do paciente": ["Situação do paciente", "SituaÃ§Ã£o do paciente"],
+    "SituaÃ§Ã£o do agendamento": ["Situação do agendamento", "SituaÃ§Ã£o do agendamento"],
+    "Tipos de cobranÃ§a": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
+    "Tipos de apresentaÃ§Ã£o": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
+    "Tipos de indicaÃ§Ã£o": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
+    "Tipos de usuÃ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio"],
+    "SÃ­mbolo grÃ¡fico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
 }
 
 SIMBOLO_TIPO_MARCA_LABELS = {
@@ -207,6 +223,14 @@ class PacientePayload(BaseModel):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
+class PacienteMenuPreferencesPayload(BaseModel):
+    cir_menu_pac: int = 0
+    status_menu_pac: int = 0
+    visualizacao_menu_pac: int = 1
+    pesquisa_menu_pac: int = 1
+    active_ord_menu_pac: int = 0
+
+
 def _norm(texto: str) -> str:
     base = (texto or "").strip().lower()
     base = unicodedata.normalize("NFD", base)
@@ -264,7 +288,7 @@ def _material_clinica_or_404(db: Session, clinica_id: int, material_id: int) -> 
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Material não encontrado para esta clínica.")
+        raise HTTPException(status_code=404, detail="Material nÃ£o encontrado para esta clÃ­nica.")
     return item
 
 
@@ -502,7 +526,7 @@ def _grupo_or_404(db: Session, clinica_id: int, grupo_id: int) -> GrupoFinanceir
         .first()
     )
     if not grupo:
-        raise HTTPException(status_code=404, detail="Grupo não encontrado.")
+        raise HTTPException(status_code=404, detail="Grupo nÃ£o encontrado.")
     return grupo
 
 
@@ -516,7 +540,7 @@ def _categoria_or_404(db: Session, clinica_id: int, categoria_id: int) -> Catego
         .first()
     )
     if not cat:
-        raise HTTPException(status_code=404, detail="Categoria não encontrada.")
+        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada.")
     return cat
 
 
@@ -856,8 +880,195 @@ def _paciente_or_404(db: Session, clinica_id: int, paciente_id: int) -> Paciente
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+        raise HTTPException(status_code=404, detail="Paciente nÃ£o encontrado.")
     return item
+
+
+PACIENTE_MENU_PREFS_DEFAULT = {
+    "cir_menu_pac": 0,
+    "status_menu_pac": 0,
+    "visualizacao_menu_pac": 1,
+    "pesquisa_menu_pac": 1,
+    "active_ord_menu_pac": 0,
+}
+
+PACIENTE_MENU_STATUS_OPTIONS = [
+    {"id": 0, "label": "<<Todos>>"},
+    {"id": 2, "label": "Ativo"},
+    {"id": 3, "label": "Em tratamento"},
+    {"id": 4, "label": "Faleceu"},
+    {"id": 1, "label": "Inativo"},
+    {"id": 98, "label": "<<Todos os ativos>>"},
+    {"id": 99, "label": "<<Todos os inativos>>"},
+]
+
+PACIENTE_MENU_VISUALIZACAO_OPTIONS = [
+    {"id": 1, "label": "Nome, número"},
+    {"id": 2, "label": "Sobrenome, nome, número"},
+    {"id": 3, "label": "Nome, matrícula"},
+    {"id": 4, "label": "Nome, telefone"},
+    {"id": 5, "label": "Nome, prontuário"},
+    {"id": 6, "label": "Nome, data de nascimento"},
+]
+
+PACIENTE_MENU_STATUS_AUX_BASE = 200000
+
+PACIENTE_MENU_STATUS_OPTIONS = [
+    {"id": 0, "label": "<<Todos>>"},
+    {"id": 2, "label": "Ativo"},
+    {"id": 3, "label": "Em tratamento"},
+    {"id": 4, "label": "Faleceu"},
+    {"id": 1, "label": "Inativo"},
+    {"id": 98, "label": "<<Todos os ativos>>"},
+    {"id": 99, "label": "<<Todos os inativos>>"},
+]
+
+PACIENTE_MENU_VISUALIZACAO_OPTIONS = [
+    {"id": 1, "label": "Nome, número"},
+    {"id": 2, "label": "Sobrenome, nome, número"},
+    {"id": 3, "label": "Nome, matrícula"},
+    {"id": 4, "label": "Nome, telefone"},
+    {"id": 5, "label": "Nome, prontuário"},
+    {"id": 6, "label": "Nome, data de nascimento"},
+]
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return int(default)
+
+
+def _load_usuario_menu_prefs(usuario: Usuario) -> dict[str, int]:
+    raw = (usuario.preferencias_usuario_json or "").strip()
+    if not raw:
+        return dict(PACIENTE_MENU_PREFS_DEFAULT)
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return dict(PACIENTE_MENU_PREFS_DEFAULT)
+    base = parsed if isinstance(parsed, dict) else {}
+    menu = base.get("menu_pacientes") if isinstance(base.get("menu_pacientes"), dict) else {}
+    out = dict(PACIENTE_MENU_PREFS_DEFAULT)
+    out.update(
+        {
+            "cir_menu_pac": max(0, _safe_int(menu.get("cir_menu_pac"), 0)),
+            "status_menu_pac": max(0, _safe_int(menu.get("status_menu_pac"), 0)),
+            "visualizacao_menu_pac": _safe_int(menu.get("visualizacao_menu_pac"), 1) or 1,
+            "pesquisa_menu_pac": _safe_int(menu.get("pesquisa_menu_pac"), 1) or 1,
+            "active_ord_menu_pac": max(0, _safe_int(menu.get("active_ord_menu_pac"), 0)),
+        }
+    )
+    if out["visualizacao_menu_pac"] not in {1, 2, 3, 4, 5, 6}:
+        out["visualizacao_menu_pac"] = 1
+    if out["pesquisa_menu_pac"] not in {1, 2}:
+        out["pesquisa_menu_pac"] = 1
+    return out
+
+
+def _save_usuario_menu_prefs(usuario: Usuario, values: dict[str, Any]) -> dict[str, int]:
+    raw = (usuario.preferencias_usuario_json or "").strip()
+    try:
+        parsed = json.loads(raw) if raw else {}
+    except Exception:
+        parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    atual = _load_usuario_menu_prefs(usuario)
+    merged = dict(atual)
+    merged.update(
+        {
+            "cir_menu_pac": max(0, _safe_int(values.get("cir_menu_pac"), atual["cir_menu_pac"])),
+            "status_menu_pac": max(0, _safe_int(values.get("status_menu_pac"), atual["status_menu_pac"])),
+            "visualizacao_menu_pac": _safe_int(values.get("visualizacao_menu_pac"), atual["visualizacao_menu_pac"]) or 1,
+            "pesquisa_menu_pac": _safe_int(values.get("pesquisa_menu_pac"), atual["pesquisa_menu_pac"]) or 1,
+            "active_ord_menu_pac": max(0, _safe_int(values.get("active_ord_menu_pac"), atual["active_ord_menu_pac"])),
+        }
+    )
+    if merged["visualizacao_menu_pac"] not in {1, 2, 3, 4, 5, 6}:
+        merged["visualizacao_menu_pac"] = 1
+    if merged["pesquisa_menu_pac"] not in {1, 2}:
+        merged["pesquisa_menu_pac"] = 1
+    parsed["menu_pacientes"] = merged
+    usuario.preferencias_usuario_json = json.dumps(parsed, ensure_ascii=False, separators=(",", ":"))
+    return merged
+
+
+def _paciente_menu_source_int(p: Paciente, key: str, fallback: int = 0) -> int:
+    src = p.source_payload if isinstance(p.source_payload, dict) else {}
+    val = src.get(key)
+    if val is None:
+        return fallback
+    return _safe_int(val, fallback)
+
+
+def _paciente_menu_status_code(p: Paciente) -> int:
+    src = _paciente_menu_source_int(p, "STATUS", -1)
+    if src in {1, 2, 3, 4}:
+        return src
+    txt = _norm(str(p.status or ""))
+    if txt == "ativo":
+        return 2
+    if txt == "em tratamento":
+        return 3
+    if txt == "faleceu":
+        return 4
+    if txt == "inativo":
+        return 1
+    return 1 if bool(p.inativo) else 2
+
+
+def _paciente_menu_status_texto_norm(p: Paciente) -> str:
+    txt = _norm(str(p.status or ""))
+    if txt:
+        return txt
+    code = _paciente_menu_status_code(p)
+    if code == 2:
+        return "ativo"
+    if code == 3:
+        return "em tratamento"
+    if code == 4:
+        return "faleceu"
+    return "inativo"
+
+
+def _paciente_menu_status_aux_id(item_id: int) -> int:
+    return PACIENTE_MENU_STATUS_AUX_BASE + max(0, int(item_id or 0))
+
+
+def _paciente_menu_status_aux_selected(status_id: int) -> bool:
+    return int(status_id or 0) >= PACIENTE_MENU_STATUS_AUX_BASE
+
+
+def _paciente_menu_status_auxiliares(db: Session, clinica_id: int) -> list[dict[str, Any]]:
+    rows = (
+        db.query(ItemAuxiliar)
+        .filter(
+            ItemAuxiliar.clinica_id == int(clinica_id),
+            ItemAuxiliar.tipo.in_(_aux_tipo_variantes("Situação do paciente")),
+            or_(ItemAuxiliar.inativo.is_(False), ItemAuxiliar.inativo.is_(None)),
+        )
+        .order_by(ItemAuxiliar.codigo.asc(), func.lower(ItemAuxiliar.descricao).asc(), ItemAuxiliar.id.asc())
+        .all()
+    )
+    usados: set[str] = set()
+    itens: list[dict[str, Any]] = []
+    for row in rows:
+        descricao = str(row.descricao or "").strip()
+        if not descricao:
+            continue
+        chave = _norm(descricao)
+        if not chave or chave in usados:
+            continue
+        usados.add(chave)
+        itens.append(
+            {
+                "id": int(row.id or 0),
+                "label": descricao,
+            }
+        )
+    return itens
 
 
 def _paciente_to_dict(p: Paciente) -> dict[str, Any]:
@@ -1013,7 +1224,7 @@ def criar_grupo(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe um grupo com este nome.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe um grupo com este nome.")
     g = GrupoFinanceiro(clinica_id=current_user.clinica_id, nome=nome, tipo=tipo)
     db.add(g)
     db.commit()
@@ -1043,7 +1254,7 @@ def editar_grupo(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe um grupo com este nome.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe um grupo com este nome.")
     grupo.nome = nome
     grupo.tipo = tipo
     db.commit()
@@ -1069,7 +1280,7 @@ def excluir_grupo(
         raise HTTPException(status_code=400, detail="Este grupo possui categorias vinculadas.")
     db.delete(grupo)
     db.commit()
-    return {"detail": "Grupo excluído."}
+    return {"detail": "Grupo excluÃ­do."}
 
 
 @router.post("/categorias", dependencies=[DEP_FINANCEIRO])
@@ -1093,7 +1304,7 @@ def criar_categoria(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Categoria já existe neste grupo.")
+        raise HTTPException(status_code=400, detail="Categoria jÃ¡ existe neste grupo.")
     c = CategoriaFinanceira(
         clinica_id=current_user.clinica_id,
         nome=nome,
@@ -1137,7 +1348,7 @@ def editar_categoria(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe outra categoria com este nome.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe outra categoria com este nome.")
     cat.nome = nome
     cat.tipo = tipo
     cat.grupo_id = int(payload.grupo_id)
@@ -1182,10 +1393,10 @@ def excluir_categoria(
         is not None
     )
     if em_uso:
-        raise HTTPException(status_code=409, detail="Categoria em uso por lançamentos.")
+        raise HTTPException(status_code=409, detail="Categoria em uso por lanÃ§amentos.")
     db.delete(cat)
     db.commit()
-    return {"detail": "Categoria excluída."}
+    return {"detail": "Categoria excluÃ­da."}
 
 
 @router.post("/categorias/{categoria_id}/migrar-e-excluir", dependencies=[DEP_FINANCEIRO])
@@ -1210,7 +1421,7 @@ def migrar_e_excluir_categoria(
     )
     db.delete(origem)
     db.commit()
-    return {"detail": "Categoria migrada e excluída."}
+    return {"detail": "Categoria migrada e excluÃ­da."}
 
 
 @router.get("/auxiliares/tipos", dependencies=[DEP_CONFIGURACAO])
@@ -1386,6 +1597,207 @@ def excluir_auxiliar(
     return {"detail": "Item excluído."}
 
 
+@router.get("/pacientes/menu-preferences", dependencies=[DEP_PROCEDIMENTOS])
+def obter_paciente_menu_preferences(
+    current_user: Usuario = Depends(get_current_user),
+):
+    values = _load_usuario_menu_prefs(current_user)
+    return {
+        "values": values,
+        "options": {
+            "visualizacao_menu_pac": list(PACIENTE_MENU_VISUALIZACAO_OPTIONS),
+            "pesquisa_menu_pac": [
+                {"id": 1, "label": "Nome"},
+                {"id": 2, "label": "Número"},
+            ],
+            "active_ord_menu_pac": [
+                {"id": 0, "label": "*"},
+                *[{"id": i, "label": chr(64 + i)} for i in range(1, 27)],
+            ],
+        },
+        "nao_confirmado": {},
+    }
+
+
+@router.patch("/pacientes/menu-preferences", dependencies=[DEP_PROCEDIMENTOS])
+def atualizar_paciente_menu_preferences(
+    payload: PacienteMenuPreferencesPayload,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    values = _save_usuario_menu_prefs(current_user, payload.model_dump())
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return {"detail": "Preferencias do menu de pacientes atualizadas.", "values": values}
+
+
+@router.get("/pacientes/menu-options", dependencies=[DEP_PROCEDIMENTOS])
+def listar_pacientes_menu_options(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    prestadores = (
+        db.query(PrestadorOdonto)
+        .filter(PrestadorOdonto.clinica_id == current_user.clinica_id)
+        .order_by(func.lower(PrestadorOdonto.nome).asc(), PrestadorOdonto.id.asc())
+        .all()
+    )
+    filtro_status = [
+        {"id": 0, "label": "<<Todos>>"},
+        *[
+            {
+                "id": _paciente_menu_status_aux_id(item["id"]),
+                "label": item["label"],
+            }
+            for item in _paciente_menu_status_auxiliares(db, current_user.clinica_id)
+        ],
+        {"id": 98, "label": "<<Todos os ativos>>"},
+        {"id": 99, "label": "<<Todos os inativos>>"},
+    ]
+    return {
+        "cirurgioes": [
+            {"id": 0, "label": "<<Todos>>"},
+            *[
+                {
+                    "id": int(item.id or 0),
+                    "label": (item.nome or "").strip() or f"Prestador {item.id}",
+                }
+                for item in prestadores
+            ],
+        ],
+        "filtro_status": filtro_status,
+        "visualizacao": list(PACIENTE_MENU_VISUALIZACAO_OPTIONS),
+        "pesquisa": [{"id": 1, "label": "Nome"}, {"id": 2, "label": "Número"}],
+    }
+
+
+@router.get("/pacientes/menu", dependencies=[DEP_PROCEDIMENTOS])
+def listar_pacientes_menu(
+    q: str = Query(default=""),
+    cir_menu_pac: int = Query(default=0),
+    status_menu_pac: int = Query(default=0),
+    visualizacao_menu_pac: int = Query(default=1),
+    pesquisa_menu_pac: int = Query(default=1),
+    active_ord_menu_pac: int = Query(default=0),
+    offset: int = Query(default=0),
+    limit: int = Query(default=5000),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    termo = (q or "").strip()
+    termo_norm = _norm(termo)
+    cirurgiao_id = max(0, _safe_int(cir_menu_pac, 0))
+    status_id = max(0, _safe_int(status_menu_pac, 0))
+    status_aux_lookup: dict[int, str] = {}
+    if _paciente_menu_status_aux_selected(status_id):
+        status_aux_lookup = {
+            _paciente_menu_status_aux_id(item["id"]): _norm(item["label"])
+            for item in _paciente_menu_status_auxiliares(db, current_user.clinica_id)
+        }
+    status_aux_alvo = status_aux_lookup.get(status_id, "")
+    visualizacao_id = _safe_int(visualizacao_menu_pac, 1)
+    if visualizacao_id not in {1, 2, 3, 4, 5, 6}:
+        visualizacao_id = 1
+    pesquisa_id = _safe_int(pesquisa_menu_pac, 1)
+    if pesquisa_id not in {1, 2}:
+        pesquisa_id = 1
+    letra_ord = max(0, min(26, _safe_int(active_ord_menu_pac, 0)))
+    inicio = max(0, _safe_int(offset, 0))
+    tamanho = max(1, min(_safe_int(limit, 5000), 5000))
+
+    pacientes = (
+        db.query(Paciente)
+        .filter(Paciente.clinica_id == current_user.clinica_id)
+        .all()
+    )
+
+    filtrados: list[Paciente] = []
+    for p in pacientes:
+        if cirurgiao_id > 0 and _paciente_menu_source_int(p, "ID_PRESTADOR", 0) != cirurgiao_id:
+            continue
+        status_pac = _paciente_menu_status_code(p)
+        status_pac_txt = _paciente_menu_status_texto_norm(p)
+        if status_id == 98 and status_pac not in {2, 3}:
+            continue
+        if status_id == 99 and status_pac not in {1, 4}:
+            continue
+        if _paciente_menu_status_aux_selected(status_id):
+            if not status_aux_alvo or status_pac_txt != status_aux_alvo:
+                continue
+        if (
+            status_id > 0
+            and status_id not in {98, 99}
+            and not _paciente_menu_status_aux_selected(status_id)
+            and status_pac != status_id
+        ):
+            continue
+        nome = (p.nome_completo or " ".join(x for x in [p.nome or "", p.sobrenome or ""] if x.strip())).strip()
+        nome_norm = _norm(nome)
+        sobrenome_nome = ", ".join(x for x in [(p.sobrenome or "").strip(), (p.nome or "").strip()] if x)
+        col_nome = sobrenome_nome if visualizacao_id == 2 and sobrenome_nome else nome
+        col2 = str(int(p.codigo or 0))
+        col2_label = "Número"
+        if visualizacao_id == 3:
+            col2 = str(p.matricula or "").strip()
+            col2_label = "Matrícula"
+        elif visualizacao_id == 4:
+            col2 = str(p.fone1 or "").strip()
+            col2_label = "Telefone"
+        elif visualizacao_id == 5:
+            col2 = str(p.cod_prontuario or "").strip()
+            col2_label = "Prontuário"
+        elif visualizacao_id == 6:
+            col2 = str(p.data_nascimento or "").strip()
+            col2_label = "Data de nascimento"
+        if letra_ord > 0:
+            letra = chr(64 + letra_ord).lower()
+            if not nome_norm.startswith(letra):
+                continue
+        if termo_norm:
+            # Legacy-like hybrid search:
+            # - numeric input: search by patient number prefix
+            # - text input: search by patient name prefix
+            if termo_norm.isdigit():
+                cod = _norm(str(p.codigo or ""))
+                if not cod.startswith(termo_norm):
+                    continue
+            else:
+                if not nome_norm.startswith(termo_norm):
+                    continue
+        p._menu_col1 = col_nome
+        p._menu_col2 = col2
+        p._menu_col2_label = col2_label
+        filtrados.append(p)
+
+    if visualizacao_id == 2:
+        filtrados.sort(key=lambda p: (_norm((p.sobrenome or "").strip()), _norm((p.nome or "").strip()), int(p.codigo or 0), int(p.id or 0)))
+    else:
+        filtrados.sort(key=lambda p: (_norm(p.nome_completo or p.nome or ""), int(p.codigo or 0), int(p.id or 0)))
+    total = len(filtrados)
+    pagina = filtrados[inicio : inicio + tamanho]
+
+    return {
+        "total": total,
+        "offset": inicio,
+        "limit": tamanho,
+        "visualizacao_menu_pac": visualizacao_id,
+        "coluna2_label": (pagina[0]._menu_col2_label if pagina else ("Número" if visualizacao_id in {1, 2} else "Valor")),
+        "items": [
+            {
+                "id": int(p.id),
+                "codigo": int(p.codigo or 0),
+                "nome": str(getattr(p, "_menu_col1", "") or (p.nome_completo or " ".join(x for x in [p.nome or "", p.sobrenome or ""] if x.strip())).strip()),
+                "valor_coluna2": str(getattr(p, "_menu_col2", str(int(p.codigo or 0)))),
+                "status": _paciente_menu_status_code(p),
+                "id_prestador": _paciente_menu_source_int(p, "ID_PRESTADOR", 0),
+                "nome_paciente": (p.nome_completo or " ".join(x for x in [p.nome or "", p.sobrenome or ""] if x.strip())).strip(),
+            }
+            for p in pagina
+        ],
+    }
+
+
 @router.get("/pacientes", dependencies=[DEP_PROCEDIMENTOS])
 def listar_pacientes(
     q: str = Query(default=""),
@@ -1450,7 +1862,7 @@ def navegar_pacientes(
     base = db.query(Paciente).filter(Paciente.clinica_id == current_user.clinica_id)
     sentido_norm = (sentido or "").strip().lower()
     if sentido_norm not in {"first", "prev", "next", "last"}:
-        raise HTTPException(status_code=400, detail="Sentido inválido. Use: first, prev, next ou last.")
+        raise HTTPException(status_code=400, detail="Sentido invÃ¡lido. Use: first, prev, next ou last.")
 
     if sentido_norm == "first":
         item = base.order_by(Paciente.codigo.asc(), Paciente.id.asc()).first()
@@ -1506,7 +1918,7 @@ def obter_paciente_por_codigo(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
+        raise HTTPException(status_code=404, detail="Paciente nÃ£o encontrado.")
     return _paciente_to_dict(item)
 
 
@@ -1528,7 +1940,7 @@ def criar_paciente(
 ):
     codigo = int(payload.codigo or _proximo_codigo_paciente(db, current_user.clinica_id))
     if codigo <= 0:
-        raise HTTPException(status_code=400, detail="Código inválido.")
+        raise HTTPException(status_code=400, detail="CÃ³digo invÃ¡lido.")
 
     existe = (
         db.query(Paciente.id)
@@ -1539,7 +1951,7 @@ def criar_paciente(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe paciente com este código.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe paciente com este cÃ³digo.")
 
     item = Paciente(
         clinica_id=current_user.clinica_id,
@@ -1567,7 +1979,7 @@ def editar_paciente(
 
     novo_codigo = int(payload.codigo or item.codigo)
     if novo_codigo <= 0:
-        raise HTTPException(status_code=400, detail="Código inválido.")
+        raise HTTPException(status_code=400, detail="CÃ³digo invÃ¡lido.")
     if novo_codigo != item.codigo:
         existe = (
             db.query(Paciente.id)
@@ -1579,7 +1991,7 @@ def editar_paciente(
             .first()
         )
         if existe:
-            raise HTTPException(status_code=400, detail="Já existe paciente com este código.")
+            raise HTTPException(status_code=400, detail="JÃ¡ existe paciente com este cÃ³digo.")
         item.codigo = novo_codigo
 
     _apply_paciente_payload(item, payload)
@@ -1597,7 +2009,7 @@ def excluir_paciente(
     item = _paciente_or_404(db, current_user.clinica_id, paciente_id)
     db.delete(item)
     db.commit()
-    return {"detail": "Paciente excluído."}
+    return {"detail": "Paciente excluÃ­do."}
 
 
 @router.get("/procedimentos-genericos", dependencies=[DEP_PROCEDIMENTOS])
@@ -1640,7 +2052,7 @@ def detalhar_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
     return _procedimento_generico_to_dict(item, clinica_id=current_user.clinica_id, detalhado=True)
 
 
@@ -1667,7 +2079,7 @@ def detalhar_procedimento_generico_v2(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
     return _procedimento_generico_to_dict(item, clinica_id=current_user.clinica_id, detalhado=True)
 
 
@@ -1678,7 +2090,7 @@ def migrar_procedimentos_genericos(
 ):
     clinica_id = current_user.clinica_id
     if not TAB_GEN_ITEM_PATH.exists():
-        raise HTTPException(status_code=404, detail=f"Arquivo não encontrado: {TAB_GEN_ITEM_PATH}")
+        raise HTTPException(status_code=404, detail=f"Arquivo nÃ£o encontrado: {TAB_GEN_ITEM_PATH}")
 
     try:
         registros = _parse_tab_gen_item(TAB_GEN_ITEM_PATH.read_bytes())
@@ -1686,7 +2098,7 @@ def migrar_procedimentos_genericos(
         raise HTTPException(status_code=500, detail=f"Falha ao ler arquivo RAW: {exc}") from exc
 
     if not registros:
-        raise HTTPException(status_code=400, detail="Nenhum procedimento genérico foi encontrado no arquivo RAW.")
+        raise HTTPException(status_code=400, detail="Nenhum procedimento genÃ©rico foi encontrado no arquivo RAW.")
 
     metadados = carregar_metadados_genericos_legado()
     existentes = {
@@ -1739,7 +2151,7 @@ def migrar_procedimentos_genericos(
     db.commit()
     total_tabela = db.query(ProcedimentoGenerico.id).filter(ProcedimentoGenerico.clinica_id == clinica_id).count()
     detail = (
-        f"Migração concluída: {len(registros)} lidos, "
+        f"MigraÃ§Ã£o concluÃ­da: {len(registros)} lidos, "
         f"{inseridos} inseridos, {atualizados} atualizados."
     )
     return {
@@ -1762,7 +2174,7 @@ def criar_procedimento_generico(
     codigo = _norm_codigo_procedimento_generico(payload.codigo)
     descricao = (payload.descricao or "").strip()
     if not codigo or not descricao:
-        raise HTTPException(status_code=400, detail="Informe código e descrição.")
+        raise HTTPException(status_code=400, detail="Informe cÃ³digo e descriÃ§Ã£o.")
 
     existe = (
         db.query(ProcedimentoGenerico.id)
@@ -1773,7 +2185,7 @@ def criar_procedimento_generico(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe um procedimento genérico com este código.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe um procedimento genÃ©rico com este cÃ³digo.")
 
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     item = ProcedimentoGenerico(
@@ -1817,12 +2229,12 @@ def editar_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
 
     codigo = _norm_codigo_procedimento_generico(payload.codigo)
     descricao = (payload.descricao or "").strip()
     if not codigo or not descricao:
-        raise HTTPException(status_code=400, detail="Informe código e descrição.")
+        raise HTTPException(status_code=400, detail="Informe cÃ³digo e descriÃ§Ã£o.")
 
     existe = (
         db.query(ProcedimentoGenerico.id)
@@ -1834,7 +2246,7 @@ def editar_procedimento_generico(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Já existe outro procedimento genérico com este código.")
+        raise HTTPException(status_code=400, detail="JÃ¡ existe outro procedimento genÃ©rico com este cÃ³digo.")
 
     item.codigo = codigo
     item.descricao = descricao
@@ -1873,7 +2285,7 @@ def excluir_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
     em_uso = (
         db.query(Procedimento.id)
         .filter(
@@ -1883,7 +2295,8 @@ def excluir_procedimento_generico(
         .first()
     )
     if em_uso:
-        raise HTTPException(status_code=409, detail="Este procedimento genÃ©rico estÃ¡ vinculado a procedimentos da tabela.")
+        raise HTTPException(status_code=409, detail="Este procedimento genÃƒÂ©rico estÃƒÂ¡ vinculado a procedimentos da tabela.")
     db.delete(item)
     db.commit()
-    return {"detail": "Procedimento genérico excluído."}
+    return {"detail": "Procedimento genÃ©rico excluÃ­do."}
+
