@@ -545,6 +545,9 @@ if(typeof agendaSemanaRenderEventos==="function"){
   let agendaSemanaCtxMenu=null;
   let agendaSemanaDeleteDialog=null;
   let agendaSemanaDragState=null;
+  let agendaSemanaPesquisa=null;
+  let agendaSemanaHorariosLivres=null;
+  let agendaSemanaAviso=null;
 
   const agendaSemanaGetEventoById=(id)=>{
     const n=Number(id||0)||0;
@@ -1026,6 +1029,9 @@ if(typeof agendaSemanaRenderEventos==="function"){
     if(typeof agendaLegadoCarregarCombos==="function"){
       try{await agendaLegadoCarregarCombos()}catch{}
     }
+    if(typeof agendaLegadoGarantirContatosCarregados==="function"){
+      try{await agendaLegadoGarantirContatosCarregados()}catch{}
+    }
     if(typeof agendaLegadoRecarregarStatus==="function"){
       try{await agendaLegadoRecarregarStatus()}catch{}
     }
@@ -1040,6 +1046,959 @@ if(typeof agendaSemanaRenderEventos==="function"){
       agendaLegado.modalBackdrop.classList.remove("hidden");
     }
     if(typeof agendaLegadoAplicarFocoPorTipo==="function")agendaLegadoAplicarFocoPorTipo();
+  };
+  const agendaSemanaPesquisaIsCompromisso=(item)=>{
+    const tipo=Number(item?.tipo);
+    if(Number.isFinite(tipo)){
+      if(tipo===2)return true;
+      if(tipo===1)return false;
+    }
+    return !(Number(item?.nro_pac||0)||0);
+  };
+  const agendaSemanaPesquisaTextoLinha=(item)=>{
+    const nome=String(item?.nome||"").trim();
+    const motivo=String(item?.motivo||"").trim();
+    return agendaSemanaPesquisaIsCompromisso(item)?(motivo||nome):(nome||motivo);
+  };
+  const agendaSemanaPesquisaDataBr=(valor)=>{
+    const d=agendaSemanaParseDataCivil(String(valor||"").trim());
+    if(!d)return String(valor||"").trim();
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  };
+  const agendaSemanaPesquisaHora=(horaMs)=>{
+    const ms=Math.max(0,Number(horaMs||0)||0);
+    const totalMin=Math.floor(ms/60000);
+    const h=Math.max(0,Math.floor(totalMin/60));
+    const m=Math.max(0,totalMin%60);
+    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+  };
+  const agendaSemanaPesquisaCirurgiaoNome=(idPrestador)=>{
+    const id=Math.max(0,Number(idPrestador||0)||0);
+    if(!id)return"";
+    const item=(Array.isArray(agendaSemanaState?.prestadores)?agendaSemanaState.prestadores:[])
+      .find(row=>Number(row?.id||0)===id);
+    return String(item?.nome||"").trim();
+  };
+  const agendaSemanaPesquisaDataHoraMs=(item)=>{
+    const d=agendaSemanaParseDataCivil(String(item?.data||"").trim());
+    if(!d)return NaN;
+    const ms=Math.max(0,Number(item?.hora_inicio||0)||0);
+    const min=Math.floor(ms/60000);
+    d.setHours(Math.floor(min/60),min%60,0,0);
+    return d.getTime();
+  };
+  const agendaSemanaPesquisaFechar=()=>{
+    if(!agendaSemanaPesquisa?.backdrop)return;
+    agendaSemanaPesquisa.backdrop.classList.add("hidden");
+  };
+  const agendaSemanaPesquisaAtualizarBotoes=()=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg)return;
+    const temTermo=String(cfg.input?.value||"").trim().length>0;
+    if(cfg.btnPesquisar)cfg.btnPesquisar.disabled=!temTermo;
+    const idx=Math.max(-1,Number(cfg.selectedIdx??-1));
+    if(cfg.btnEditar)cfg.btnEditar.disabled=idx<0||idx>=cfg.results.length;
+  };
+  const agendaSemanaPesquisaSelecionarIndice=(idx,scroll=false)=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg)return;
+    const total=cfg.results.length;
+    if(!total){
+      cfg.selectedIdx=-1;
+      agendaSemanaPesquisaAtualizarBotoes();
+      return;
+    }
+    const alvo=Math.max(0,Math.min(total-1,Number(idx||0)));
+    cfg.selectedIdx=alvo;
+    cfg.tbody.querySelectorAll("tr[data-idx]").forEach(row=>{
+      const rowIdx=Number(row.dataset.idx||-1);
+      row.classList.toggle("selected",rowIdx===alvo);
+      if(rowIdx===alvo&&scroll)row.scrollIntoView({block:"nearest"});
+    });
+    agendaSemanaPesquisaAtualizarBotoes();
+  };
+  const agendaSemanaPesquisaRenderResultados=(rows)=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg)return;
+    cfg.results=Array.isArray(rows)?rows:[];
+    if(!cfg.results.length){
+      cfg.selectedIdx=-1;
+      cfg.tbody.innerHTML='<tr class="agenda-semana-pesquisa-empty"><td colspan="4"></td></tr>';
+      agendaSemanaPesquisaAtualizarBotoes();
+      return;
+    }
+    cfg.tbody.innerHTML=cfg.results.map((item,idx)=>{
+      const dataTxt=agendaSemanaPesquisaDataBr(item?.data);
+      const horaTxt=agendaSemanaPesquisaHora(item?.hora_inicio);
+      const principalTxt=agendaSemanaPesquisaTextoLinha(item);
+      const cirurgiaoTxt=agendaSemanaPesquisaCirurgiaoNome(item?.id_prestador);
+      return `<tr data-idx="${idx}"><td>${esc(dataTxt)}</td><td>${esc(horaTxt)}</td><td>${esc(principalTxt)}</td><td>${esc(cirurgiaoTxt)}</td></tr>`;
+    }).join("");
+    agendaSemanaPesquisaSelecionarIndice(0,false);
+  };
+  const agendaSemanaPesquisaAbrirEdicaoSelecionada=()=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg)return;
+    const idx=Math.max(0,Number(cfg.selectedIdx||0)||0);
+    const item=cfg.results[idx]||null;
+    if(!item)return;
+    agendaSemanaPesquisaFechar();
+    agendaSemanaState.selectedEventId=Number(item?.id||0)||null;
+    agendaSemanaAbrirModalEditar(item);
+  };
+  const agendaSemanaPesquisaPesquisar=async()=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg)return;
+    const termo=String(cfg.input?.value||"").trim();
+    if(!termo){
+      agendaSemanaPesquisaAtualizarBotoes();
+      return;
+    }
+    const incluirFuturos=!!cfg.chkFuturos?.checked;
+    const incluirPassados=!!cfg.chkPassados?.checked;
+    if(!incluirFuturos&&!incluirPassados){
+      return;
+    }
+    const hojeIso=agendaSemanaToIsoDate(new Date());
+    const params=new URLSearchParams();
+    if(incluirFuturos&&incluirPassados){
+      params.set("start","1900-01-01");
+      params.set("end","2100-12-31");
+    }else if(incluirFuturos){
+      params.set("start",hojeIso);
+      params.set("end","2100-12-31");
+    }else{
+      params.set("start","1900-01-01");
+      params.set("end",hojeIso);
+    }
+    const prestador=String(agendaSemana?.selectPrestador?.value||"").trim();
+    const unidade=String(agendaSemana?.selectUnidade?.value||"").trim();
+    if(prestador)params.set("prestador_id",prestador);
+    if(unidade)params.set("unidade_id",unidade);
+    params.set("nome",termo);
+    params.set("limit","10000");
+    if(cfg.btnPesquisar)cfg.btnPesquisar.disabled=true;
+    const {res,data}=await requestJson("GET",`/agenda-legado?${params.toString()}`,undefined,true);
+    agendaSemanaPesquisaAtualizarBotoes();
+    if(!res.ok){
+      footerMsg.textContent=data?.detail||"Falha ao pesquisar agendamentos.";
+      return;
+    }
+    const permitirPacientes=!!cfg.chkPacientes?.checked;
+    const permitirCompromissos=!!cfg.chkCompromissos?.checked;
+    const nowMs=Date.now();
+    const rows=(Array.isArray(data)?data:[]).filter(item=>{
+      const compromisso=agendaSemanaPesquisaIsCompromisso(item);
+      if(compromisso&&!permitirCompromissos)return false;
+      if(!compromisso&&!permitirPacientes)return false;
+      if(incluirFuturos!==incluirPassados){
+        const dataHoraMs=agendaSemanaPesquisaDataHoraMs(item);
+        if(Number.isFinite(dataHoraMs)){
+          if(incluirFuturos&&dataHoraMs<nowMs)return false;
+          if(incluirPassados&&dataHoraMs>=nowMs)return false;
+        }
+      }
+      return true;
+    });
+    agendaSemanaPesquisaRenderResultados(rows);
+  };
+  const agendaSemanaPesquisaVincularEventos=()=>{
+    const cfg=agendaSemanaPesquisa;
+    if(!cfg||cfg.bound)return;
+    cfg.bound=true;
+    cfg.input.addEventListener("input",()=>agendaSemanaPesquisaAtualizarBotoes());
+    cfg.input.addEventListener("keydown",ev=>{
+      if(ev.key==="Enter"){
+        ev.preventDefault();
+        agendaSemanaPesquisaPesquisar();
+      }
+    });
+    cfg.btnPesquisar.addEventListener("click",agendaSemanaPesquisaPesquisar);
+    [cfg.chkFuturos,cfg.chkPassados,cfg.chkPacientes,cfg.chkCompromissos].forEach(el=>{
+      if(el)el.addEventListener("change",()=>agendaSemanaPesquisaAtualizarBotoes());
+    });
+    cfg.btnEditar.addEventListener("click",agendaSemanaPesquisaAbrirEdicaoSelecionada);
+    cfg.btnFechar.addEventListener("click",agendaSemanaPesquisaFechar);
+    cfg.backdrop.addEventListener("click",ev=>{
+      if(ev.target===cfg.backdrop)agendaSemanaPesquisaFechar();
+    });
+    cfg.tbody.addEventListener("click",ev=>{
+      const tr=ev.target.closest("tr[data-idx]");
+      if(!tr)return;
+      agendaSemanaPesquisaSelecionarIndice(Number(tr.dataset.idx||0),false);
+    });
+    cfg.tbody.addEventListener("dblclick",ev=>{
+      const tr=ev.target.closest("tr[data-idx]");
+      if(!tr)return;
+      agendaSemanaPesquisaSelecionarIndice(Number(tr.dataset.idx||0),false);
+      agendaSemanaPesquisaAbrirEdicaoSelecionada();
+    });
+    cfg.modal.addEventListener("keydown",ev=>{
+      if(ev.key==="Escape"){
+        ev.preventDefault();
+        agendaSemanaPesquisaFechar();
+        return;
+      }
+      if(ev.key==="ArrowDown"||ev.key==="ArrowUp"){
+        if(!cfg.results.length)return;
+        ev.preventDefault();
+        const delta=ev.key==="ArrowDown"?1:-1;
+        const atual=Math.max(-1,Number(cfg.selectedIdx??-1));
+        agendaSemanaPesquisaSelecionarIndice((atual<0?0:atual)+delta,true);
+        return;
+      }
+      if(ev.key==="Enter"&&ev.target!==cfg.input&&cfg.selectedIdx>=0){
+        ev.preventDefault();
+        agendaSemanaPesquisaAbrirEdicaoSelecionada();
+      }
+    });
+  };
+  const agendaSemanaPesquisaEnsureUI=()=>{
+    if(agendaSemanaPesquisa?.backdrop)return agendaSemanaPesquisa;
+    if(!document.getElementById("agenda-semana-pesquisa-style")){
+      const style=document.createElement("style");
+      style.id="agenda-semana-pesquisa-style";
+      style.textContent=`
+        .agenda-semana-pesquisa-backdrop{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.18);display:grid;place-items:center}
+        .agenda-semana-pesquisa-backdrop.hidden{display:none}
+        .agenda-semana-pesquisa-modal{width:min(560px,96vw);background:#efefef;border:1px solid #b9b9b9;box-shadow:2px 2px 10px rgba(0,0,0,.25);padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}
+        .agenda-semana-pesquisa-title{font:400 33px/1 "Segoe UI Symbol","Arial Unicode MS",Tahoma,sans-serif;text-align:center;letter-spacing:0;transform:translateY(-1px) scaleX(.72);transform-origin:center;margin:2px 0 8px;color:#2d2d2d}
+        .agenda-semana-pesquisa-box{border:1px solid #c3c3c3;padding:8px;background:#efefef}
+        .agenda-semana-pesquisa-row{display:flex;align-items:center;gap:8px;margin-top:4px}
+        .agenda-semana-pesquisa-row input[type="text"]{flex:1;height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff}
+        .agenda-semana-pesquisa-row .materiais-btn{height:24px;min-width:92px;justify-content:center}
+        .agenda-semana-pesquisa-subtitle{margin-top:10px;margin-bottom:2px}
+        .agenda-semana-pesquisa-checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-bottom:8px}
+        .agenda-semana-pesquisa-checks label{display:flex;align-items:center;gap:5px}
+        .agenda-semana-pesquisa-grid{border:1px solid #c0c9d6;background:#fff;height:192px;overflow:auto}
+        .agenda-semana-pesquisa-grid table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .agenda-semana-pesquisa-grid th,.agenda-semana-pesquisa-grid td{height:22px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #edf1f6}
+        .agenda-semana-pesquisa-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}
+        .agenda-semana-pesquisa-grid tr.selected{background:#1f66c2;color:#fff}
+        .agenda-semana-pesquisa-grid tr.agenda-semana-pesquisa-empty td{height:168px;border-bottom:none}
+        .agenda-semana-pesquisa-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+        .agenda-semana-pesquisa-actions .materiais-btn{min-width:92px;justify-content:center}
+      `;
+      document.head.appendChild(style);
+    }
+    const backdrop=document.createElement("div");
+    backdrop.className="agenda-semana-pesquisa-backdrop hidden";
+    backdrop.innerHTML=`
+      <div class="agenda-semana-pesquisa-modal" role="dialog" aria-modal="true" tabindex="0">
+        <div class="agenda-semana-pesquisa-title">Pesquisa agendamentos</div>
+        <div class="agenda-semana-pesquisa-box">
+          <label for="agenda-semana-pesquisa-termo">Texto a ser pesquisado (nome ou assunto):</label>
+          <div class="agenda-semana-pesquisa-row">
+            <input id="agenda-semana-pesquisa-termo" type="text" autocomplete="off">
+            <button id="agenda-semana-pesquisa-btn" class="materiais-btn" type="button" disabled>Pesquisa</button>
+          </div>
+          <div class="agenda-semana-pesquisa-subtitle">Opcoes de pesquisa:</div>
+          <div class="agenda-semana-pesquisa-checks">
+            <label><input id="agenda-semana-pesquisa-futuros" type="checkbox" checked> Agendamentos futuros</label>
+            <label><input id="agenda-semana-pesquisa-pacientes" type="checkbox" checked> Pesquisar pacientes</label>
+            <label><input id="agenda-semana-pesquisa-passados" type="checkbox" checked> Agendamentos passados</label>
+            <label><input id="agenda-semana-pesquisa-compromissos" type="checkbox" checked> Pesquisar compromissos</label>
+          </div>
+          <div class="agenda-semana-pesquisa-grid">
+            <table>
+              <colgroup>
+                <col style="width:100px">
+                <col style="width:68px">
+                <col>
+                <col style="width:120px">
+              </colgroup>
+              <thead><tr><th>Data</th><th>Hora</th><th>Paciente / compromisso</th><th>Cirurgiao</th></tr></thead>
+              <tbody id="agenda-semana-pesquisa-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="agenda-semana-pesquisa-actions">
+          <button id="agenda-semana-pesquisa-edita" class="materiais-btn" type="button" disabled>Edita...</button>
+          <button id="agenda-semana-pesquisa-fecha" class="materiais-btn" type="button">Fecha</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    agendaSemanaPesquisa={
+      backdrop,
+      modal:backdrop.querySelector(".agenda-semana-pesquisa-modal"),
+      input:backdrop.querySelector("#agenda-semana-pesquisa-termo"),
+      btnPesquisar:backdrop.querySelector("#agenda-semana-pesquisa-btn"),
+      chkFuturos:backdrop.querySelector("#agenda-semana-pesquisa-futuros"),
+      chkPassados:backdrop.querySelector("#agenda-semana-pesquisa-passados"),
+      chkPacientes:backdrop.querySelector("#agenda-semana-pesquisa-pacientes"),
+      chkCompromissos:backdrop.querySelector("#agenda-semana-pesquisa-compromissos"),
+      tbody:backdrop.querySelector("#agenda-semana-pesquisa-tbody"),
+      btnEditar:backdrop.querySelector("#agenda-semana-pesquisa-edita"),
+      btnFechar:backdrop.querySelector("#agenda-semana-pesquisa-fecha"),
+      results:[],
+      selectedIdx:-1,
+      bound:false,
+    };
+    agendaSemanaPesquisaVincularEventos();
+    agendaSemanaPesquisaRenderResultados([]);
+    return agendaSemanaPesquisa;
+  };
+  const agendaSemanaPesquisaAbrir=()=>{
+    const cfg=agendaSemanaPesquisaEnsureUI();
+    cfg.input.value="";
+    cfg.chkFuturos.checked=true;
+    cfg.chkPassados.checked=true;
+    cfg.chkPacientes.checked=true;
+    cfg.chkCompromissos.checked=true;
+    agendaSemanaPesquisaRenderResultados([]);
+    agendaSemanaPesquisaAtualizarBotoes();
+    cfg.backdrop.classList.remove("hidden");
+    requestAnimationFrame(()=>{
+      cfg.input.focus();
+      cfg.input.select();
+    });
+  };
+
+  const agendaSemanaHorariosToDataBr=(iso)=>{
+    const d=agendaSemanaParseDataCivil(String(iso||"").trim());
+    if(!d)return String(iso||"").trim();
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  };
+  const agendaSemanaHorariosNormalizarHora=(value)=>{
+    const bruto=String(value||"").trim();
+    if(!bruto)return"";
+    const m=/^(\d{1,2}):(\d{2})$/.exec(bruto);
+    if(m){
+      const h=Number(m[1]);
+      const min=Number(m[2]);
+      if(Number.isFinite(h)&&Number.isFinite(min)&&h>=0&&h<=23&&min>=0&&min<=59){
+        return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
+      }
+    }
+    const dig=bruto.replace(/\D+/g,"");
+    if(dig.length===3||dig.length===4){
+      const pad=dig.padStart(4,"0");
+      const h=Number(pad.slice(0,2));
+      const min=Number(pad.slice(2,4));
+      if(Number.isFinite(h)&&Number.isFinite(min)&&h>=0&&h<=23&&min>=0&&min<=59){
+        return `${String(h).padStart(2,"0")}:${String(min).padStart(2,"0")}`;
+      }
+    }
+    return"";
+  };
+  const agendaSemanaHorariosMs=(hhmm)=>{
+    const txt=agendaSemanaHorariosNormalizarHora(hhmm);
+    if(!txt)return NaN;
+    const[h,m]=txt.split(":").map(v=>Number(v)||0);
+    return(h*60+m)*60000;
+  };
+  const agendaSemanaHorariosCirurgiaoNome=(id)=>{
+    const n=Number(id||0)||0;
+    if(!n)return"";
+    const item=(Array.isArray(agendaSemanaState?.prestadores)?agendaSemanaState.prestadores:[])
+      .find(row=>Number(row?.id||0)===n);
+    return String(item?.nome||"").trim();
+  };
+  const agendaSemanaHorariosFechar=()=>{
+    if(!agendaSemanaHorariosLivres?.backdrop)return;
+    agendaSemanaHorariosLivres.backdrop.classList.add("hidden");
+  };
+  const agendaSemanaHorariosSelecionarIndice=(idx,scroll=false)=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    const total=cfg.results.length;
+    if(!total){
+      cfg.selectedIdx=-1;
+      return;
+    }
+    const alvo=Math.max(0,Math.min(total-1,Number(idx||0)));
+    cfg.selectedIdx=alvo;
+    cfg.tbody.querySelectorAll("tr[data-idx]").forEach(row=>{
+      const rowIdx=Number(row.dataset.idx||-1);
+      row.classList.toggle("selected",rowIdx===alvo);
+      if(rowIdx===alvo&&scroll)row.scrollIntoView({block:"nearest"});
+    });
+  };
+  const agendaSemanaHorariosAtualizarBotoes=()=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    const temDia=cfg.chkDias.some(chk=>!!chk?.checked);
+    const horaIni=agendaSemanaHorariosNormalizarHora(cfg.horaIni?.value||"");
+    const horaFim=agendaSemanaHorariosNormalizarHora(cfg.horaFim?.value||"");
+    const msIni=agendaSemanaHorariosMs(horaIni);
+    const msFim=agendaSemanaHorariosMs(horaFim);
+    const periodoLigado=!!cfg.chkPeriodo?.checked;
+    if(cfg.dataIni)cfg.dataIni.disabled=!periodoLigado;
+    if(cfg.dataFim)cfg.dataFim.disabled=!periodoLigado;
+    const periodoOk=!periodoLigado||(
+      String(cfg.dataIni?.value||"").trim().length>0&&
+      String(cfg.dataFim?.value||"").trim().length>0&&
+      String(cfg.dataFim?.value||"").trim()>=String(cfg.dataIni?.value||"").trim()
+    );
+    const horasOk=Number.isFinite(msIni)&&Number.isFinite(msFim)&&msFim>msIni;
+    if(cfg.btnPesquisar)cfg.btnPesquisar.disabled=!(temDia&&horasOk&&periodoOk);
+    if(cfg.btnEditar)cfg.btnEditar.disabled=cfg.selectedIdx<0||cfg.selectedIdx>=cfg.results.length;
+  };
+  const agendaSemanaHorariosRenderResultados=(rows)=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    cfg.results=Array.isArray(rows)?rows:[];
+    cfg.selectedIdx=-1;
+    if(!cfg.results.length){
+      cfg.tbody.innerHTML='<tr class="agenda-semana-horarios-empty"><td colspan="5"></td></tr>';
+      agendaSemanaHorariosAtualizarBotoes();
+      return;
+    }
+    cfg.tbody.innerHTML=cfg.results.map((item,idx)=>{
+      const dataTxt=agendaSemanaHorariosToDataBr(item?.data);
+      const diaTxt=String(item?.dia||"").trim();
+      const horaTxt=agendaSemanaHorariosNormalizarHora(item?.hora||"");
+      const durPadrao=Math.max(5,parseInt(agendaSemanaState?.step||5,10)||5);
+      const durTxt=String(durPadrao);
+      const cirTxt=String(item?.cirurgiao||agendaSemanaHorariosCirurgiaoNome(item?.id_prestador)||"").trim();
+      return `<tr data-idx="${idx}"><td>${esc(dataTxt)}</td><td>${esc(diaTxt)}</td><td>${esc(horaTxt)}</td><td>${esc(durTxt)}</td><td>${esc(cirTxt)}</td></tr>`;
+    }).join("");
+    agendaSemanaHorariosSelecionarIndice(0,false);
+    agendaSemanaHorariosAtualizarBotoes();
+  };
+  const agendaSemanaHorariosAbrirNovoSelecionado=()=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    const idx=Math.max(0,Number(cfg.selectedIdx||0)||0);
+    const row=cfg.results[idx]||null;
+    if(!row)return;
+    const prestadorId=String(Number(row?.id_prestador||0)||"");
+    const unidadeId=String(Number(row?.id_unidade||0)||"");
+    if(prestadorId&&agendaSemana?.selectPrestador&&[...agendaSemana.selectPrestador.options].some(opt=>opt.value===prestadorId)){
+      agendaSemana.selectPrestador.value=prestadorId;
+      if(typeof agendaSemanaSaveFiltro==="function")agendaSemanaSaveFiltro("prestador_id",prestadorId);
+    }
+    if(unidadeId&&agendaSemana?.selectUnidade&&[...agendaSemana.selectUnidade.options].some(opt=>opt.value===unidadeId)){
+      agendaSemana.selectUnidade.value=unidadeId;
+      if(typeof agendaSemanaSaveFiltro==="function")agendaSemanaSaveFiltro("unidade_id",unidadeId);
+    }
+    agendaSemanaHorariosFechar();
+    agendaSemanaAbrirModalNovo(String(row?.data||""),String(row?.hora||""));
+  };
+  const agendaSemanaHorariosPesquisar=async()=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    const dias=cfg.chkDias.filter(chk=>chk.checked).map(chk=>String(chk.value||"").trim()).filter(Boolean);
+    if(!dias.length){
+      agendaSemanaHorariosRenderResultados([]);
+      return;
+    }
+    const horaIni=agendaSemanaHorariosNormalizarHora(cfg.horaIni?.value||"");
+    const horaFim=agendaSemanaHorariosNormalizarHora(cfg.horaFim?.value||"");
+    if(!horaIni||!horaFim||agendaSemanaHorariosMs(horaFim)<=agendaSemanaHorariosMs(horaIni)){
+      agendaSemanaHorariosAtualizarBotoes();
+      return;
+    }
+    cfg.horaIni.value=horaIni;
+    cfg.horaFim.value=horaFim;
+    const params=new URLSearchParams();
+    params.set("dias_semana",dias.join(","));
+    params.set("hora_inicio",horaIni);
+    params.set("hora_fim",horaFim);
+    const prestador=String(cfg.prestador?.value||agendaSemana?.selectPrestador?.value||"").trim();
+    const unidade=String(cfg.unidade?.value||agendaSemana?.selectUnidade?.value||"").trim();
+    if(prestador)params.set("prestador_id",prestador);
+    if(unidade)params.set("unidade_id",unidade);
+    if(cfg.chkPeriodo?.checked){
+      const ini=String(cfg.dataIni?.value||"").trim();
+      const fim=String(cfg.dataFim?.value||"").trim();
+      if(ini)params.set("data_ini",ini);
+      if(fim)params.set("data_fim",fim);
+    }
+    params.set("limit","5000");
+    if(cfg.btnPesquisar)cfg.btnPesquisar.disabled=true;
+    const {res,data}=await requestJson("GET",`/agenda-legado/horarios-livres?${params.toString()}`,undefined,true);
+    agendaSemanaHorariosAtualizarBotoes();
+    if(!res.ok){
+      footerMsg.textContent=data?.detail||"Falha ao pesquisar horarios livres.";
+      return;
+    }
+    agendaSemanaHorariosRenderResultados(Array.isArray(data)?data:[]);
+  };
+  const agendaSemanaHorariosVincularEventos=()=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg||cfg.bound)return;
+    cfg.bound=true;
+    cfg.chkDias.forEach(chk=>chk.addEventListener("change",agendaSemanaHorariosAtualizarBotoes));
+    cfg.chkPeriodo.addEventListener("change",agendaSemanaHorariosAtualizarBotoes);
+    [cfg.horaIni,cfg.horaFim,cfg.dataIni,cfg.dataFim,cfg.prestador,cfg.unidade].forEach(el=>{
+      if(el)el.addEventListener("change",agendaSemanaHorariosAtualizarBotoes);
+    });
+    [cfg.horaIni,cfg.horaFim].forEach(el=>{
+      if(!el)return;
+      el.addEventListener("blur",()=>{
+        const normal=agendaSemanaHorariosNormalizarHora(el.value);
+        if(normal)el.value=normal;
+        agendaSemanaHorariosAtualizarBotoes();
+      });
+    });
+    cfg.btnPesquisar.addEventListener("click",agendaSemanaHorariosPesquisar);
+    cfg.btnEditar.addEventListener("click",agendaSemanaHorariosAbrirNovoSelecionado);
+    cfg.btnFechar.addEventListener("click",agendaSemanaHorariosFechar);
+    cfg.backdrop.addEventListener("click",ev=>{
+      if(ev.target===cfg.backdrop)agendaSemanaHorariosFechar();
+    });
+    cfg.tbody.addEventListener("click",ev=>{
+      const tr=ev.target.closest("tr[data-idx]");
+      if(!tr)return;
+      agendaSemanaHorariosSelecionarIndice(Number(tr.dataset.idx||0),false);
+      agendaSemanaHorariosAtualizarBotoes();
+    });
+    cfg.tbody.addEventListener("dblclick",ev=>{
+      const tr=ev.target.closest("tr[data-idx]");
+      if(!tr)return;
+      agendaSemanaHorariosSelecionarIndice(Number(tr.dataset.idx||0),false);
+      agendaSemanaHorariosAbrirNovoSelecionado();
+    });
+    cfg.modal.addEventListener("keydown",ev=>{
+      if(ev.key==="Escape"){
+        ev.preventDefault();
+        agendaSemanaHorariosFechar();
+        return;
+      }
+      if(ev.key==="ArrowDown"||ev.key==="ArrowUp"){
+        if(!cfg.results.length)return;
+        ev.preventDefault();
+        const delta=ev.key==="ArrowDown"?1:-1;
+        const atual=Math.max(-1,Number(cfg.selectedIdx??-1));
+        agendaSemanaHorariosSelecionarIndice((atual<0?0:atual)+delta,true);
+        agendaSemanaHorariosAtualizarBotoes();
+        return;
+      }
+      if(ev.key==="Enter"&&ev.target!==cfg.horaIni&&ev.target!==cfg.horaFim&&cfg.selectedIdx>=0){
+        ev.preventDefault();
+        agendaSemanaHorariosAbrirNovoSelecionado();
+      }
+    });
+  };
+  const agendaSemanaHorariosPreencherCombos=()=>{
+    const cfg=agendaSemanaHorariosLivres;
+    if(!cfg)return;
+    const prestadores=Array.isArray(agendaSemanaState?.prestadores)?agendaSemanaState.prestadores:[];
+    const unidades=Array.isArray(agendaSemanaState?.unidades)?agendaSemanaState.unidades:[];
+    const prestadorAtual=String(agendaSemana?.selectPrestador?.value||sessaoAtual?.prestador_id||"").trim();
+    const unidadeAtual=String(agendaSemana?.selectUnidade?.value||sessaoAtual?.unidade_atendimento_id||"").trim();
+    cfg.prestador.innerHTML=prestadores.map(item=>`<option value="${esc(String(item?.id||""))}">${esc(String(item?.nome||"").trim())}</option>`).join("");
+    cfg.unidade.innerHTML=unidades.map(item=>`<option value="${esc(String(item?.id||""))}">${esc(String(item?.nome||"").trim())}</option>`).join("");
+    if(prestadorAtual&&[...cfg.prestador.options].some(opt=>opt.value===prestadorAtual))cfg.prestador.value=prestadorAtual;
+    else if(cfg.prestador.options.length)cfg.prestador.selectedIndex=0;
+    if(unidadeAtual&&[...cfg.unidade.options].some(opt=>opt.value===unidadeAtual))cfg.unidade.value=unidadeAtual;
+    else if(cfg.unidade.options.length)cfg.unidade.selectedIndex=0;
+  };
+  const agendaSemanaHorariosEnsureUI=()=>{
+    if(agendaSemanaHorariosLivres?.backdrop)return agendaSemanaHorariosLivres;
+    if(!document.getElementById("agenda-semana-horarios-style")){
+      const style=document.createElement("style");
+      style.id="agenda-semana-horarios-style";
+      style.textContent=`
+        .agenda-semana-horarios-backdrop{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.18);display:grid;place-items:center}
+        .agenda-semana-horarios-backdrop.hidden{display:none}
+        .agenda-semana-horarios-modal{width:min(640px,96vw);background:#efefef;border:1px solid #b9b9b9;box-shadow:2px 2px 10px rgba(0,0,0,.25);padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif}
+        .agenda-semana-horarios-title{font:400 33px/1 "Segoe UI Symbol","Arial Unicode MS",Tahoma,sans-serif;text-align:center;transform:translateY(-1px) scaleX(.72);transform-origin:center;margin:2px 0 8px;color:#2d2d2d}
+        .agenda-semana-horarios-box{border:1px solid #c3c3c3;padding:8px;background:#efefef}
+        .agenda-semana-horarios-top{display:grid;grid-template-columns:140px 1fr;gap:8px}
+        .agenda-semana-horarios-dias{border:1px solid #c6c6c6;padding:6px;background:#efefef}
+        .agenda-semana-horarios-dias-title{margin-bottom:4px;font-weight:700}
+        .agenda-semana-horarios-dias label{display:flex;align-items:center;gap:5px;line-height:19px}
+        .agenda-semana-horarios-filtros{display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center}
+        .agenda-semana-horarios-filtros label{white-space:nowrap}
+        .agenda-semana-horarios-filtros select,.agenda-semana-horarios-filtros input[type="text"],.agenda-semana-horarios-filtros input[type="date"]{height:24px;border:1px solid #bfc9d6;padding:0 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif}
+        .agenda-semana-horarios-linha-hora{display:flex;align-items:center;gap:6px}
+        .agenda-semana-horarios-linha-hora input{width:64px}
+        .agenda-semana-horarios-linha-periodo{display:flex;align-items:center;gap:6px}
+        .agenda-semana-horarios-linha-periodo input[type="date"]{width:136px}
+        .agenda-semana-horarios-btn-wrap{display:flex;justify-content:flex-end}
+        .agenda-semana-horarios-btn-wrap .materiais-btn{height:24px;min-width:92px;justify-content:center}
+        .agenda-semana-horarios-grid{border:1px solid #c0c9d6;background:#fff;height:214px;overflow:auto;margin-top:8px}
+        .agenda-semana-horarios-grid table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .agenda-semana-horarios-grid th,.agenda-semana-horarios-grid td{height:22px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #edf1f6}
+        .agenda-semana-horarios-grid th{background:#f2f6fb;font:700 12px Tahoma,sans-serif;text-align:left}
+        .agenda-semana-horarios-grid tr.selected{background:#1f66c2;color:#fff}
+        .agenda-semana-horarios-grid tr.agenda-semana-horarios-empty td{height:190px;border-bottom:none}
+        .agenda-semana-horarios-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+        .agenda-semana-horarios-actions .materiais-btn{min-width:92px;justify-content:center}
+      `;
+      document.head.appendChild(style);
+    }
+    const backdrop=document.createElement("div");
+    backdrop.className="agenda-semana-horarios-backdrop hidden";
+    backdrop.innerHTML=`
+      <div class="agenda-semana-horarios-modal" role="dialog" aria-modal="true" tabindex="0">
+        <div class="agenda-semana-horarios-title">Pesquisa horarios livres</div>
+        <div class="agenda-semana-horarios-box">
+          <div class="agenda-semana-horarios-top">
+            <div class="agenda-semana-horarios-dias">
+              <div class="agenda-semana-horarios-dias-title">Dias da semana:</div>
+              <label><input id="agenda-semana-hl-dia-1" type="checkbox" value="1" checked> Segunda</label>
+              <label><input id="agenda-semana-hl-dia-2" type="checkbox" value="2" checked> Terca</label>
+              <label><input id="agenda-semana-hl-dia-3" type="checkbox" value="3" checked> Quarta</label>
+              <label><input id="agenda-semana-hl-dia-4" type="checkbox" value="4" checked> Quinta</label>
+              <label><input id="agenda-semana-hl-dia-5" type="checkbox" value="5" checked> Sexta</label>
+              <label><input id="agenda-semana-hl-dia-6" type="checkbox" value="6" checked> Sabado</label>
+            </div>
+            <div class="agenda-semana-horarios-filtros">
+              <label for="agenda-semana-hl-prestador">Cirurgiao:</label>
+              <select id="agenda-semana-hl-prestador"></select>
+              <label for="agenda-semana-hl-unidade">Unidade:</label>
+              <select id="agenda-semana-hl-unidade"></select>
+              <label for="agenda-semana-hl-hora-ini">Horario entre:</label>
+              <div class="agenda-semana-horarios-linha-hora">
+                <input id="agenda-semana-hl-hora-ini" type="text" maxlength="5" value="07:00">
+                <span>e</span>
+                <input id="agenda-semana-hl-hora-fim" type="text" maxlength="5" value="20:00">
+              </div>
+              <label for="agenda-semana-hl-data-ini"><input id="agenda-semana-hl-periodo" type="checkbox"> Periodo entre:</label>
+              <div class="agenda-semana-horarios-linha-periodo">
+                <input id="agenda-semana-hl-data-ini" type="date" disabled>
+                <span>e</span>
+                <input id="agenda-semana-hl-data-fim" type="date" disabled>
+              </div>
+              <div></div>
+              <div class="agenda-semana-horarios-btn-wrap">
+                <button id="agenda-semana-hl-pesquisar" class="materiais-btn" type="button">Pesquisa</button>
+              </div>
+            </div>
+          </div>
+          <div class="agenda-semana-horarios-grid">
+            <table>
+              <colgroup>
+                <col style="width:98px">
+                <col style="width:84px">
+                <col style="width:78px">
+                <col style="width:82px">
+                <col>
+              </colgroup>
+              <thead><tr><th>Data</th><th>Dia</th><th>Hora</th><th>Duração</th><th>Cirurgião</th></tr></thead>
+              <tbody id="agenda-semana-hl-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="agenda-semana-horarios-actions">
+          <button id="agenda-semana-hl-editar" class="materiais-btn" type="button" disabled>Edita...</button>
+          <button id="agenda-semana-hl-fechar" class="materiais-btn" type="button">Fecha</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    agendaSemanaHorariosLivres={
+      backdrop,
+      modal:backdrop.querySelector(".agenda-semana-horarios-modal"),
+      chkDias:[1,2,3,4,5,6].map(n=>backdrop.querySelector(`#agenda-semana-hl-dia-${n}`)).filter(Boolean),
+      prestador:backdrop.querySelector("#agenda-semana-hl-prestador"),
+      unidade:backdrop.querySelector("#agenda-semana-hl-unidade"),
+      horaIni:backdrop.querySelector("#agenda-semana-hl-hora-ini"),
+      horaFim:backdrop.querySelector("#agenda-semana-hl-hora-fim"),
+      chkPeriodo:backdrop.querySelector("#agenda-semana-hl-periodo"),
+      dataIni:backdrop.querySelector("#agenda-semana-hl-data-ini"),
+      dataFim:backdrop.querySelector("#agenda-semana-hl-data-fim"),
+      btnPesquisar:backdrop.querySelector("#agenda-semana-hl-pesquisar"),
+      tbody:backdrop.querySelector("#agenda-semana-hl-tbody"),
+      btnEditar:backdrop.querySelector("#agenda-semana-hl-editar"),
+      btnFechar:backdrop.querySelector("#agenda-semana-hl-fechar"),
+      results:[],
+      selectedIdx:-1,
+      bound:false,
+    };
+    agendaSemanaHorariosVincularEventos();
+    agendaSemanaHorariosRenderResultados([]);
+    return agendaSemanaHorariosLivres;
+  };
+  const agendaSemanaHorariosAbrir=()=>{
+    const cfg=agendaSemanaHorariosEnsureUI();
+    agendaSemanaHorariosPreencherCombos();
+    cfg.chkDias.forEach(chk=>{chk.checked=true});
+    cfg.chkPeriodo.checked=false;
+    cfg.dataIni.value="";
+    cfg.dataFim.value="";
+    const prestSel=(Array.isArray(agendaSemanaState?.prestadores)?agendaSemanaState.prestadores:[])
+      .find(item=>Number(item?.id||0)===Number(cfg.prestador?.value||0));
+    const agendaCfg=agendaSemanaNormalizaConfig(prestSel?.agenda_config||{});
+    const horaIni=agendaSemanaHorariosNormalizarHora(agendaCfg?.manha_inicio||"07:00")||"07:00";
+    const horaFim=agendaSemanaHorariosNormalizarHora(agendaCfg?.tarde_fim||"20:00")||"20:00";
+    cfg.horaIni.value=horaIni;
+    cfg.horaFim.value=horaFim;
+    agendaSemanaHorariosRenderResultados([]);
+    agendaSemanaHorariosAtualizarBotoes();
+    cfg.backdrop.classList.remove("hidden");
+    requestAnimationFrame(()=>{try{cfg.horaIni.focus();cfg.horaIni.select()}catch{}});
+  };
+  const agendaSemanaAvisoDataBr=(iso)=>{
+    const d=agendaSemanaParseDataCivil(String(iso||"").trim());
+    if(!d)return String(iso||"").trim();
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+  };
+  const agendaSemanaAvisoTipoAtual=()=>String(agendaSemanaAviso?.tipo?.value||"email").trim().toLowerCase()==="whatsapp"?"whatsapp":"email";
+  const agendaSemanaAvisoFechar=()=>{
+    if(!agendaSemanaAviso?.backdrop)return;
+    agendaSemanaAviso.backdrop.classList.add("hidden");
+  };
+  const agendaSemanaAvisoAtualizarColunaContato=()=>{
+    if(!agendaSemanaAviso)return;
+    if(agendaSemanaAviso.thContato)agendaSemanaAviso.thContato.textContent=agendaSemanaAvisoTipoAtual()==="whatsapp"?"WhatsApp":"E-mail";
+  };
+  const agendaSemanaAvisoAtualizarBotoes=()=>{
+    if(!agendaSemanaAviso)return;
+    const ini=String(agendaSemanaAviso.dataIni?.value||"").trim();
+    const fim=String(agendaSemanaAviso.dataFim?.value||"").trim();
+    const podePesquisar=!!ini&&!!fim&&fim>=ini&&String(agendaSemanaAviso.modelo?.value||"").trim().length>0;
+    if(agendaSemanaAviso.btnPesquisar)agendaSemanaAviso.btnPesquisar.disabled=!podePesquisar;
+    const marcados=(Array.isArray(agendaSemanaAviso.rows)?agendaSemanaAviso.rows:[]).some(row=>!!row?.ok);
+    if(agendaSemanaAviso.btnOk)agendaSemanaAviso.btnOk.disabled=!marcados;
+  };
+  const agendaSemanaAvisoRenderRows=(rows)=>{
+    if(!agendaSemanaAviso)return;
+    agendaSemanaAviso.rows=(Array.isArray(rows)?rows:[]).map(row=>({...row,ok:row?.ok!==false}));
+    agendaSemanaAviso.selectedIdx=agendaSemanaAviso.rows.length?0:-1;
+    agendaSemanaAviso.tbody.innerHTML=agendaSemanaAviso.rows.map((row,idx)=>{
+      const selected=idx===agendaSemanaAviso.selectedIdx?" selected":"";
+      const okMark=row?.ok?"✔":"";
+      return `<tr data-idx="${idx}" class="${selected}"><td>${esc(agendaSemanaAvisoDataBr(row?.data))}</td><td>${esc(String(row?.hora||""))}</td><td>${esc(String(row?.paciente||""))}</td><td>${esc(String(row?.contato||""))}</td><td class="agenda-semana-aviso-ok-cell">${esc(okMark)}</td></tr>`;
+    }).join("")||'<tr class="agenda-semana-aviso-empty"><td colspan="5"></td></tr>';
+    agendaSemanaAvisoAtualizarColunaContato();
+    agendaSemanaAvisoAtualizarBotoes();
+  };
+  const agendaSemanaAvisoRecarregarModelos=()=>{
+    if(!agendaSemanaAviso)return;
+    const tipo=agendaSemanaAvisoTipoAtual();
+    const modelos=(agendaSemanaAviso.opcoes?.modelos?.[tipo]||[]);
+    const atual=String(agendaSemanaAviso.modelo.value||"").trim();
+    agendaSemanaAviso.modelo.innerHTML=modelos.map(item=>`<option value="${esc(String(item?.id||""))}">${esc(String(item?.nome||""))}</option>`).join("");
+    if(atual&&[...agendaSemanaAviso.modelo.options].some(opt=>opt.value===atual)){
+      agendaSemanaAviso.modelo.value=atual;
+    }else{
+      const defaults=agendaSemanaAviso.opcoes?.defaults||{};
+      const def=String(tipo==="whatsapp"?defaults?.whatsapp_modelo_id||"":defaults?.email_modelo_id||"");
+      if(def&&[...agendaSemanaAviso.modelo.options].some(opt=>opt.value===def))agendaSemanaAviso.modelo.value=def;
+      else if(agendaSemanaAviso.modelo.options.length)agendaSemanaAviso.modelo.selectedIndex=0;
+    }
+    agendaSemanaAvisoAtualizarColunaContato();
+    agendaSemanaAvisoAtualizarBotoes();
+  };
+  const agendaSemanaAvisoCarregarOpcoes=async()=>{
+    if(!agendaSemanaAviso)return false;
+    const {res,data}=await requestJson("GET","/agenda-legado/avisos-agendamento/opcoes",undefined,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao carregar opções de aviso.");
+      return false;
+    }
+    agendaSemanaAviso.opcoes=data||{};
+    const tipos=Array.isArray(data?.tipos_envio)?data.tipos_envio:[];
+    agendaSemanaAviso.tipo.innerHTML=tipos.map(item=>`<option value="${esc(String(item?.id||""))}">${esc(String(item?.label||item?.id||""))}</option>`).join("");
+    if(!agendaSemanaAviso.tipo.value&&agendaSemanaAviso.tipo.options.length)agendaSemanaAviso.tipo.selectedIndex=0;
+    agendaSemanaAvisoRecarregarModelos();
+    const defaults=data?.defaults||{};
+    if(defaults?.periodo_ini)agendaSemanaAviso.dataIni.value=String(defaults.periodo_ini||"");
+    if(defaults?.periodo_fim)agendaSemanaAviso.dataFim.value=String(defaults.periodo_fim||"");
+    agendaSemanaAviso.chkTodos.checked=true;
+    agendaSemanaAvisoRenderRows([]);
+    return true;
+  };
+  const agendaSemanaAvisoPesquisar=async()=>{
+    if(!agendaSemanaAviso)return;
+    const params=new URLSearchParams();
+    params.set("data_ini",String(agendaSemanaAviso.dataIni.value||"").trim());
+    params.set("data_fim",String(agendaSemanaAviso.dataFim.value||"").trim());
+    params.set("tipo_envio",agendaSemanaAvisoTipoAtual());
+    params.set("todos_cirurgioes",agendaSemanaAviso.chkTodos.checked?"1":"0");
+    if(!agendaSemanaAviso.chkTodos.checked){
+      const prestador=String(agendaSemana?.selectPrestador?.value||"").trim();
+      if(prestador)params.set("id_prestador",prestador);
+    }
+    params.set("limit","5000");
+    if(agendaSemanaAviso.btnPesquisar)agendaSemanaAviso.btnPesquisar.disabled=true;
+    const {res,data}=await requestJson("GET",`/agenda-legado/avisos-agendamento?${params.toString()}`,undefined,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao pesquisar avisos.");
+      agendaSemanaAvisoAtualizarBotoes();
+      return;
+    }
+    agendaSemanaAvisoRenderRows(Array.isArray(data)?data:[]);
+  };
+  const agendaSemanaAvisoEnviar=async()=>{
+    if(!agendaSemanaAviso)return;
+    const rows=Array.isArray(agendaSemanaAviso.rows)?agendaSemanaAviso.rows:[];
+    const itens=rows.map(row=>({agenda_id:Number(row?.id||0)||0,ok:!!row?.ok})).filter(row=>row.agenda_id>0);
+    if(!itens.some(item=>item.ok)){
+      agendaSemanaAvisoAtualizarBotoes();
+      return;
+    }
+    const payload={
+      tipo_envio:agendaSemanaAvisoTipoAtual(),
+      modelo_id:Number(agendaSemanaAviso.modelo?.value||0)||null,
+      itens,
+    };
+    const {res,data}=await requestJson("POST","/agenda-legado/avisos-agendamento/enviar",payload,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao enviar avisos.");
+      return;
+    }
+    const enviados=Number(data?.enviados||0)||0;
+    const pendentes=Number(data?.pendentes||0)||0;
+    const total=Number(data?.total_selecionados||0)||0;
+    if(payload.tipo_envio==="whatsapp"){
+      const links=Array.isArray(data?.links_whatsapp)?data.links_whatsapp:[];
+      links.forEach(item=>{
+        const url=String(item?.url||"").trim();
+        if(url)window.open(url,"_blank","noopener");
+      });
+    }
+    const falhas=Array.isArray(data?.falhas)?data.falhas:[];
+    if(falhas.length)window.alert(`Processado ${total} aviso(s). Enviados: ${enviados}. Pendentes: ${pendentes}. Falhas: ${falhas.length}.`);
+    else window.alert(`Processado ${total} aviso(s). Enviados: ${enviados}. Pendentes: ${pendentes}.`);
+    agendaSemanaAvisoFechar();
+  };
+  const agendaSemanaAvisoVincularEventos=()=>{
+    if(!agendaSemanaAviso||agendaSemanaAviso.bound)return;
+    agendaSemanaAviso.bound=true;
+    [agendaSemanaAviso.dataIni,agendaSemanaAviso.dataFim,agendaSemanaAviso.modelo].forEach(el=>{
+      if(el)el.addEventListener("change",agendaSemanaAvisoAtualizarBotoes);
+    });
+    agendaSemanaAviso.tipo.addEventListener("change",()=>{
+      agendaSemanaAvisoRecarregarModelos();
+      agendaSemanaAvisoRenderRows([]);
+    });
+    agendaSemanaAviso.chkTodos.addEventListener("change",agendaSemanaAvisoAtualizarBotoes);
+    agendaSemanaAviso.btnPesquisar.addEventListener("click",agendaSemanaAvisoPesquisar);
+    agendaSemanaAviso.btnOk.addEventListener("click",agendaSemanaAvisoEnviar);
+    agendaSemanaAviso.btnCancela.addEventListener("click",agendaSemanaAvisoFechar);
+    agendaSemanaAviso.backdrop.addEventListener("click",ev=>{
+      if(ev.target===agendaSemanaAviso.backdrop)agendaSemanaAvisoFechar();
+    });
+    agendaSemanaAviso.tbody.addEventListener("click",ev=>{
+      const tr=ev.target.closest("tr[data-idx]");
+      if(!tr)return;
+      const idx=Math.max(0,Number(tr.dataset.idx||0)||0);
+      agendaSemanaAviso.selectedIdx=idx;
+      if(ev.target.closest(".agenda-semana-aviso-ok-cell")){
+        const row=agendaSemanaAviso.rows[idx];
+        if(row)row.ok=!row.ok;
+      }
+      agendaSemanaAvisoRenderRows(agendaSemanaAviso.rows);
+    });
+    agendaSemanaAviso.modal.addEventListener("keydown",ev=>{
+      if(ev.key==="Escape"){
+        ev.preventDefault();
+        agendaSemanaAvisoFechar();
+        return;
+      }
+      if(ev.key==="Enter"){
+        ev.preventDefault();
+        agendaSemanaAvisoPesquisar();
+      }
+    });
+  };
+  const agendaSemanaAvisoEnsureUI=()=>{
+    if(agendaSemanaAviso?.backdrop)return agendaSemanaAviso;
+    if(!document.getElementById("agenda-semana-aviso-style")){
+      const style=document.createElement("style");
+      style.id="agenda-semana-aviso-style";
+      style.textContent=`
+        .agenda-semana-aviso-backdrop{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.12);display:grid;place-items:center}
+        .agenda-semana-aviso-backdrop.hidden{display:none}
+        .agenda-semana-aviso-modal{width:min(700px,96vw);background:#efefef;border:1px solid #9ea9b5;box-shadow:2px 2px 8px rgba(0,0,0,.18);padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#111}
+        .agenda-semana-aviso-modal *{font-family:Tahoma,sans-serif}
+        .agenda-semana-aviso-title{font:400 33px/1 "Segoe UI Symbol","Arial Unicode MS",Tahoma,sans-serif;text-align:center;transform:translateY(-1px) scaleX(.72);transform-origin:center;margin:0 0 8px;color:#2a2a2a}
+        .agenda-semana-aviso-box{border:1px solid #bfc6ce;padding:8px;background:#efefef}
+        .agenda-semana-aviso-top{display:grid;grid-template-columns:190px 120px minmax(140px,1fr) 86px;column-gap:8px;row-gap:0;align-items:end}
+        .agenda-semana-aviso-top label{display:block;margin:0 0 1px}
+        .agenda-semana-aviso-top input,.agenda-semana-aviso-top select{height:24px;border:1px solid #aeb9c6;padding:0 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif;border-radius:0}
+        .agenda-semana-aviso-periodo{display:flex;align-items:center;gap:5px}
+        #agenda-semana-aviso-data-ini,#agenda-semana-aviso-data-fim{width:86px;min-width:86px}
+        #agenda-semana-aviso-tipo{width:118px;min-width:118px}
+        #agenda-semana-aviso-modelo{width:100%;min-width:0}
+        #agenda-semana-aviso-pesquisar{width:86px;min-width:86px;padding:0}
+        .agenda-semana-aviso-todos{margin:8px 0 6px;display:flex;align-items:center;gap:6px}
+        .agenda-semana-aviso-todos input{margin:0}
+        .agenda-semana-aviso-grid{border:1px solid #bfc6ce;background:#fff;height:318px;overflow:auto}
+        .agenda-semana-aviso-grid table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .agenda-semana-aviso-grid th,.agenda-semana-aviso-grid td{height:22px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #e7ebf0}
+        .agenda-semana-aviso-grid th{background:#eceff3;font:700 12px Tahoma,sans-serif;text-align:left;border-bottom:1px solid #c8d0da}
+        .agenda-semana-aviso-grid tr.selected{background:#2a72c9;color:#fff}
+        .agenda-semana-aviso-grid tr.agenda-semana-aviso-empty td{height:286px;border-bottom:none}
+        .agenda-semana-aviso-grid .agenda-semana-aviso-ok-cell{text-align:center;font-weight:700;cursor:pointer}
+        .agenda-semana-aviso-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+        .agenda-semana-aviso-modal .materiais-btn{height:30px;min-width:90px;padding:0 12px;border:1px solid #9ba9b9;border-radius:2px;background:#efefef;color:#111;box-shadow:none;font:700 12px Tahoma,sans-serif}
+        .agenda-semana-aviso-modal .materiais-btn:disabled{color:#8f8f8f;background:#ececec;opacity:1}
+        .agenda-semana-aviso-modal .materiais-btn:not(:disabled):hover{background:#e7ebf1}
+      `;
+      document.head.appendChild(style);
+    }
+    const backdrop=document.createElement("div");
+    backdrop.className="agenda-semana-aviso-backdrop hidden";
+    backdrop.innerHTML=`
+      <div class="agenda-semana-aviso-modal" role="dialog" aria-modal="true" tabindex="0">
+        <div class="agenda-semana-aviso-title">Enviar avisos de agendamento</div>
+        <div class="agenda-semana-aviso-box">
+          <div class="agenda-semana-aviso-top">
+            <div>
+              <label for="agenda-semana-aviso-data-ini">Período:</label>
+              <div class="agenda-semana-aviso-periodo">
+                <input id="agenda-semana-aviso-data-ini" type="date">
+                <span>a</span>
+                <input id="agenda-semana-aviso-data-fim" type="date">
+              </div>
+            </div>
+            <div>
+              <label for="agenda-semana-aviso-tipo">Tipo de envio:</label>
+              <select id="agenda-semana-aviso-tipo"></select>
+            </div>
+            <div>
+              <label for="agenda-semana-aviso-modelo">Arquivo:</label>
+              <select id="agenda-semana-aviso-modelo"></select>
+            </div>
+            <button id="agenda-semana-aviso-pesquisar" class="materiais-btn" type="button">Pesquisa</button>
+          </div>
+          <label class="agenda-semana-aviso-todos"><input id="agenda-semana-aviso-todos" type="checkbox" checked> Todos os cirurgiões</label>
+          <div class="agenda-semana-aviso-grid">
+            <table>
+              <colgroup>
+                <col style="width:102px">
+                <col style="width:66px">
+                <col>
+                <col style="width:170px">
+                <col style="width:46px">
+              </colgroup>
+              <thead><tr><th>Data</th><th>Hora</th><th>Paciente</th><th id="agenda-semana-aviso-th-contato">E-mail</th><th>Ok</th></tr></thead>
+              <tbody id="agenda-semana-aviso-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="agenda-semana-aviso-actions">
+          <button id="agenda-semana-aviso-ok" class="materiais-btn" type="button">Ok</button>
+          <button id="agenda-semana-aviso-cancela" class="materiais-btn" type="button">Cancela</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    agendaSemanaAviso={
+      backdrop,
+      modal:backdrop.querySelector(".agenda-semana-aviso-modal"),
+      dataIni:backdrop.querySelector("#agenda-semana-aviso-data-ini"),
+      dataFim:backdrop.querySelector("#agenda-semana-aviso-data-fim"),
+      tipo:backdrop.querySelector("#agenda-semana-aviso-tipo"),
+      modelo:backdrop.querySelector("#agenda-semana-aviso-modelo"),
+      btnPesquisar:backdrop.querySelector("#agenda-semana-aviso-pesquisar"),
+      chkTodos:backdrop.querySelector("#agenda-semana-aviso-todos"),
+      thContato:backdrop.querySelector("#agenda-semana-aviso-th-contato"),
+      tbody:backdrop.querySelector("#agenda-semana-aviso-tbody"),
+      btnOk:backdrop.querySelector("#agenda-semana-aviso-ok"),
+      btnCancela:backdrop.querySelector("#agenda-semana-aviso-cancela"),
+      rows:[],
+      selectedIdx:-1,
+      opcoes:null,
+      bound:false,
+    };
+    agendaSemanaAvisoVincularEventos();
+    agendaSemanaAvisoRenderRows([]);
+    return agendaSemanaAviso;
+  };
+  const agendaSemanaAvisoAbrir=async()=>{
+    const cfg=agendaSemanaAvisoEnsureUI();
+    const ok=await agendaSemanaAvisoCarregarOpcoes();
+    if(!ok)return;
+    cfg.backdrop.classList.remove("hidden");
+    requestAnimationFrame(()=>{try{cfg.dataIni.focus();cfg.dataIni.select()}catch{}});
   };
   if(_agendaSemanaRenderEstruturaOrig){
     agendaSemanaRenderEstrutura=function(skipStablePass=false){
@@ -1244,21 +2203,31 @@ if(typeof agendaSemanaRenderEventos==="function"){
         agendaSemana.daysWrap.addEventListener("drop",agendaSemanaOnDrop);
         agendaSemana.daysWrap.addEventListener("dragleave",agendaSemanaOnDragLeave);
       }
-      if(!agendaSemana?.btnHorario)return;
-      if(agendaSemana.btnHorario.dataset.editPatchBound==="1")return;
-      agendaSemana.btnHorario.dataset.editPatchBound="1";
-      const novoBtn=agendaSemana.btnHorario.cloneNode(true);
-      agendaSemana.btnHorario.replaceWith(novoBtn);
-      agendaSemana.btnHorario=novoBtn;
-      agendaSemana.btnHorario.dataset.editPatchBound="1";
-      agendaSemana.btnHorario.addEventListener("click",()=>{
-        const item=agendaSemanaGetEventoById(agendaSemanaState?.selectedEventId);
-        if(!item){
-          footerMsg.textContent="Selecione um agendamento na grade para editar.";
-          return;
-        }
-        agendaSemanaAbrirModalEditar(item);
-      });
+      if(agendaSemana?.btnPaciente&&agendaSemana.btnPaciente.dataset.searchPatchBound!=="1"){
+        const novoBtnPaciente=agendaSemana.btnPaciente.cloneNode(true);
+        agendaSemana.btnPaciente.replaceWith(novoBtnPaciente);
+        agendaSemana.btnPaciente=novoBtnPaciente;
+        agendaSemana.btnPaciente.dataset.searchPatchBound="1";
+        agendaSemana.btnPaciente.addEventListener("click",()=>agendaSemanaPesquisaAbrir());
+      }
+      if(agendaSemana?.btnHorario&&agendaSemana.btnHorario.dataset.freeSearchPatchBound!=="1"){
+        const novoBtn=agendaSemana.btnHorario.cloneNode(true);
+        agendaSemana.btnHorario.replaceWith(novoBtn);
+        agendaSemana.btnHorario=novoBtn;
+        agendaSemana.btnHorario.dataset.freeSearchPatchBound="1";
+        agendaSemana.btnHorario.addEventListener("click",()=>{
+          agendaSemanaHorariosAbrir();
+        });
+      }
+      if(agendaSemana?.btnAviso&&agendaSemana.btnAviso.dataset.avisoPatchBound!=="1"){
+        const novoBtnAviso=agendaSemana.btnAviso.cloneNode(true);
+        agendaSemana.btnAviso.replaceWith(novoBtnAviso);
+        agendaSemana.btnAviso=novoBtnAviso;
+        agendaSemana.btnAviso.dataset.avisoPatchBound="1";
+        agendaSemana.btnAviso.addEventListener("click",()=>{
+          agendaSemanaAvisoAbrir();
+        });
+      }
     };
   }
 

@@ -217,7 +217,7 @@ function initMojibakeAutoFix(){
 const protectedErr=parseProtectedError(res,data);if(auth&&protectedErr){try{const grant=await ensureProtectedGrant(protectedErr.moduleCode,protectedErr.message);if(grant){protectedGrantCache.set(protectedErr.moduleCode,grant);({res,data}=await requestJsonBase(method,path,payload,auth,{"X-Protected-Grant":grant}));const protectedAfterRetry=parseProtectedError(res,data);if(protectedAfterRetry){protectedGrantCache.delete(protectedErr.moduleCode)}}}catch(err){return{res,data:{detail:err?.message||"Falha ao validar mÃƒÂ³dulo protegido."}}}}return{res,data}};
 const postJson=async(path,payload,auth=false)=>requestJson("POST",path,payload,auth);
 const licSetStatus=(msg,erro=false,sucesso=false)=>{if(!licDlg.status)return;licDlg.status.textContent=msg||"";licDlg.status.style.color=erro?"#b00020":(sucesso?"#0a7a00":"#1f2937")};
-const licPlanoLabel=(info)=>{if(!info)return"LicenÃƒÂ§a";if(info.status==="OWNER")return"LicenÃƒÂ§a VitalÃƒÂ­cia";if(info.status==="SUPERADMIN")return"Super Admin";if(info.status==="DEMO")return`Demo (${info.dias_restantes||0} dias)`;if(info.status==="MENSAL")return"Plano Mensal";if(info.status==="ANUAL")return"Plano Anual";if(info.status==="EXPIRADO")return"LicenÃƒÂ§a Expirada";return"LicenÃƒÂ§a"};
+const licPlanoLabel=(info)=>{if(!info)return"Licença";if(info.status==="OWNER")return"Licença Vitalícia";if(info.status==="SUPERADMIN")return"Super Admin";if(info.status==="DEMO")return`Demo (${info.dias_restantes||0} dias)`;if(info.status==="MENSAL")return"Plano Mensal";if(info.status==="ANUAL")return"Plano Anual";if(info.status==="EXPIRADO")return"Licença Expirada";return"Licença"};
 const licUpdateBadge=(info)=>{if(!userLicense)return;userLicense.textContent=licPlanoLabel(info)};
 async function licCarregarInfo(){const{res,data}=await requestJson("GET","/licenca/info",undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar licenÃƒÂ§a.");licInfoCache=data;licUpdateBadge(data);return data}
 function licPreencherSobre(info){sobreDlg.versao.textContent=info.versao_sistema||"1.0.0";sobreDlg.suporte.textContent=info.email_suporte||"institutobrana@gmail.com";sobreDlg.registrado.textContent=info.usuario_registro||"Registrado";sobreDlg.serial.textContent=info.serial||"-";sobreDlg.machine.textContent=info.machine_id||"-";sobreDlg.status.textContent=info.mensagem_sobre||"-"}
@@ -277,7 +277,7 @@ const PANEL_TITLE_DEFAULTS={"workspace-empty":"Bem-vindo","cenario-panel":"Confi
 function panelInsetsById(panelId){const m={"workspace-empty":[12,12],"cenario-panel":[12,12],"materiais-panel":[10,10],"procedimentos-panel":[10,10],"novo-proc-panel":[12,12],"users-panel":[12,12],"superadmin-panel":[12,12],"proteticos-panel":[10,10],"ctrl-proteticos-panel":[10,10],"convenios-planos-panel":[10,10],"convplan-cal-panel":[10,10],"prestadores-panel":[10,10],"prest-cred-panel":[10,10],"prest-com-panel":[10,10],"pgen-panel":[8,8],"cc-panel":[8,8],"plano-panel":[8,8],"aux-panel":[9,9],"rcc-panel":[8,8],"rview-panel":[8,8],"fcx-panel":[0,0],"dash-panel":[10,8],"agenda-contatos-panel":[10,10],"agenda-legado-panel":[10,10],"agenda-semana-panel":[10,10],"cid-panel":[10,10],"simbolos-panel":[10,10],"anamnese-panel":[10,10]};return m[panelId]||[12,12]}
 function modalInsetsById(backdropId){const m={"materiais-modal-backdrop":[10,10],"materiais-tabela-modal-backdrop":[12,10],"vincula-backdrop":[12,12],"proc-tabela-modal-backdrop":[11,0],"proc-relatorio-backdrop":[12,12],"users-modal-backdrop":[12,12],"users-pass-backdrop":[12,12],"protected-pass-backdrop":[12,12],"users-perm-backdrop":[12,12],"sobre-backdrop":[12,12],"licenca-backdrop":[12,12],"ficha-menu-backdrop":[0,0],"cc-modal-backdrop":[8,8],"cad-modal-backdrop":[8,8],"prot-modal-backdrop":[8,8],"prot-relatorio-backdrop":[8,8],"prot-relatorio-arquivo-backdrop":[8,8],"agenda-contatos-modal-backdrop":[10,10],"cid-modal-backdrop":[10,10],"simbolos-modal-backdrop":[8,8],"config-relatorios-backdrop":[10,10],"config-impressora-backdrop":[10,10],"config-relatorios-teste-backdrop":[10,10],"config-relatorios-fonte-backdrop":[10,10],"config-relatorios-rede-backdrop":[0,0],"config-preferencias-backdrop":[10,10],"config-opcoes-sistema-backdrop":[10,10],"config-indices-backdrop":[10,10],"config-etiquetas-backdrop":[10,10],"config-etiquetas-edit-backdrop":[10,10],"convplan-convenio-modal-backdrop":[10,10],"convplan-plano-modal-backdrop":[10,10],"convplan-cal-modal-backdrop":[10,10],"prest-modal-backdrop":[10,10],"prest-agenda-backdrop":[10,10],"prest-agenda-bloqueio-backdrop":[10,10],"prest-agenda-fonte-backdrop":[10,10],"prest-cred-modal-backdrop":[10,10],"prest-com-modal-backdrop":[10,10]};return m[backdropId]||[12,12]}
 function closeModalByBackdropId(backdropId){if(backdropId==="materiais-modal-backdrop"){materiaisFecharModal();return}if(backdropId==="materiais-tabela-modal-backdrop"){materiaisTabelaFecharModal();return}if(backdropId==="vincula-backdrop"){procFecharVincular();return}if(backdropId==="proc-tabela-modal-backdrop"){procTabelaFecharModal();return}if(backdropId==="proc-relatorio-backdrop"){procRelatorioFechar();return}if(backdropId==="users-modal-backdrop"){usersFecharModal();return}if(backdropId==="users-pass-backdrop"){usersFecharModalSenha();return}if(backdropId==="protected-pass-backdrop"){protectedPassClose(null);return}if(backdropId==="users-perm-backdrop"){usersFecharPermissoes();return}if(backdropId==="sobre-backdrop"){fecharSobreModal();return}if(backdropId==="licenca-backdrop"){fecharLicencaModal();return}if(backdropId==="ficha-menu-backdrop"){fichaMenuPacFechar();return}if(backdropId==="cc-modal-backdrop"){ccFecharModal();return}if(backdropId==="cad-modal-backdrop"){const mb=document.getElementById("cad-modal-backdrop");if(mb)mb.classList.add("hidden");return}if(backdropId==="prot-modal-backdrop"){protFecharModal();return}if(backdropId==="prot-relatorio-backdrop"){protFecharRelatorio();return}if(backdropId==="prot-relatorio-arquivo-backdrop"){protFecharRelatorioArquivo();return}if(backdropId==="agenda-contatos-modal-backdrop"){agendaContatosFecharModal();return}if(backdropId==="cid-modal-backdrop"){cidFecharModal();return}if(backdropId==="simbolos-modal-backdrop"){simbolosFecharModal();return}if(backdropId==="config-relatorios-backdrop"){if(cnfRelatorio?.backdrop)cnfRelatorio.backdrop.classList.add("hidden");return}if(backdropId==="config-impressora-backdrop"){if(cnfRelatorioDlgImp?.backdrop)cnfRelatorioDlgImp.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-teste-backdrop"){if(cnfRelatorioDlgTeste?.backdrop)cnfRelatorioDlgTeste.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-fonte-backdrop"){if(cnfRelatorioDlgFonte?.backdrop)cnfRelatorioDlgFonte.backdrop.classList.add("hidden");return}if(backdropId==="config-relatorios-rede-backdrop"){if(cnfRelatorioDlgRede?.backdrop)cnfRelatorioDlgRede.backdrop.classList.add("hidden");return}if(backdropId==="config-preferencias-backdrop"){if(prefCfg?.backdrop)prefCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-opcoes-sistema-backdrop"){if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-indices-backdrop"){indicesFechar();return}if(backdropId==="config-etiquetas-backdrop"){if(etqCfg?.backdrop)etqCfg.backdrop.classList.add("hidden");return}if(backdropId==="config-etiquetas-edit-backdrop"){if(etqCfg?.editBackdrop)etqCfg.editBackdrop.classList.add("hidden");return}if(backdropId==="convplan-convenio-modal-backdrop"){if(convPlanCfg?.convenioModal?.backdrop)convPlanCfg.convenioModal.backdrop.classList.add("hidden");return}if(backdropId==="convplan-plano-modal-backdrop"){if(convPlanCfg?.planoModal?.backdrop)convPlanCfg.planoModal.backdrop.classList.add("hidden");return}if(backdropId==="convplan-cal-modal-backdrop"){if(convPlanCalCfg?.modal?.backdrop)convPlanCalCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-modal-backdrop"){if(prestCfg?.modal?.backdrop)prestCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-backdrop"){if(prestCfg?.agenda?.backdrop)prestCfg.agenda.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-bloqueio-backdrop"){if(prestCfg?.agendaBloqueioModal?.backdrop)prestCfg.agendaBloqueioModal.backdrop.classList.add("hidden");return}if(backdropId==="prest-agenda-fonte-backdrop"){if(prestCfg?.agendaFonteModal?.backdrop)prestCfg.agendaFonteModal.backdrop.classList.add("hidden");return}if(backdropId==="prest-cred-modal-backdrop"){if(prestCredCfg?.modal?.backdrop)prestCredCfg.modal.backdrop.classList.add("hidden");return}if(backdropId==="prest-com-modal-backdrop"){if(prestComCfg?.modal?.backdrop)prestComCfg.modal.backdrop.classList.add("hidden");return}}
-function modalTitleByBackdropId(backdropId){const m={"materiais-modal-backdrop":"Material","materiais-tabela-modal-backdrop":"Tabela de materiais","vincula-backdrop":"Vincular material","proc-tabela-modal-backdrop":"Tabela de preÃƒÂ§os","proc-relatorio-backdrop":"Tabela de intervenÃƒÂ§ÃƒÂµes","users-modal-backdrop":"UsuÃƒÂ¡rio","users-pass-backdrop":"Troca de senha","protected-pass-backdrop":"Senha","users-perm-backdrop":"PermissÃƒÂµes do usuÃƒÂ¡rio","sobre-backdrop":"Sobre","licenca-backdrop":"LicenÃƒÂ§a","ficha-menu-backdrop":"Menu de pacientes","cc-modal-backdrop":"Conta corrente","cad-modal-backdrop":"Cadastro","prot-modal-backdrop":"Insere serviÃƒÂ§o","prot-relatorio-backdrop":"Tabela de serviÃƒÂ§os de protÃƒÂ©tico","prot-relatorio-arquivo-backdrop":"Salvar relatÃƒÂ³rio em arquivo","agenda-contatos-modal-backdrop":"Novo contato","cid-modal-backdrop":"Nova doenÃƒÂ§a","simbolos-modal-backdrop":"Edita sÃƒÂ­mbolo grÃƒÂ¡fico","config-relatorios-backdrop":"Configura impressos","config-impressora-backdrop":"Configurar ImpressÃƒÂ£o","config-relatorios-teste-backdrop":"Imprimir","config-relatorios-fonte-backdrop":"Fonte","config-relatorios-rede-backdrop":"Rede","config-preferencias-backdrop":"Configura preferÃƒÂªncias do usuÃƒÂ¡rio","config-opcoes-sistema-backdrop":"OpÃƒÂ§ÃƒÂµes do sistema","config-indices-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de ÃƒÂ­ndices financeiros","config-etiquetas-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de modelos de etiqueta","config-etiquetas-edit-backdrop":"Novo modelo de etiqueta","convplan-convenio-modal-backdrop":"Novo convÃƒÂªnio","convplan-plano-modal-backdrop":"Novo plano","convplan-cal-modal-backdrop":"Nova data de faturamento","prest-modal-backdrop":"Novo prestador","prest-agenda-backdrop":"Configura horÃ¡rios de agendamento","prest-agenda-bloqueio-backdrop":"Novo bloqueio","prest-agenda-fonte-backdrop":"Fonte","prest-cred-modal-backdrop":"Novo credenciamento","prest-com-modal-backdrop":"Novo fator de comiss?o"};return m[backdropId]||"Detalhes"}
+function modalTitleByBackdropId(backdropId){const m={"materiais-modal-backdrop":"Material","materiais-tabela-modal-backdrop":"Tabela de materiais","vincula-backdrop":"Vincular material","proc-tabela-modal-backdrop":"Tabela de preÃƒÂ§os","proc-relatorio-backdrop":"Tabela de intervenÃƒÂ§ÃƒÂµes","users-modal-backdrop":"UsuÃƒÂ¡rio","users-pass-backdrop":"Troca de senha","protected-pass-backdrop":"Senha","users-perm-backdrop":"PermissÃƒÂµes do usuÃƒÂ¡rio","sobre-backdrop":"Sobre","licenca-backdrop":"LicenÃƒÂ§a","ficha-menu-backdrop":"Menu de pacientes","cc-modal-backdrop":"Conta corrente","cad-modal-backdrop":"Cadastro","prot-modal-backdrop":"Insere serviÃƒÂ§o","prot-relatorio-backdrop":"Tabela de serviÃƒÂ§os de protÃƒÂ©tico","prot-relatorio-arquivo-backdrop":"Salvar relatÃƒÂ³rio em arquivo","agenda-contatos-modal-backdrop":"Novo contato","cid-modal-backdrop":"Nova doenÃƒÂ§a","simbolos-modal-backdrop":"Edita sÃƒÂ­mbolo grÃƒÂ¡fico","config-relatorios-backdrop":"Configura impressos","config-impressora-backdrop":"Configurar Impressão","config-relatorios-teste-backdrop":"Imprimir","config-relatorios-fonte-backdrop":"Fonte","config-relatorios-rede-backdrop":"Rede","config-preferencias-backdrop":"Configura preferÃƒÂªncias do usuÃƒÂ¡rio","config-opcoes-sistema-backdrop":"OpÃƒÂ§ÃƒÂµes do sistema","config-indices-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de ÃƒÂ­ndices financeiros","config-etiquetas-backdrop":"ConfiguraÃƒÂ§ÃƒÂ£o de modelos de etiqueta","config-etiquetas-edit-backdrop":"Novo modelo de etiqueta","convplan-convenio-modal-backdrop":"Novo convÃƒÂªnio","convplan-plano-modal-backdrop":"Novo plano","convplan-cal-modal-backdrop":"Nova data de faturamento","prest-modal-backdrop":"Novo prestador","prest-agenda-backdrop":"Configura horÃ¡rios de agendamento","prest-agenda-bloqueio-backdrop":"Novo bloqueio","prest-agenda-fonte-backdrop":"Fonte","prest-cred-modal-backdrop":"Novo credenciamento","prest-com-modal-backdrop":"Novo fator de comiss?o"};return m[backdropId]||"Detalhes"}
 function directChildBySelector(parent,selector){return Array.from(parent.children||[]).find(el=>el.matches&&el.matches(selector))||null}
 function applyPanelChromeInsets(panel){const[x,y]=panelInsetsById(panel.id);panel.style.setProperty("--panel-pad-x",`${x}px`);panel.style.setProperty("--panel-pad-top",`${y}px`)}
 function applyModalChromeInsets(modal,backdropId){const[x,y]=modalInsetsById(backdropId);modal.style.setProperty("--modal-pad-x",`${x}px`);modal.style.setProperty("--modal-pad-top",`${y}px`)}
@@ -944,9 +944,9 @@ const CNF_RELATORIO_SECOES=[
   {id:"rodape",label:"RodapÃƒÂ© e totais",preview:"RodapÃƒÂ© e totais"}
 ];
 const CNF_RELATORIO_DESTINOS=[
-  {id:"browser",nome:"Escolher no navegador",tipo:"Destino do navegador",onde:"Definido pelo sistema",status:"DisponÃƒÂ­vel ao imprimir",comentario:"A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador."},
-  {id:"pdf",nome:"Salvar em PDF",tipo:"PDF do navegador",onde:"Download local",status:"DisponÃƒÂ­vel ao imprimir",comentario:"O navegador permitirÃƒÂ¡ salvar em PDF na etapa final."},
-  {id:"preview",nome:"PrÃƒÂ©via no navegador",tipo:"PrÃƒÂ©via do navegador",onde:"Tela",status:"DisponÃƒÂ­vel",comentario:"A impressÃƒÂ£o fÃƒÂ­sica serÃƒÂ¡ escolhida depois, no navegador."}
+  {id:"browser",nome:"Escolher no navegador",tipo:"Destino do navegador",onde:"Definido pelo sistema",status:"Disponível ao imprimir",comentario:"A impressora física é escolhida no diálogo final do navegador."},
+  {id:"pdf",nome:"Salvar em PDF",tipo:"PDF do navegador",onde:"Download local",status:"Disponível ao imprimir",comentario:"O navegador permitirá salvar em PDF na etapa final."},
+  {id:"preview",nome:"Prévia no navegador",tipo:"Prévia do navegador",onde:"Tela",status:"Disponível",comentario:"A impressão física será escolhida depois, no navegador."}
 ];
 function cnfRelatorioEnsureUI(){
   if(cnfRelatorio)return;
@@ -1225,7 +1225,7 @@ function cnfRelatorioContextoPadrao(){const userId=Number(sessaoAtual?.user_id||
 function cnfRelatorioResolverContexto(user=null,origin="menu"){if(user){return{scope:"usuario",origin,userId:Number(user.id||0)||0,userNome:String(user.nome||"").trim(),userApelido:String(user.apelido||user.nome||"").trim()}}const padrao=cnfRelatorioContextoPadrao();return{...padrao,origin}}
 function cnfRelatorioContextoAtual(){return cnfRelatorio?.context||cnfRelatorioContextoPadrao()}
 function cnfRelatorioStorageKey(){const clinicaId=Number(sessaoAtual?.clinica_id||0);const ctx=cnfRelatorioContextoAtual();const userKey=Number(ctx?.userId||0)||String(ctx?.scope||"sessao");return`brana_relatorios_cfg_${clinicaId||"global"}_${userKey}`}
-function cnfRelatorioPadrao(){return{headerText:"",printLogo:true,logoPath:"C:\\EDS70\\Textos\\CABECALHO.bmp",logoDataUrl:"",printUser:false,printPage:true,printDateTime:true,sectionId:"titulo",sectionStyles:{titulo:{fontFamily:"Tahoma",fontSize:22,bold:true,italic:false,underline:false,strike:false,color:"#111111"},cabecalho:{fontFamily:"Tahoma",fontSize:12,bold:true,italic:false,underline:false,strike:false,color:"#111111"},colunas:{fontFamily:"Tahoma",fontSize:10,bold:true,italic:false,underline:false,strike:false,color:"#111111"},corpo:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"},rodape:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"}},usePrinterPaper:true,paperHeightCm:29.7,paperWidthCm:21,paperMarginPreset:"custom",marginLeftCm:1,marginRightCm:1,marginTopCm:1,marginBottomCm:1,printerName:"Escolher no navegador",printerStatus:"DisponÃƒÂ­vel ao imprimir",printerType:"Destino do navegador",printerWhere:"Definido pelo sistema",printerComment:"A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador.",paperSize:"A4",paperSource:"Origem padrÃƒÂ£o",printerOrientation:"retrato"}}
+function cnfRelatorioPadrao(){return{headerText:"",printLogo:true,logoPath:"C:\\EDS70\\Textos\\CABECALHO.bmp",logoDataUrl:"",printUser:false,printPage:true,printDateTime:true,sectionId:"titulo",sectionStyles:{titulo:{fontFamily:"Tahoma",fontSize:22,bold:true,italic:false,underline:false,strike:false,color:"#111111"},cabecalho:{fontFamily:"Tahoma",fontSize:12,bold:true,italic:false,underline:false,strike:false,color:"#111111"},colunas:{fontFamily:"Tahoma",fontSize:10,bold:true,italic:false,underline:false,strike:false,color:"#111111"},corpo:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"},rodape:{fontFamily:"Tahoma",fontSize:10,bold:false,italic:false,underline:false,strike:false,color:"#111111"}},usePrinterPaper:true,paperHeightCm:29.7,paperWidthCm:21,paperMarginPreset:"custom",marginLeftCm:1,marginRightCm:1,marginTopCm:1,marginBottomCm:1,printerName:"Escolher no navegador",printerStatus:"Disponível ao imprimir",printerType:"Destino do navegador",printerWhere:"Definido pelo sistema",printerComment:"A impressora física é escolhida no diálogo final do navegador.",paperSize:"A4",paperSource:"Origem padrão",printerOrientation:"retrato"}}
 function cnfRelatorioNormalizarConfig(data){const padrao=cnfRelatorioPadrao();const parsed=data&&typeof data==="object"?data:{};return{...padrao,...parsed,sectionStyles:{...padrao.sectionStyles,...(parsed?.sectionStyles||{})}}}
 function cnfRelatorioCarregarLocal(){try{const raw=localStorage.getItem(cnfRelatorioStorageKey());const parsed=raw?JSON.parse(raw):{};return cnfRelatorioNormalizarConfig(parsed)}catch{return cnfRelatorioPadrao()}}
 function cnfRelatorioSalvarEstado(){if(cnfRelatorio?.state)localStorage.setItem(cnfRelatorioStorageKey(),JSON.stringify(cnfRelatorio.state))}
@@ -1355,12 +1355,12 @@ function cnfRelatorioAlterarFonte(){
 }
 function cnfRelatorioImpressoraAplicarPapel(st){const size=String(st.paperSize||"A4").toUpperCase();const retrato=String(st.printerOrientation||"retrato")!=="paisagem";let altura=29.7,largura=21;if(size==="LETTER"){altura=27.94;largura=21.59}else if(size==="A5"){altura=21;largura=14.8}else if(size==="A3"){altura=42;largura=29.7}st.paperHeightCm=retrato?altura:largura;st.paperWidthCm=retrato?largura:altura}
 function cnfRelatorioDestinoPorId(id){return CNF_RELATORIO_DESTINOS.find(item=>item.id===id)||CNF_RELATORIO_DESTINOS[0]}
-function cnfRelatorioDestinoAtual(st){const nome=String(st?.printerName||"").toLowerCase();if(nome.includes("pdf"))return cnfRelatorioDestinoPorId("pdf");if(nome.includes("prÃƒÂ©via")||nome.includes("previa"))return cnfRelatorioDestinoPorId("preview");return cnfRelatorioDestinoPorId("browser")}
-function cnfRelatorioImpressoraEnsureUI(){if(cnfRelatorioDlgImp)return;const style=document.createElement("style");style.textContent=".cnf-imp-modal{width:min(520px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-imp-grid{display:grid;grid-template-columns:1fr 150px;gap:12px}.cnf-imp-box{border:1px solid #c7ced8;background:#fff;padding:10px}.cnf-imp-row{display:grid;grid-template-columns:64px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}.cnf-imp-label{white-space:nowrap}.cnf-imp-value{min-height:16px}.cnf-imp-input,.cnf-imp-select{height:26px;border:1px solid #b9c4d3;padding:0 8px;background:#fff;font:12px Tahoma,sans-serif;width:100%;box-sizing:border-box}.cnf-imp-paper{display:grid;grid-template-columns:1fr 150px;gap:12px;margin-top:10px}.cnf-imp-radios label{display:flex;align-items:center;gap:6px;margin-bottom:8px}.cnf-imp-icon{width:40px;height:58px;border:1px solid #555;display:flex;align-items:center;justify-content:center;font:700 28px Tahoma,sans-serif;background:#fff}.cnf-imp-icon.landscape{width:58px;height:40px}.cnf-imp-bottom{display:flex;justify-content:flex-end;align-items:center;padding-top:10px}.cnf-imp-actions{display:flex;gap:8px}.cnf-imp-muted{color:#777}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-impressora-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-imp-modal"><div class="cnf-imp-grid"><div class="cnf-imp-box"><div style="margin-bottom:8px">ConfiguraÃƒÂ§ÃƒÂ£o de impressÃƒÂ£o</div><div class="cnf-imp-row"><div class="cnf-imp-label">Destino:</div><select id="cnf-imp-nome" class="cnf-imp-select"><option>Escolher no navegador</option><option>Salvar em PDF</option><option>PrÃƒÂ©via no navegador</option></select><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Status:</div><div id="cnf-imp-status" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Tipo:</div><div id="cnf-imp-tipo" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Onde:</div><div id="cnf-imp-onde" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">ComentÃƒÂ¡rio:</div><div id="cnf-imp-coment" class="cnf-imp-value cnf-imp-muted"></div><div></div></div></div><div></div></div><div class="cnf-imp-paper"><div class="cnf-imp-box"><div style="margin-bottom:8px">Papel</div><div class="cnf-imp-row"><div class="cnf-imp-label">Tamanho:</div><select id="cnf-imp-papel" class="cnf-imp-select"><option value="A4">A4</option><option value="Letter">Letter</option><option value="A5">A5</option><option value="A3">A3</option></select><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">Origem:</div><select id="cnf-imp-origem" class="cnf-imp-select" disabled><option>Origem padrÃƒÂ£o</option></select><div></div></div></div><div class="cnf-imp-box"><div style="margin-bottom:8px">OrientaÃƒÂ§ÃƒÂ£o</div><div style="display:flex;gap:10px;align-items:flex-start"><div id="cnf-imp-icon" class="cnf-imp-icon">A</div><div class="cnf-imp-radios"><label><input id="cnf-imp-retrato" type="radio" name="cnf-imp-orient" checked> Retrato</label><label><input id="cnf-imp-paisagem" type="radio" name="cnf-imp-orient"> Paisagem</label></div></div></div></div><div class="cnf-imp-bottom"><div class="cnf-imp-actions"><button id="cnf-imp-ok" class="materiais-btn" type="button">OK</button><button id="cnf-imp-cancel" class="materiais-btn" type="button">Cancelar</button></div></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgImp={backdrop,modal:backdrop.querySelector(".cnf-imp-modal"),nome:backdrop.querySelector("#cnf-imp-nome"),status:backdrop.querySelector("#cnf-imp-status"),tipo:backdrop.querySelector("#cnf-imp-tipo"),onde:backdrop.querySelector("#cnf-imp-onde"),coment:backdrop.querySelector("#cnf-imp-coment"),prop:null,papel:backdrop.querySelector("#cnf-imp-papel"),origem:backdrop.querySelector("#cnf-imp-origem"),retrato:backdrop.querySelector("#cnf-imp-retrato"),paisagem:backdrop.querySelector("#cnf-imp-paisagem"),icon:backdrop.querySelector("#cnf-imp-icon"),rede:null,ok:backdrop.querySelector("#cnf-imp-ok"),cancel:backdrop.querySelector("#cnf-imp-cancel")};ensureModalChrome(cnfRelatorioDlgImp.modal);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});const sync=()=>{const paisagem=cnfRelatorioDlgImp.paisagem.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",paisagem)};cnfRelatorioDlgImp.retrato.addEventListener("change",sync);cnfRelatorioDlgImp.paisagem.addEventListener("change",sync);cnfRelatorioDlgImp.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgImp.ok.addEventListener("click",()=>{if(!cnfRelatorio)return;const st=cnfRelatorio.state;st.printerName=String(cnfRelatorioDlgImp.nome.value||"").trim()||st.printerName;st.printerStatus=String(cnfRelatorioDlgImp.status.textContent||st.printerStatus||"").trim();st.printerType=String(cnfRelatorioDlgImp.tipo.textContent||st.printerType||st.printerName||"").trim();st.printerWhere=String(cnfRelatorioDlgImp.onde.textContent||st.printerWhere||"").trim();st.printerComment=String(cnfRelatorioDlgImp.coment.textContent||st.printerComment||"").trim();st.paperSize=String(cnfRelatorioDlgImp.papel.value||"A4");st.paperSource=String(cnfRelatorioDlgImp.origem.value||"Origem padrÃƒÂ£o");st.printerOrientation=cnfRelatorioDlgImp.paisagem.checked?"paisagem":"retrato";cnfRelatorioImpressoraAplicarPapel(st);cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();backdrop.classList.add("hidden")})}
-function cnfRelatorioAbrirDlgImpressora(){if(!cnfRelatorio)return;cnfRelatorioImpressoraEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();const destinoAtual=cnfRelatorioDestinoAtual(st);cnfRelatorioDlgImp.nome.innerHTML=CNF_RELATORIO_DESTINOS.map(dest=>`<option value="${dest.nome}" ${dest.nome===destinoAtual.nome?"selected":""}>${dest.nome}</option>`).join("");cnfRelatorioDlgImp.nome.value=destinoAtual.nome;cnfRelatorioDlgImp.status.textContent=st.printerStatus||destinoAtual.status;cnfRelatorioDlgImp.tipo.textContent=st.printerType||destinoAtual.tipo;cnfRelatorioDlgImp.onde.textContent=st.printerWhere||destinoAtual.onde;cnfRelatorioDlgImp.coment.textContent=st.printerComment||destinoAtual.comentario;cnfRelatorioDlgImp.papel.value=st.paperSize||"A4";cnfRelatorioDlgImp.origem.value=st.paperSource||"Origem padrÃƒÂ£o";cnfRelatorioDlgImp.retrato.checked=String(st.printerOrientation||"retrato")!=="paisagem";cnfRelatorioDlgImp.paisagem.checked=!cnfRelatorioDlgImp.retrato.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",cnfRelatorioDlgImp.paisagem.checked);cnfRelatorioDlgImp.nome.onchange=()=>{const destino=CNF_RELATORIO_DESTINOS.find(item=>item.nome===cnfRelatorioDlgImp.nome.value)||CNF_RELATORIO_DESTINOS[0];cnfRelatorioDlgImp.status.textContent=destino.status;cnfRelatorioDlgImp.tipo.textContent=destino.tipo;cnfRelatorioDlgImp.onde.textContent=destino.onde;cnfRelatorioDlgImp.coment.textContent=destino.comentario};cnfRelatorioDlgImp.backdrop.classList.remove("hidden")}
+function cnfRelatorioDestinoAtual(st){const nome=String(st?.printerName||"").toLowerCase();if(nome.includes("pdf"))return cnfRelatorioDestinoPorId("pdf");if(nome.includes("prévia")||nome.includes("previa"))return cnfRelatorioDestinoPorId("preview");return cnfRelatorioDestinoPorId("browser")}
+function cnfRelatorioImpressoraEnsureUI(){if(cnfRelatorioDlgImp)return;const style=document.createElement("style");style.textContent=".cnf-imp-modal{width:min(520px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:10px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-imp-grid{display:grid;grid-template-columns:1fr 150px;gap:12px}.cnf-imp-box{border:1px solid #c7ced8;background:#fff;padding:10px}.cnf-imp-row{display:grid;grid-template-columns:64px 1fr auto;gap:8px;align-items:center;margin-bottom:6px}.cnf-imp-label{white-space:nowrap}.cnf-imp-value{min-height:16px}.cnf-imp-input,.cnf-imp-select{height:26px;border:1px solid #b9c4d3;padding:0 8px;background:#fff;font:12px Tahoma,sans-serif;width:100%;box-sizing:border-box}.cnf-imp-paper{display:grid;grid-template-columns:1fr 150px;gap:12px;margin-top:10px}.cnf-imp-radios label{display:flex;align-items:center;gap:6px;margin-bottom:8px}.cnf-imp-icon{width:40px;height:58px;border:1px solid #555;display:flex;align-items:center;justify-content:center;font:700 28px Tahoma,sans-serif;background:#fff}.cnf-imp-icon.landscape{width:58px;height:40px}.cnf-imp-bottom{display:flex;justify-content:flex-end;align-items:center;padding-top:10px}.cnf-imp-actions{display:flex;gap:8px}.cnf-imp-muted{color:#777}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-impressora-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-imp-modal"><div class="cnf-imp-grid"><div class="cnf-imp-box"><div style="margin-bottom:8px">Configuração de impressão</div><div class="cnf-imp-row"><div class="cnf-imp-label">Destino:</div><select id="cnf-imp-nome" class="cnf-imp-select"><option>Escolher no navegador</option><option>Salvar em PDF</option><option>Prévia no navegador</option></select><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Status:</div><div id="cnf-imp-status" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Tipo:</div><div id="cnf-imp-tipo" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row"><div class="cnf-imp-label">Onde:</div><div id="cnf-imp-onde" class="cnf-imp-value"></div><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">Comentário:</div><div id="cnf-imp-coment" class="cnf-imp-value cnf-imp-muted"></div><div></div></div></div><div></div></div><div class="cnf-imp-paper"><div class="cnf-imp-box"><div style="margin-bottom:8px">Papel</div><div class="cnf-imp-row"><div class="cnf-imp-label">Tamanho:</div><select id="cnf-imp-papel" class="cnf-imp-select"><option value="A4">A4</option><option value="Letter">Letter</option><option value="A5">A5</option><option value="A3">A3</option></select><div></div></div><div class="cnf-imp-row" style="margin-bottom:0"><div class="cnf-imp-label">Origem:</div><select id="cnf-imp-origem" class="cnf-imp-select" disabled><option>Origem padrão</option></select><div></div></div></div><div class="cnf-imp-box"><div style="margin-bottom:8px">Orientação</div><div style="display:flex;gap:10px;align-items:flex-start"><div id="cnf-imp-icon" class="cnf-imp-icon">A</div><div class="cnf-imp-radios"><label><input id="cnf-imp-retrato" type="radio" name="cnf-imp-orient" checked> Retrato</label><label><input id="cnf-imp-paisagem" type="radio" name="cnf-imp-orient"> Paisagem</label></div></div></div></div><div class="cnf-imp-bottom"><div class="cnf-imp-actions"><button id="cnf-imp-ok" class="materiais-btn" type="button">OK</button><button id="cnf-imp-cancel" class="materiais-btn" type="button">Cancelar</button></div></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgImp={backdrop,modal:backdrop.querySelector(".cnf-imp-modal"),nome:backdrop.querySelector("#cnf-imp-nome"),status:backdrop.querySelector("#cnf-imp-status"),tipo:backdrop.querySelector("#cnf-imp-tipo"),onde:backdrop.querySelector("#cnf-imp-onde"),coment:backdrop.querySelector("#cnf-imp-coment"),prop:null,papel:backdrop.querySelector("#cnf-imp-papel"),origem:backdrop.querySelector("#cnf-imp-origem"),retrato:backdrop.querySelector("#cnf-imp-retrato"),paisagem:backdrop.querySelector("#cnf-imp-paisagem"),icon:backdrop.querySelector("#cnf-imp-icon"),rede:null,ok:backdrop.querySelector("#cnf-imp-ok"),cancel:backdrop.querySelector("#cnf-imp-cancel")};ensureModalChrome(cnfRelatorioDlgImp.modal);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});const sync=()=>{const paisagem=cnfRelatorioDlgImp.paisagem.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",paisagem)};cnfRelatorioDlgImp.retrato.addEventListener("change",sync);cnfRelatorioDlgImp.paisagem.addEventListener("change",sync);cnfRelatorioDlgImp.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgImp.ok.addEventListener("click",()=>{if(!cnfRelatorio)return;const st=cnfRelatorio.state;st.printerName=String(cnfRelatorioDlgImp.nome.value||"").trim()||st.printerName;st.printerStatus=String(cnfRelatorioDlgImp.status.textContent||st.printerStatus||"").trim();st.printerType=String(cnfRelatorioDlgImp.tipo.textContent||st.printerType||st.printerName||"").trim();st.printerWhere=String(cnfRelatorioDlgImp.onde.textContent||st.printerWhere||"").trim();st.printerComment=String(cnfRelatorioDlgImp.coment.textContent||st.printerComment||"").trim();st.paperSize=String(cnfRelatorioDlgImp.papel.value||"A4");st.paperSource=String(cnfRelatorioDlgImp.origem.value||"Origem padrão");st.printerOrientation=cnfRelatorioDlgImp.paisagem.checked?"paisagem":"retrato";cnfRelatorioImpressoraAplicarPapel(st);cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();backdrop.classList.add("hidden")})}
+function cnfRelatorioAbrirDlgImpressora(){if(!cnfRelatorio)return;cnfRelatorioImpressoraEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();const destinoAtual=cnfRelatorioDestinoAtual(st);cnfRelatorioDlgImp.nome.innerHTML=CNF_RELATORIO_DESTINOS.map(dest=>`<option value="${dest.nome}" ${dest.nome===destinoAtual.nome?"selected":""}>${dest.nome}</option>`).join("");cnfRelatorioDlgImp.nome.value=destinoAtual.nome;cnfRelatorioDlgImp.status.textContent=st.printerStatus||destinoAtual.status;cnfRelatorioDlgImp.tipo.textContent=st.printerType||destinoAtual.tipo;cnfRelatorioDlgImp.onde.textContent=st.printerWhere||destinoAtual.onde;cnfRelatorioDlgImp.coment.textContent=st.printerComment||destinoAtual.comentario;cnfRelatorioDlgImp.papel.value=st.paperSize||"A4";cnfRelatorioDlgImp.origem.value=st.paperSource||"Origem padrão";cnfRelatorioDlgImp.retrato.checked=String(st.printerOrientation||"retrato")!=="paisagem";cnfRelatorioDlgImp.paisagem.checked=!cnfRelatorioDlgImp.retrato.checked;cnfRelatorioDlgImp.icon.classList.toggle("landscape",cnfRelatorioDlgImp.paisagem.checked);cnfRelatorioDlgImp.nome.onchange=()=>{const destino=CNF_RELATORIO_DESTINOS.find(item=>item.nome===cnfRelatorioDlgImp.nome.value)||CNF_RELATORIO_DESTINOS[0];cnfRelatorioDlgImp.status.textContent=destino.status;cnfRelatorioDlgImp.tipo.textContent=destino.tipo;cnfRelatorioDlgImp.onde.textContent=destino.onde;cnfRelatorioDlgImp.coment.textContent=destino.comentario};cnfRelatorioDlgImp.backdrop.classList.remove("hidden")}
 function cnfRelatorioRedeEnsureUI(){if(cnfRelatorioDlgRede)return;const style=document.createElement("style");style.textContent=".cnf-rede-modal{width:min(620px,96vw);background:#f6f6f4;border:1px solid #c6ced8;padding:14px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-rede-top{margin-bottom:12px;font-size:13px;line-height:1.4}.cnf-rede-list{display:grid;gap:10px}.cnf-rede-item{border:1px solid #c7ced8;background:#fff;padding:12px;cursor:pointer;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start}.cnf-rede-item.active{border-color:#2f79d8;background:#eef5ff}.cnf-rede-item strong{display:block;margin-bottom:4px}.cnf-rede-item small{color:#566579;line-height:1.35}.cnf-rede-bottom{display:flex;justify-content:flex-end;gap:8px;padding-top:14px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-rede-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-rede-modal"><div class="cnf-rede-top">No SaaS, a escolha da impressora fÃƒÂ­sica ÃƒÂ© feita no diÃƒÂ¡logo final do navegador. Aqui vocÃƒÂª define apenas o destino preferencial de saÃƒÂ­da.</div><div id="cnf-rede-list" class="cnf-rede-list"><div class="cnf-rede-item active" data-destino="browser"><input type="radio" checked><div><strong>Escolher ao imprimir</strong><small>Usa o diÃƒÂ¡logo nativo do navegador para escolher a impressora instalada na hora da impressÃƒÂ£o.</small></div></div><div class="cnf-rede-item" data-destino="pdf"><input type="radio"><div><strong>Salvar em PDF</strong><small>Prioriza a geraÃƒÂ§ÃƒÂ£o em PDF para download ou arquivamento antes da impressÃƒÂ£o.</small></div></div><div class="cnf-rede-item" data-destino="preview"><input type="radio"><div><strong>PrÃƒÂ©via no navegador</strong><small>Abre a prÃƒÂ©via e deixa a decisÃƒÂ£o final de impressÃƒÂ£o para o usuÃƒÂ¡rio no navegador.</small></div></div></div><div class="cnf-rede-bottom"><button id="cnf-rede-select" class="materiais-btn" type="button">Selecionar</button><button id="cnf-rede-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgRede={backdrop,modal:backdrop.querySelector(".cnf-rede-modal"),list:backdrop.querySelector("#cnf-rede-list"),select:backdrop.querySelector("#cnf-rede-select"),cancel:backdrop.querySelector("#cnf-rede-cancel"),destino:"browser"};ensureModalChrome(cnfRelatorioDlgRede.modal);const marcar=dest=>{cnfRelatorioDlgRede.destino=dest;cnfRelatorioDlgRede.list.querySelectorAll(".cnf-rede-item").forEach(item=>{const active=item.dataset.destino===dest;item.classList.toggle("active",active);const radio=item.querySelector("input[type='radio']");if(radio)radio.checked=active})};cnfRelatorioDlgRede.list.addEventListener("click",ev=>{const item=ev.target.closest(".cnf-rede-item");if(!item)return;marcar(item.dataset.destino||"browser")});backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgRede.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgRede.select.addEventListener("click",()=>{if(!cnfRelatorio)return;const dest=cnfRelatorioDlgRede.destino||"browser";if(dest==="pdf"){cnfRelatorio.state.printerName="Salvar em PDF";cnfRelatorio.state.printerType="PDF do navegador";cnfRelatorio.state.printerWhere="Download local";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel ao imprimir";cnfRelatorio.state.printerComment="O navegador permitirÃƒÂ¡ salvar em PDF na etapa final."}else if(dest==="preview"){cnfRelatorio.state.printerName="PrÃƒÂ©via no navegador";cnfRelatorio.state.printerType="PrÃƒÂ©via do navegador";cnfRelatorio.state.printerWhere="Tela";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel";cnfRelatorio.state.printerComment="A impressÃƒÂ£o fÃƒÂ­sica serÃƒÂ¡ escolhida depois, no navegador."}else{cnfRelatorio.state.printerName="Escolher no navegador";cnfRelatorio.state.printerType="Destino do navegador";cnfRelatorio.state.printerWhere="Definido pelo sistema";cnfRelatorio.state.printerStatus="DisponÃƒÂ­vel ao imprimir";cnfRelatorio.state.printerComment="A impressora fÃƒÂ­sica ÃƒÂ© escolhida no diÃƒÂ¡logo final do navegador."}cnfRelatorioSalvarEstado();cnfRelatorioSincronizarUI();if(cnfRelatorioDlgImp){cnfRelatorioDlgImp.nome.value=cnfRelatorio.state.printerName;cnfRelatorioDlgImp.status.textContent=cnfRelatorio.state.printerStatus;cnfRelatorioDlgImp.tipo.textContent=cnfRelatorio.state.printerType;cnfRelatorioDlgImp.onde.textContent=cnfRelatorio.state.printerWhere;cnfRelatorioDlgImp.coment.textContent=cnfRelatorio.state.printerComment}backdrop.classList.add("hidden")})}
 function cnfRelatorioAbrirDlgRede(){if(!cnfRelatorio)return;cnfRelatorioRedeEnsureUI();const dest=cnfRelatorioDestinoAtual(cnfRelatorio.state).id;cnfRelatorioDlgRede.destino=dest;cnfRelatorioDlgRede.list.querySelectorAll(".cnf-rede-item").forEach(item=>{const active=item.dataset.destino===dest;item.classList.toggle("active",active);const radio=item.querySelector("input[type='radio']");if(radio)radio.checked=active});cnfRelatorioDlgRede.backdrop.classList.remove("hidden")}
-function cnfRelatorioTesteEnsureUI(){if(cnfRelatorioDlgTeste)return;const style=document.createElement("style");style.textContent=".cnf-test-modal{width:min(380px,94vw);background:#f6f6f4;border:1px solid #c6ced8;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-test-box{border:1px solid #c7ced8;background:#fff;padding:8px;margin-bottom:8px}.cnf-test-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}.cnf-test-row:last-child{margin-bottom:0}.cnf-test-num{width:48px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-small{width:42px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-actions{display:flex;justify-content:flex-end;gap:8px}.cnf-test-col{display:flex;flex-direction:column;gap:4px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-teste-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-test-modal"><div class="cnf-test-box"><div style="margin-bottom:6px">Impressora selecionada:</div><div id="cnf-test-printer" style="min-height:18px"></div></div><div class="cnf-test-box"><div class="cnf-test-row"><span>NÃƒÂºmero de cÃƒÂ³pias:</span><input id="cnf-test-copias" class="cnf-test-num" type="number" min="1" step="1" value="1"></div><div style="border-top:1px solid #d4d4d4;margin:8px 0"></div><div class="cnf-test-col"><div>Intervalo de pÃƒÂ¡ginas</div><label><input id="cnf-test-todas" type="radio" name="cnf-test-intervalo" checked> Todas</label><div class="cnf-test-row"><label><input id="cnf-test-paginas" type="radio" name="cnf-test-intervalo"> PÃƒÂ¡ginas:</label><input id="cnf-test-de" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled><span>a</span><input id="cnf-test-ate" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled></div></div></div><div class="cnf-test-actions"><button id="cnf-test-config" class="materiais-btn" type="button">Configura</button><button id="cnf-test-ok" class="materiais-btn" type="button">Ok</button><button id="cnf-test-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgTeste={backdrop,modal:backdrop.querySelector(".cnf-test-modal"),printer:backdrop.querySelector("#cnf-test-printer"),copias:backdrop.querySelector("#cnf-test-copias"),todas:backdrop.querySelector("#cnf-test-todas"),paginas:backdrop.querySelector("#cnf-test-paginas"),de:backdrop.querySelector("#cnf-test-de"),ate:backdrop.querySelector("#cnf-test-ate"),config:backdrop.querySelector("#cnf-test-config"),ok:backdrop.querySelector("#cnf-test-ok"),cancel:backdrop.querySelector("#cnf-test-cancel")};ensureModalChrome(cnfRelatorioDlgTeste.modal);const sync=()=>{const on=cnfRelatorioDlgTeste.paginas.checked;cnfRelatorioDlgTeste.de.disabled=!on;cnfRelatorioDlgTeste.ate.disabled=!on};cnfRelatorioDlgTeste.todas.addEventListener("change",sync);cnfRelatorioDlgTeste.paginas.addEventListener("change",sync);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgTeste.config.addEventListener("click",()=>{backdrop.classList.add("hidden");cnfRelatorioAbrirDlgImpressora()});cnfRelatorioDlgTeste.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgTeste.ok.addEventListener("click",()=>{backdrop.classList.add("hidden");window.print()});sync()}
+function cnfRelatorioTesteEnsureUI(){if(cnfRelatorioDlgTeste)return;const style=document.createElement("style");style.textContent=".cnf-test-modal{width:min(380px,94vw);background:#f6f6f4;border:1px solid #c6ced8;padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#000}.cnf-test-box{border:1px solid #c7ced8;background:#fff;padding:8px;margin-bottom:8px}.cnf-test-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}.cnf-test-row:last-child{margin-bottom:0}.cnf-test-num{width:48px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-small{width:42px;height:24px;border:1px solid #b9c4d3;padding:0 6px;box-sizing:border-box;font:12px Tahoma,sans-serif}.cnf-test-actions{display:flex;justify-content:flex-end;gap:8px}.cnf-test-col{display:flex;flex-direction:column;gap:4px}";document.head.appendChild(style);const backdrop=document.createElement("div");backdrop.id="config-relatorios-teste-backdrop";backdrop.className="modal-backdrop hidden";backdrop.innerHTML=`<div class="cnf-test-modal"><div class="cnf-test-box"><div style="margin-bottom:6px">Impressora selecionada:</div><div id="cnf-test-printer" style="min-height:18px"></div></div><div class="cnf-test-box"><div class="cnf-test-row"><span>Número de cópias:</span><input id="cnf-test-copias" class="cnf-test-num" type="number" min="1" step="1" value="1"></div><div style="border-top:1px solid #d4d4d4;margin:8px 0"></div><div class="cnf-test-col"><div>Intervalo de páginas</div><label><input id="cnf-test-todas" type="radio" name="cnf-test-intervalo" checked> Todas</label><div class="cnf-test-row"><label><input id="cnf-test-paginas" type="radio" name="cnf-test-intervalo"> Páginas:</label><input id="cnf-test-de" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled><span>a</span><input id="cnf-test-ate" class="cnf-test-small" type="number" min="1" step="1" value="1" disabled></div></div></div><div class="cnf-test-actions"><button id="cnf-test-config" class="materiais-btn" type="button">Configura</button><button id="cnf-test-ok" class="materiais-btn" type="button">Ok</button><button id="cnf-test-cancel" class="materiais-btn" type="button">Cancelar</button></div></div>`;document.body.appendChild(backdrop);cnfRelatorioDlgTeste={backdrop,modal:backdrop.querySelector(".cnf-test-modal"),printer:backdrop.querySelector("#cnf-test-printer"),copias:backdrop.querySelector("#cnf-test-copias"),todas:backdrop.querySelector("#cnf-test-todas"),paginas:backdrop.querySelector("#cnf-test-paginas"),de:backdrop.querySelector("#cnf-test-de"),ate:backdrop.querySelector("#cnf-test-ate"),config:backdrop.querySelector("#cnf-test-config"),ok:backdrop.querySelector("#cnf-test-ok"),cancel:backdrop.querySelector("#cnf-test-cancel")};ensureModalChrome(cnfRelatorioDlgTeste.modal);const sync=()=>{const on=cnfRelatorioDlgTeste.paginas.checked;cnfRelatorioDlgTeste.de.disabled=!on;cnfRelatorioDlgTeste.ate.disabled=!on};cnfRelatorioDlgTeste.todas.addEventListener("change",sync);cnfRelatorioDlgTeste.paginas.addEventListener("change",sync);backdrop.addEventListener("click",ev=>{if(ev.target===backdrop)backdrop.classList.add("hidden")});cnfRelatorioDlgTeste.config.addEventListener("click",()=>{backdrop.classList.add("hidden");cnfRelatorioAbrirDlgImpressora()});cnfRelatorioDlgTeste.cancel.addEventListener("click",()=>backdrop.classList.add("hidden"));cnfRelatorioDlgTeste.ok.addEventListener("click",()=>{backdrop.classList.add("hidden");window.print()});sync()}
 function cnfRelatorioAbrirDlgTeste(){if(!cnfRelatorio)return;cnfRelatorioTesteEnsureUI();const st=cnfRelatorio.state||cnfRelatorioPadrao();cnfRelatorioDlgTeste.printer.textContent=st.printerName||"Microsoft Print to PDF";cnfRelatorioDlgTeste.copias.value="1";cnfRelatorioDlgTeste.todas.checked=true;cnfRelatorioDlgTeste.paginas.checked=false;cnfRelatorioDlgTeste.de.value="1";cnfRelatorioDlgTeste.ate.value="1";cnfRelatorioDlgTeste.de.disabled=true;cnfRelatorioDlgTeste.ate.disabled=true;cnfRelatorioDlgTeste.backdrop.classList.remove("hidden")}
 function cnfRelatorioAbrir(opts={}){
   cnfRelatorioEnsureUI();
@@ -7906,8 +7906,8 @@ function agendaLegadoModalPreencher(item){
   }
   if(agendaLegado.modalFone2)agendaLegado.modalFone2.value=item?.fone2||"";
   if(agendaLegado.modalFone3)agendaLegado.modalFone3.value=item?.fone3||"";
-  if(nroPacExistente>0&&typeof agendaLegadoAplicarContato==="function"){
-    agendaLegadoAplicarContato(String(item?.nome||""),nroPacExistente);
+  if(String(agendaLegado?.modalTipo?.value||"1")==="1"&&typeof agendaLegadoAplicarContato==="function"){
+    agendaLegadoAplicarContato(String(item?.nome||""),nroPacExistente>0?nroPacExistente:null);
   }
   if(agendaLegado.modalObserv)agendaLegado.modalObserv.value=item?.observ||"";
   if(agendaLegado.modalInclusao)agendaLegado.modalInclusao.value=agendaLegadoFmtStamp(item?.time_stamp_ins||"");
@@ -8461,24 +8461,28 @@ async function agendaLegadoCarregarContatos(){
   agendaLegadoPacientesMap=new Map();
   agendaLegadoPacientesByIdMap=new Map();
   const list=document.getElementById("agenda-legado-contatos");
-  if(list){
-    const datalist=[];
-    contatos.forEach(c=>{
-      const nome=String(c.nome||"").trim();
-      const key=agendaLegadoNomeKey(nome);
-      if(!nome||!key)return;
-      if(!agendaLegadoContatosMap.has(key))agendaLegadoContatosMap.set(key,c);
-      datalist.push(`<option value="${esc(nome)}"></option>`);
-    });
-    pacientes.forEach(p=>{
-      const nome=String(p.nome_completo||p.nome||"").trim();
-      const key=agendaLegadoNomeKey(nome);
-      if(!nome||!key)return;
-      if(!agendaLegadoPacientesMap.has(key))agendaLegadoPacientesMap.set(key,p);
-      const nroPac=Number(p?.id||0)||0;
+  const datalist=[];
+  contatos.forEach(c=>{
+    const nome=String(c.nome||"").trim();
+    const key=agendaLegadoNomeKey(nome);
+    if(!nome||!key)return;
+    if(!agendaLegadoContatosMap.has(key))agendaLegadoContatosMap.set(key,c);
+    datalist.push(`<option value="${esc(nome)}"></option>`);
+  });
+  pacientes.forEach(p=>{
+    const nome=String(p.nome_completo||p.nome||"").trim();
+    const key=agendaLegadoNomeKey(nome);
+    if(!nome||!key)return;
+    if(!agendaLegadoPacientesMap.has(key))agendaLegadoPacientesMap.set(key,p);
+    const nroPacId=Number(p?.id||0)||0;
+    const nroPacCodigo=Number(p?.codigo||0)||0;
+    const nroPacSource=Number(p?.source_id||0)||0;
+    [nroPacId,nroPacCodigo,nroPacSource].forEach(nroPac=>{
       if(nroPac>0&&!agendaLegadoPacientesByIdMap.has(nroPac))agendaLegadoPacientesByIdMap.set(nroPac,p);
-      datalist.push(`<option value="${esc(nome)}"></option>`);
     });
+    datalist.push(`<option value="${esc(nome)}"></option>`);
+  });
+  if(list){
     list.innerHTML=[...new Set(datalist)].join("");
   }
 }
@@ -9462,28 +9466,85 @@ function agendaSemanaFontStyle(cfg){
   const size=Math.max(6,Number(f.size||8)||8);
   return`font-family:${f.family||"MS Sans Serif"};font-size:${size}px;font-weight:${weight};font-style:${style};text-decoration:${deco};color:${f.color||"#000000"}`;
 }
+function agendaSemanaNormalizarCampoVisualizacao(valor){
+  return String(valor||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim();
+}
+function agendaSemanaCamposVisualizacaoSelecionados(cfg){
+  const lista=Array.isArray(cfg?.visualizacao_campos)?cfg.visualizacao_campos:[];
+  const selecionados=new Set();
+  lista.forEach(campo=>{
+    const chave=agendaSemanaNormalizarCampoVisualizacao(campo);
+    if(chave)selecionados.add(chave);
+  });
+  return selecionados;
+}
+function agendaSemanaTemCampoVisualizacao(selecionados,rotulo){
+  if(!(selecionados instanceof Set)||!selecionados.size)return false;
+  return selecionados.has(agendaSemanaNormalizarCampoVisualizacao(rotulo));
+}
+function agendaSemanaDadosPacienteVisual(item){
+  const nroPac=Number(item?.nro_pac||0)||0;
+  if(nroPac<=0)return null;
+  const paciente=agendaLegadoPacientesByIdMap.get(nroPac)||null;
+  if(!paciente)return null;
+  const extra=paciente&&typeof paciente.extra==="object"?paciente.extra:{};
+  const convenioNome=String(paciente.convenio_nome||extra?.convenio_nome||"").trim();
+  const tabelaNome=String(paciente.tabela_nome||extra?.tabela_nome||"").trim();
+  return{
+    prontuario:String(paciente.cod_prontuario||"").trim(),
+    matricula:String(paciente.matricula||"").trim(),
+    convenio:convenioNome||(paciente.id_convenio!=null?String(paciente.id_convenio).trim():""),
+    tabela:tabelaNome||(paciente.tabela_codigo!=null?String(paciente.tabela_codigo).trim():""),
+  };
+}
 function agendaSemanaEventoTexto(item,cfg){
-  const _cfg=cfg;
+  const selecionados=agendaSemanaCamposVisualizacaoSelecionados(cfg);
+  const mostrarNumeroPaciente=agendaSemanaTemCampoVisualizacao(selecionados,"Número do paciente");
+  const mostrarProntuario=agendaSemanaTemCampoVisualizacao(selecionados,"Número do prontuário");
+  const mostrarNome=agendaSemanaTemCampoVisualizacao(selecionados,"Nome do paciente");
+  const mostrarMatricula=agendaSemanaTemCampoVisualizacao(selecionados,"Matrícula");
+  const mostrarConvenio=agendaSemanaTemCampoVisualizacao(selecionados,"Convênio");
+  const mostrarTabela=agendaSemanaTemCampoVisualizacao(selecionados,"Tabela");
+  const mostrarFone1=agendaSemanaTemCampoVisualizacao(selecionados,"Fone 1");
+  const mostrarFone2=agendaSemanaTemCampoVisualizacao(selecionados,"Fone 2");
+  const mostrarFone3=agendaSemanaTemCampoVisualizacao(selecionados,"Fone 3");
+  const mostrarSala=agendaSemanaTemCampoVisualizacao(selecionados,"Sala");
   const hora=agendaLegadoFmtHora(item?.hora_inicio||0);
   const codigoTxt=String(item?.nro_pac??"").trim();
-  const nome=String(item?.nome||item?.motivo||"").trim();
-  const fones=[item?.fone1,item?.fone2,item?.fone3].map(v=>String(v||"").trim()).filter(Boolean);
-  const telefone=fones[0]||"";
-  const sala=item?.sala!=null?`Sala: ${String(item.sala).trim()}`:"";
+  const nome=mostrarNome?String(item?.nome||item?.motivo||"").trim():"";
+  const dadosPaciente=agendaSemanaDadosPacienteVisual(item);
+  const prontuario=String(dadosPaciente?.prontuario||"").trim();
+  const matricula=String(dadosPaciente?.matricula||"").trim();
+  const convenio=String(dadosPaciente?.convenio||"").trim();
+  const tabela=String(dadosPaciente?.tabela||"").trim();
+  const fone1=String(item?.fone1||"").trim();
+  const fone2=String(item?.fone2||"").trim();
+  const fone3=String(item?.fone3||"").trim();
+  const sala=mostrarSala&&item?.sala!=null?`Sala: ${String(item.sala).trim()}`:"";
 
   const linha1Partes=[];
   if(hora)linha1Partes.push(hora);
-  if(codigoTxt)linha1Partes.push(codigoTxt);
+  if(mostrarNumeroPaciente&&codigoTxt)linha1Partes.push(codigoTxt);
+  if(mostrarProntuario&&prontuario)linha1Partes.push(`Pront.: ${prontuario}`);
+  if(mostrarMatricula&&matricula)linha1Partes.push(`Matr.: ${matricula}`);
   const linha1=linha1Partes.join(" - ");
+  const linha3Partes=[];
+  if(mostrarFone1&&fone1)linha3Partes.push(fone1);
+  if(mostrarFone2&&fone2)linha3Partes.push(fone2);
+  if(mostrarFone3&&fone3)linha3Partes.push(fone3);
+  const linha3=linha3Partes.join(" | ");
+  const linha4Partes=[];
+  if(mostrarConvenio&&convenio)linha4Partes.push(`Convênio: ${convenio}`);
+  if(mostrarTabela&&tabela)linha4Partes.push(`Tabela: ${tabela}`);
+  if(sala)linha4Partes.push(sala);
+  const linha4=linha4Partes.join(" | ");
 
   const linhas=[
     {classe:"linha linha-1",texto:linha1},
     {classe:"linha linha-2",texto:nome},
-    {classe:"linha linha-3",texto:telefone},
-    {classe:"linha linha-4",texto:sala},
+    {classe:"linha linha-3",texto:linha3},
+    {classe:"linha linha-4",texto:linha4},
   ].filter(l=>l.texto);
-
-  void _cfg;
   return linhas.map(l=>`<div class="${l.classe}">${esc(l.texto)}</div>`).join("");
 }
 function agendaSemanaAdicionarBloqueios(eventos,cfg){
@@ -9562,6 +9623,324 @@ function agendaSemanaRenderEventos(){
   });
   agendaSemanaDiagLog("agendaSemanaRenderEventos","after",{eventos_cache:Array.isArray(agendaSemanaCache)?agendaSemanaCache.length:0});
 }
+function agendaSemanaLinhasImpressao(){
+  const cfg=agendaSemanaState?.config||agendaSemanaConfigAtual();
+  const weekStart=agendaSemanaState.weekStart||agendaSemanaStartOfWeek(new Date());
+  const weekEnd=agendaSemanaAddDays(weekStart,5);
+  const weekDates=AGENDA_SEMANA_DIAS.map((_,idx)=>agendaSemanaAddDays(weekStart,idx));
+  const faixa=agendaSemanaBuildSlots(cfg);
+  const step=Math.max(5,Number(faixa?.step||cfg?.duracao||5)||5);
+  const slots=Array.isArray(faixa?.slots)?faixa.slots:[];
+  const startMin=Number(faixa?.startMin||420)||420;
+  const endMin=Number(faixa?.endMin||1200)||1200;
+  const startIso=agendaSemanaToIsoDate(weekStart);
+  const endIso=agendaSemanaToIsoDate(weekEnd);
+  const prestSel=Number(agendaSemana?.selectPrestador?.value||0)||0;
+  const esp=String(agendaSemana?.selectEspecialidade?.value||"").trim();
+  let eventos=Array.isArray(agendaSemanaCache)?agendaSemanaCache:[];
+  if(esp&&!prestSel){
+    const permitidos=new Set(agendaSemanaPrestadoresFiltrados().map(item=>Number(item.id||0)));
+    eventos=eventos.filter(item=>permitidos.has(Number(item.id_prestador||0)));
+  }
+  eventos=agendaSemanaAdicionarBloqueios(eventos,cfg);
+  const eventosFormatados=eventos
+    .map(item=>{
+      const dataTxt=String(item?.data||"").trim();
+      if(!dataTxt)return null;
+      if(startIso&&dataTxt<startIso)return null;
+      if(endIso&&dataTxt>endIso)return null;
+      const dataObj=agendaSemanaParseDataCivil(dataTxt);
+      if(!dataObj)return null;
+      const dayIdx=agendaSemanaDayIndex(dataObj);
+      if(dayIdx<0||dayIdx>5)return null;
+      const inicioMs=Number(item?.hora_inicio||0)||0;
+      let fimMs=Number(item?.hora_fim||0)||0;
+      if(!fimMs||fimMs<=inicioMs)fimMs=inicioMs+(step*60000);
+      const inicioMin=Math.floor(inicioMs/60000);
+      const fimMin=Math.floor(fimMs/60000);
+      const topMin=Math.max(startMin,inicioMin);
+      const endMinReal=Math.min(endMin,fimMin);
+      if(endMinReal<=topMin)return null;
+      const corLinha=agendaSemanaCorEvento(item,cfg);
+      const fonteLinha=agendaSemanaFontStyle(cfg);
+      return{
+        id:Number(item?.id||0)||0,
+        data_iso:dataTxt,
+        day_idx:dayIdx,
+        inicio_min:topMin,
+        fim_min:endMinReal,
+        hora_inicio:agendaLegadoFmtHora(inicioMs),
+        hora_fim:agendaLegadoFmtHora(fimMs),
+        __cor:corLinha,
+        __fontStyle:fonteLinha,
+        __html:agendaSemanaEventoTexto(item,cfg),
+      };
+    })
+    .filter(Boolean)
+    .sort((a,b)=>{
+      if(a.day_idx!==b.day_idx)return a.day_idx-b.day_idx;
+      if(a.inicio_min!==b.inicio_min)return a.inicio_min-b.inicio_min;
+      if(a.fim_min!==b.fim_min)return a.fim_min-b.fim_min;
+      return a.id-b.id;
+    });
+  return{cfg,weekStart,weekEnd,weekDates,slots,startMin,endMin,step,eventos:eventosFormatados};
+}
+function agendaSemanaTituloImpressao(){
+  const weekStart=agendaSemanaState.weekStart||agendaSemanaStartOfWeek(new Date());
+  const weekEnd=agendaSemanaAddDays(weekStart,5);
+  const prestadorTxt=String(agendaSemana?.selectPrestador?.selectedOptions?.[0]?.textContent||"").trim();
+  const unidadeTxt=String(agendaSemana?.selectUnidade?.selectedOptions?.[0]?.textContent||"").trim();
+  const sufixos=[];
+  if(prestadorTxt&&prestadorTxt!=="<<Todas>>")sufixos.push(`Cirurgião: ${prestadorTxt}`);
+  if(unidadeTxt&&unidadeTxt!=="<<Todas>>")sufixos.push(`Unidade: ${unidadeTxt}`);
+  const periodo=`${agendaSemanaFormatDateBr(weekStart,true)} a ${agendaSemanaFormatDateBr(weekEnd,true)}`;
+  return `Agenda da semana (${periodo})${sufixos.length?` - ${sufixos.join(" | ")}`:""}`;
+}
+function agendaSemanaNomeDiaCompletoImpressao(idx){
+  const base=String(AGENDA_SEMANA_DIAS?.[idx]?.label||"").trim();
+  if(!base)return"";
+  if(idx>=0&&idx<=4)return`${base}-feira`;
+  return base;
+}
+function agendaSemanaMontarHtmlImpressao(dados,titulo){
+  const slots=Array.isArray(dados?.slots)?dados.slots:[];
+  const startMin=Number(dados?.startMin||420)||420;
+  const endMin=Number(dados?.endMin||1200)||1200;
+  const step=Math.max(5,Number(dados?.step||5)||5);
+  const weekDates=Array.isArray(dados?.weekDates)&&dados.weekDates.length===6
+    ?dados.weekDates
+    :AGENDA_SEMANA_DIAS.map((_,idx)=>agendaSemanaAddDays(agendaSemanaStartOfWeek(new Date()),idx));
+  const eventos=Array.isArray(dados?.eventos)?dados.eventos:[];
+  const slotCount=Math.max(1,slots.length||1);
+  const targetGridHeight=700;
+  const rowHeight=Math.max(3,Number((targetGridHeight/slotCount).toFixed(2)));
+  const gridHeight=Math.max(240,Number((slotCount*rowHeight).toFixed(2)));
+  const rowTemplate=`repeat(${slotCount}, ${rowHeight}px)`;
+  const dayHeaders=weekDates.map((d,idx)=>{
+    const nome=agendaSemanaNomeDiaCompletoImpressao(idx);
+    const dataTxt=agendaSemanaFormatDateBr(d);
+    return`<div class="agw-day-head"><div class="agw-day-head-name">${esc(nome)}</div><div class="agw-day-head-date">${esc(dataTxt)}</div></div>`;
+  }).join("");
+  const timeCells=slots.map(slot=>`<div class="agw-time-cell">${esc(String(slot?.label||""))}</div>`).join("");
+  const dayCols=weekDates.map((_,idx)=>{
+    const blocos=eventos
+      .filter(ev=>Number(ev?.day_idx)===idx)
+      .map(ev=>{
+        const ini=Number(ev?.inicio_min||0)||0;
+        const fim=Number(ev?.fim_min||0)||0;
+        const top=((ini-startMin)/step)*rowHeight;
+        const height=Math.max(rowHeight,((fim-ini)/step)*rowHeight);
+        const cor=String(ev?.__cor||"#ffffff").trim()||"#ffffff";
+        const font=String(ev?.__fontStyle||"").trim();
+        const htmlEvento=String(ev?.__html||"").trim();
+        const fallback=esc(String(ev?.hora_inicio||""));
+        return`<div class="agw-event" style="top:${top.toFixed(2)}px;height:${height.toFixed(2)}px;background:${cor};${font}">${htmlEvento||fallback}</div>`;
+      }).join("");
+    return`<div class="agw-day-col">${blocos}</div>`;
+  }).join("");
+  const breakTargets=[agendaSemanaHoraMin(dados?.cfg?.manha_fim),agendaSemanaHoraMin(dados?.cfg?.tarde_inicio)]
+    .filter(v=>Number.isFinite(v)&&v>startMin&&v<endMin);
+  const uniqBreak=[...new Set(breakTargets.map(v=>Math.trunc(Number(v))))];
+  const breakLines=uniqBreak.map(min=>{
+    const top=((min-startMin)/step)*rowHeight;
+    return`<div class="agw-break" style="top:${top.toFixed(2)}px"></div>`;
+  }).join("");
+  return`<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>${esc(titulo||"Agenda da semana")}</title>
+  <style>
+    @page{size:A4 landscape;margin:6mm}
+    html,body{
+      margin:0;
+      padding:0;
+      font:11px Tahoma,Arial,sans-serif;
+      color:#000;
+      -webkit-print-color-adjust:exact;
+      print-color-adjust:exact;
+    }
+    .agw-wrap{padding:2px 2px 0}
+    .agw-title{
+      font:700 13px Tahoma,Arial,sans-serif;
+      margin:0 0 6px;
+    }
+    .agw-head{
+      display:grid;
+      grid-template-columns:56px repeat(6,minmax(0,1fr));
+      border:1px solid #333;
+      border-bottom:0;
+      background:#fff;
+    }
+    .agw-head-time{
+      border-right:1px solid #333;
+      min-height:30px;
+      background:#f7f7f7;
+    }
+    .agw-day-head{
+      min-height:30px;
+      border-right:1px solid #333;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      font:700 9px Tahoma,Arial,sans-serif;
+      text-align:center;
+      background:#fff;
+      padding:1px 0;
+    }
+    .agw-day-head:last-child{border-right:0}
+    .agw-day-head-name{font-size:9px;line-height:1.1}
+    .agw-day-head-date{font-size:8px;line-height:1.1}
+    .agw-body{
+      position:relative;
+      display:grid;
+      grid-template-columns:56px repeat(6,minmax(0,1fr));
+      height:${gridHeight.toFixed(2)}px;
+      border:1px solid #333;
+      background:#fff;
+    }
+    .agw-time-col{
+      display:grid;
+      grid-template-rows:${rowTemplate};
+      border-right:1px solid #333;
+      background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(${rowHeight.toFixed(2)}px - 1px),#8f8f8f calc(${rowHeight.toFixed(2)}px - 1px),#8f8f8f ${rowHeight.toFixed(2)}px);
+    }
+    .agw-time-cell{
+      font:7px/${rowHeight.toFixed(2)}px Tahoma,Arial,sans-serif;
+      padding:0 1px;
+      white-space:nowrap;
+      overflow:hidden;
+    }
+    .agw-day-col{
+      position:relative;
+      border-right:1px solid #333;
+      background-image:repeating-linear-gradient(to bottom,transparent 0,transparent calc(${rowHeight.toFixed(2)}px - 1px),#8f8f8f calc(${rowHeight.toFixed(2)}px - 1px),#8f8f8f ${rowHeight.toFixed(2)}px);
+    }
+    .agw-day-col:last-child{border-right:0}
+    .agw-break{
+      position:absolute;
+      left:0;
+      right:0;
+      height:0;
+      border-top:1.6px solid #000;
+      z-index:2;
+      pointer-events:none;
+    }
+    .agw-event{
+      position:absolute;
+      left:0;
+      right:0;
+      z-index:3;
+      border:1px solid #4f4f4f;
+      box-sizing:border-box;
+      padding:1px 2px;
+      overflow:hidden;
+      white-space:normal;
+      line-height:1.05;
+      word-break:break-word;
+    }
+    .agw-event .linha{
+      display:block;
+      white-space:normal;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      line-height:1.05;
+    }
+    .agw-event .linha-1{font-weight:700}
+    .agw-empty{
+      border:1px solid #333;
+      border-top:0;
+      padding:10px 6px;
+      text-align:center;
+      font:12px Tahoma,Arial,sans-serif;
+      background:#fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="agw-wrap">
+    <h1 class="agw-title">${esc(titulo||"Agenda da semana")}</h1>
+    <div class="agw-head">
+      <div class="agw-head-time"></div>
+      ${dayHeaders}
+    </div>
+    ${slots.length?`<div class="agw-body"><div class="agw-time-col">${timeCells}</div>${dayCols}${breakLines}</div>`:`<div class="agw-empty">Sem slots configurados para impressão.</div>`}
+  </div>
+</body>
+</html>`;
+}
+function agendaSemanaAbrirImpressaoHtml(html){
+  const frame=document.createElement("iframe");
+  frame.style.position="fixed";
+  frame.style.right="0";
+  frame.style.bottom="0";
+  frame.style.width="0";
+  frame.style.height="0";
+  frame.style.border="0";
+  document.body.appendChild(frame);
+  const win=frame.contentWindow;
+  const doc=win?.document;
+  if(!doc){
+    frame.remove();
+    window.alert("Não foi possível iniciar a impressão.");
+    return false;
+  }
+  doc.open();
+  doc.write(html);
+  doc.close();
+  let printed=false;
+  const doPrint=()=>{
+    if(printed)return;
+    printed=true;
+    try{
+      win.focus();
+      win.print();
+    }catch{}
+  };
+  frame.onload=doPrint;
+  setTimeout(doPrint,180);
+  const cleanup=()=>{setTimeout(()=>{try{frame.remove()}catch{}},1200)};
+  try{win.addEventListener("afterprint",cleanup)}catch{}
+  setTimeout(cleanup,60000);
+  return true;
+}
+function agendaSemanaImprimir(){
+  const dados=agendaSemanaLinhasImpressao();
+  const titulo=agendaSemanaTituloImpressao();
+  const html=agendaSemanaMontarHtmlImpressao(dados,titulo);
+  try{
+    if(!cnfRelatorio&&typeof cnfRelatorioEnsureUI==="function")cnfRelatorioEnsureUI();
+    if(cnfRelatorio&&!cnfRelatorio.state&&typeof cnfRelatorioCarregarLocal==="function"){
+      cnfRelatorio.state=cnfRelatorioCarregarLocal();
+    }
+    if(typeof cnfRelatorioTesteEnsureUI==="function")cnfRelatorioTesteEnsureUI();
+    if(!cnfRelatorioDlgTeste){
+      agendaSemanaAbrirImpressaoHtml(html);
+      return;
+    }
+    const dlg=cnfRelatorioDlgTeste;
+    const st=cnfRelatorio?.state||cnfRelatorioPadrao();
+    dlg.printer.textContent=String(st?.printerName||"Escolher no navegador").trim();
+    dlg.copias.value="1";
+    dlg.todas.checked=true;
+    dlg.paginas.checked=false;
+    dlg.de.value="1";
+    dlg.ate.value="1";
+    dlg.de.disabled=true;
+    dlg.ate.disabled=true;
+    const novoOk=dlg.ok.cloneNode(true);
+    dlg.ok.replaceWith(novoOk);
+    dlg.ok=novoOk;
+    dlg.ok.addEventListener("click",()=>{
+      dlg.backdrop.classList.add("hidden");
+      agendaSemanaAbrirImpressaoHtml(html);
+    });
+    dlg.backdrop.classList.remove("hidden");
+  }catch{
+    agendaSemanaAbrirImpressaoHtml(html);
+  }
+}
 async function agendaSemanaCarregarEventos(){
   const start=agendaSemanaState.weekStart||agendaSemanaStartOfWeek(new Date());
   const end=agendaSemanaAddDays(start,5);
@@ -9573,6 +9952,9 @@ async function agendaSemanaCarregarEventos(){
   if(prestador)params.set("prestador_id",prestador);
   if(unidade)params.set("unidade_id",unidade);
   params.set("limit","5000");
+  try{
+    await agendaLegadoGarantirContatosCarregados();
+  }catch{}
   const{res,data}=await requestJson("GET",`/agenda-legado?${params.toString()}`,undefined,true);
   if(!res.ok){
     footerMsg.textContent=data?.detail||"Falha ao carregar agenda da semana.";
@@ -9605,7 +9987,7 @@ function agendaSemanaVincularEventos(){
   agendaSemana.btnCal.addEventListener("click",ev=>{ev.stopPropagation();if(agendaSemana.cal.classList.contains("hidden")){agendaSemanaCalendarioAbrir()}else{agendaSemanaCalendarioFechar()}});
   agendaSemana.btnPaciente.addEventListener("click",()=>{footerMsg.textContent="Paciente: em planejamento."});
   agendaSemana.btnHorario.addEventListener("click",()=>{footerMsg.textContent="HorÃƒÂ¡rio: em planejamento."});
-  agendaSemana.btnImprimir.addEventListener("click",()=>{footerMsg.textContent="ImpressÃƒÂ£o da agenda: em planejamento."});
+  agendaSemana.btnImprimir.addEventListener("click",()=>agendaSemanaImprimir());
   agendaSemana.btnAviso.addEventListener("click",()=>{footerMsg.textContent="Envio de aviso: em planejamento."});
   agendaSemana.btnPublicar.addEventListener("click",()=>{footerMsg.textContent="Publicar no Google agenda: em planejamento."});
   agendaSemana.btnConfig.addEventListener("click",async()=>{
