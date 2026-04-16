@@ -23,5 +23,6 @@ def build_user_context(usuario, *, is_superadmin: bool = False) -> dict:
         "is_superadmin": bool(is_superadmin),
         "ativo": bool(getattr(usuario, "ativo", False)),
         "forcar_troca_senha": bool(getattr(usuario, "forcar_troca_senha", False)),
+        "setup_completed": bool(getattr(usuario, "setup_completed", False)),
         "permissoes": permissoes,
     }

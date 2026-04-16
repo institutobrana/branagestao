@@ -16,6 +16,9 @@ from models.procedimento import Procedimento, ProcedimentoMaterial
 from models.procedimento_generico import ProcedimentoGenerico
 from models.procedimento_tabela import ProcedimentoTabela
 from models.usuario import Usuario
+from seeds.procedimentos_genericos import seed_procedimentos_genericos
+from seeds.procedimentos_padrao import seed_procedimentos
+from seeds.simbolos_graficos import seed_simbolos_graficos
 from security.permissions import dump_permissions_json, sanitize_permissions
 from security.system_accounts import (
     SYSTEM_PRESTADOR_CODIGO,
@@ -2098,6 +2101,7 @@ def _garantir_usuario_sistemico_clinica(db, clinica_id: int, prestador: Prestado
             ativo=True,
             online=False,
             forcar_troca_senha=False,
+            setup_completed=True,
             is_system_user=True,
             prestador_id=int(prestador.id) if prestador else None,
             permissoes_json=dump_permissions_json(
@@ -2131,6 +2135,9 @@ def _garantir_usuario_sistemico_clinica(db, clinica_id: int, prestador: Prestado
             changed = True
         if bool(usuario.online):
             usuario.online = False
+            changed = True
+        if not bool(getattr(usuario, "setup_completed", False)):
+            usuario.setup_completed = True
             changed = True
         if bool(usuario.is_admin):
             usuario.is_admin = False
@@ -2178,6 +2185,7 @@ def criar_conta_saas(db, nome, email, senha):
             clinica_id=clinica.id,
             is_admin=True,
             online=False,
+            setup_completed=False,
             is_system_user=False,
             permissoes_json=dump_permissions_json(
                 sanitize_permissions({}, tipo_usuario="Clínica", is_admin=True)
@@ -2186,8 +2194,10 @@ def criar_conta_saas(db, nome, email, senha):
     )
 
     garantir_lista_padrao_clinica(db, clinica.id)
-    # Onboarding SaaS: procedimentos iniciais entram com Valor Paciente zerado.
-    garantir_procedimentos_padrao_clinica(db, clinica.id, reset_preco=True)
+    # Seed oficial estatico (extraido da conta modelo) para novas contas.
+    seed_simbolos_graficos(db, clinica.id)
+    seed_procedimentos_genericos(db, clinica.id)
+    seed_procedimentos(db, clinica.id)
     garantir_financeiro_padrao_clinica(db, clinica.id)
     garantir_indices_padrao_clinica(db, clinica.id)
     garantir_especialidades_padrao_clinica(db, clinica.id)
@@ -2198,4 +2208,3 @@ def criar_conta_saas(db, nome, email, senha):
 
     db.commit()
     return clinica
-

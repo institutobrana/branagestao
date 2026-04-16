@@ -75,6 +75,11 @@ class ProtectedUnlockRequest(BaseModel):
     module_code: str | None = None
 
 
+class SetupCompleteRequest(BaseModel):
+    senha: str
+    confirma_senha: str
+
+
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -519,6 +524,34 @@ def password_reset(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     db.commit()
 
     return {"detail": "Senha atualizada com sucesso."}
+
+
+@router.post("/auth/setup/complete")
+def setup_complete(
+    payload: SetupCompleteRequest,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    senha = payload.senha or ""
+    confirma = payload.confirma_senha or ""
+
+    validate_password(senha)
+    if senha != confirma:
+        raise HTTPException(status_code=400, detail="Confirmacao de senha invalida.")
+    if is_system_user(current_user):
+        raise HTTPException(status_code=403, detail="Conta sistemica sem setup interativo.")
+
+    usuario = db.query(Usuario).filter(Usuario.id == current_user.id).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
+
+    usuario.senha_hash = hash_password(senha)
+    usuario.forcar_troca_senha = False
+    usuario.setup_completed = True
+    usuario.online = True
+    db.commit()
+
+    return {"detail": "Configuracao inicial concluida com sucesso."}
 
 
 @router.post("/logout")

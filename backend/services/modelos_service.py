@@ -2,6 +2,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from models.clinica import Clinica
 from models.modelo_documento import ModeloDocumento
 
 
@@ -76,6 +77,13 @@ def sincronizar_catalogo_modelos_storage(db: Session) -> dict:
     vistos = set()
     inseridos = 0
     atualizados = 0
+    ignorados_sem_clinica = 0
+
+    clinicas_validas = {
+        int(row[0])
+        for row in db.query(Clinica.id).all()
+        if row and row[0] is not None
+    }
 
     existentes = (
         db.query(ModeloDocumento)
@@ -92,9 +100,13 @@ def sincronizar_catalogo_modelos_storage(db: Session) -> dict:
     }
 
     for item in _iter_storage_records() or []:
+        clinica_id = item["clinica_id"]
+        if clinica_id is not None and int(clinica_id) not in clinicas_validas:
+            ignorados_sem_clinica += 1
+            continue
         arquivo = item["arquivo"]
         key = (
-            item["clinica_id"],
+            clinica_id,
             item["tipo_modelo"],
             arquivo.name,
         )
@@ -103,7 +115,7 @@ def sincronizar_catalogo_modelos_storage(db: Session) -> dict:
         registro = por_chave.get(key)
         if registro is None:
             registro = ModeloDocumento(
-                clinica_id=item["clinica_id"],
+                clinica_id=clinica_id,
                 tipo_modelo=item["tipo_modelo"],
                 codigo=_codigo_modelo_por_arquivo(item["tipo_modelo"], arquivo),
                 nome_exibicao=_nome_exibicao_por_arquivo(arquivo),
@@ -160,4 +172,5 @@ def sincronizar_catalogo_modelos_storage(db: Session) -> dict:
         "atualizados": atualizados,
         "desativados": desativados,
         "vistos": len(vistos),
+        "ignorados_sem_clinica": ignorados_sem_clinica,
     }

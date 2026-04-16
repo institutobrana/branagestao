@@ -16,6 +16,12 @@ from security.superadmin import is_owner_email
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
+SETUP_ALLOWED_PATHS = {
+    "/me",
+    "/logout",
+    "/auth/setup/complete",
+}
+
 
 def _bool_from_value(value, default: bool = True) -> bool:
     if isinstance(value, bool):
@@ -49,6 +55,7 @@ def _is_user_control_enabled(clinica: Clinica | None) -> bool:
 
 
 def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
@@ -67,6 +74,12 @@ def get_current_user(
     owner = is_owner_email(usuario.email)
     if not usuario.ativo and not owner:
         raise HTTPException(status_code=403, detail="Usuario inativo")
+
+    setup_completed = bool(getattr(usuario, "setup_completed", False))
+    if not setup_completed:
+        path = (request.url.path or "").strip()
+        if path not in SETUP_ALLOWED_PATHS:
+            raise HTTPException(status_code=403, detail="setup_required")
 
     # Conta proprietaria sempre com acesso total.
     if owner:

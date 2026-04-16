@@ -91,14 +91,15 @@ AUX_TIPO_STORAGE_ALIASES = {
     "Tipos de cobrança": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
     "Tipos de apresentação": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
     "Tipos de indicação": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
-    "Tipos de usuário": ["Tipos de usuário", "Tipos de usuÃ¡rio"],
+    "Tipos de usuário": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
     "Símbolo gráfico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
     "SituaÃ§Ã£o do paciente": ["Situação do paciente", "SituaÃ§Ã£o do paciente"],
     "SituaÃ§Ã£o do agendamento": ["Situação do agendamento", "SituaÃ§Ã£o do agendamento"],
     "Tipos de cobranÃ§a": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
     "Tipos de apresentaÃ§Ã£o": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
     "Tipos de indicaÃ§Ã£o": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
-    "Tipos de usuÃ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio"],
+    "Tipos de usuÃ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
+    "Tipos de usuÃƒÂ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
     "SÃ­mbolo grÃ¡fico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
 }
 
@@ -671,7 +672,10 @@ def listar_simbolos_graficos(
         legacy_catalogo = carregar_legacy_ids_catalogo_oficial()
     rows = (
         db.query(SimboloGrafico)
-        .filter(SimboloGrafico.ativo.is_(True))
+        .filter(
+            SimboloGrafico.clinica_id == clinica_id,
+            SimboloGrafico.ativo.is_(True),
+        )
         .order_by(SimboloGrafico.descricao.asc(), SimboloGrafico.codigo.asc(), SimboloGrafico.id.asc())
         .all()
     )
@@ -685,13 +689,21 @@ def listar_simbolos_graficos(
             continue
         if scope_norm == "catalogo":
             legacy_id = int(getattr(row, "legacy_id", 0) or 0)
-            if legacy_catalogo and legacy_id not in legacy_catalogo and int(row.tipo_simbolo or 2) == 1:
+            # Catalogo oficial da tela "Configura simbolos": somente os 81 itens
+            # vindos do snapshot EasyDental (_SIMBOLO_ODONTO).
+            if legacy_catalogo and legacy_id not in legacy_catalogo:
                 continue
         else:
-            if catalogo and codigo.lower() not in catalogo:
-                continue
+            codigo_key = codigo.lower()
+            if catalogo:
+                if scope_norm == "procedimentos":
+                    # EasyDental: combo de simbolo grafico em procedimentos aceita
+                    # catalogo oficial + simbolos personalizados da clinica.
+                    if codigo_key not in catalogo and _simbolo_eh_oficial(row):
+                        continue
+                elif codigo_key not in catalogo:
+                    continue
             if scope_norm == "genericos":
-                codigo_key = codigo.lower()
                 if codigo_key in vistos_codigo:
                     continue
                 vistos_codigo.add(codigo_key)
@@ -717,8 +729,15 @@ def listar_simbolos_graficos(
     return itens
 
 
-def _simbolo_or_404(db: Session, simbolo_id: int) -> SimboloGrafico:
-    item = db.query(SimboloGrafico).filter(SimboloGrafico.id == simbolo_id).first()
+def _simbolo_or_404(db: Session, clinica_id: int, simbolo_id: int) -> SimboloGrafico:
+    item = (
+        db.query(SimboloGrafico)
+        .filter(
+            SimboloGrafico.id == simbolo_id,
+            SimboloGrafico.clinica_id == int(clinica_id),
+        )
+        .first()
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Simbolo grafico nao encontrado.")
     return item
@@ -732,8 +751,14 @@ def _simbolo_eh_oficial(item: SimboloGrafico) -> bool:
     return not legacy_catalogo or legacy_id in legacy_catalogo
 
 
-def _simbolo_nome_ativo_existe(db: Session, descricao: str, exclude_id: int | None = None) -> bool:
+def _simbolo_nome_ativo_existe(
+    db: Session,
+    clinica_id: int,
+    descricao: str,
+    exclude_id: int | None = None,
+) -> bool:
     query = db.query(SimboloGrafico.id).filter(
+        SimboloGrafico.clinica_id == int(clinica_id),
         func.lower(SimboloGrafico.descricao) == descricao.lower(),
         SimboloGrafico.ativo.is_(True),
     )
@@ -758,11 +783,12 @@ def criar_simbolo_grafico(
         raise HTTPException(status_code=400, detail="Informe um nome proprio para o simbolo, diferente do arquivo base.")
     if int(payload.legacy_id or 0) > 0:
         raise HTTPException(status_code=400, detail="Simbolos oficiais do sistema nao podem ser recriados manualmente.")
-    if _simbolo_nome_ativo_existe(db, descricao):
+    if _simbolo_nome_ativo_existe(db, current_user.clinica_id, descricao):
         raise HTTPException(status_code=400, detail="Ja existe simbolo com este nome.")
     existe = (
         db.query(SimboloGrafico.id)
         .filter(
+            SimboloGrafico.clinica_id == int(current_user.clinica_id),
             func.lower(SimboloGrafico.codigo) == codigo.lower(),
             func.lower(SimboloGrafico.descricao) == descricao.lower(),
             SimboloGrafico.ativo.is_(True),
@@ -772,6 +798,7 @@ def criar_simbolo_grafico(
     if existe:
         raise HTTPException(status_code=400, detail="Ja existe simbolo com este nome usando este bitmap.")
     item = SimboloGrafico(
+        clinica_id=int(current_user.clinica_id),
         legacy_id=None,
         codigo=codigo,
         descricao=descricao[:120],
@@ -799,14 +826,19 @@ def atualizar_simbolo_grafico(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    item = _simbolo_or_404(db, simbolo_id)
+    item = _simbolo_or_404(db, current_user.clinica_id, simbolo_id)
     descricao = str(payload.descricao or "").strip()
     if not descricao:
         raise HTTPException(status_code=400, detail="Informe o nome do simbolo.")
-    if _simbolo_eh_oficial(item):
-        raise HTTPException(status_code=409, detail="Simbolos de sistema nao podem ser sobrescritos.")
-    if _simbolo_nome_ativo_existe(db, descricao, exclude_id=item.id):
+    if _simbolo_nome_ativo_existe(db, current_user.clinica_id, descricao, exclude_id=item.id):
         raise HTTPException(status_code=400, detail="Ja existe simbolo com este nome.")
+    if _simbolo_eh_oficial(item):
+        # Regra Easy: simbolo de sistema permite alterar apenas nome e especialidade.
+        item.descricao = descricao[:120]
+        if payload.especialidade is not None:
+            item.especialidade = payload.especialidade
+        db.commit()
+        return {"detail": "Simbolo atualizado.", "id": int(item.id), "codigo": item.codigo, "descricao": item.descricao}
     novo_codigo = str(payload.codigo or item.codigo or "").strip()
     if not novo_codigo:
         raise HTTPException(status_code=400, detail="Informe o codigo do simbolo.")
@@ -815,6 +847,7 @@ def atualizar_simbolo_grafico(
     existe = (
         db.query(SimboloGrafico.id)
         .filter(
+            SimboloGrafico.clinica_id == int(current_user.clinica_id),
             SimboloGrafico.id != item.id,
             func.lower(SimboloGrafico.codigo) == novo_codigo.lower(),
             func.lower(SimboloGrafico.descricao) == descricao.lower(),
@@ -853,7 +886,7 @@ def excluir_simbolo_grafico(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    item = _simbolo_or_404(db, simbolo_id)
+    item = _simbolo_or_404(db, current_user.clinica_id, simbolo_id)
     if _simbolo_eh_oficial(item) or int(item.tipo_simbolo or 0) == 1:
         raise HTTPException(status_code=409, detail="Simbolos de sistema nao podem ser excluidos.")
     db.delete(item)

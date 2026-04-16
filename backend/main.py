@@ -667,6 +667,10 @@ with engine.begin() as conn:
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS tipo_usuario VARCHAR(80)"))
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS online BOOLEAN NOT NULL DEFAULT FALSE"))
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS forcar_troca_senha BOOLEAN NOT NULL DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS setup_completed BOOLEAN"))
+    conn.execute(text("UPDATE usuarios SET setup_completed = TRUE WHERE setup_completed IS NULL"))
+    conn.execute(text("ALTER TABLE usuarios ALTER COLUMN setup_completed SET NOT NULL"))
+    conn.execute(text("ALTER TABLE usuarios ALTER COLUMN setup_completed SET DEFAULT FALSE"))
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS is_system_user BOOLEAN NOT NULL DEFAULT FALSE"))
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prestador_id INTEGER"))
     conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS unidade_atendimento_id INTEGER"))
@@ -895,9 +899,50 @@ with engine.begin() as conn:
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_doenca_cid_legacy_registro ON doenca_cid (legacy_registro)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_doenca_cid_codigo ON doenca_cid (codigo)"))
     conn.execute(text("ALTER TABLE simbolo_grafico_catalogo ADD COLUMN IF NOT EXISTS legacy_id INTEGER"))
+    conn.execute(text("ALTER TABLE simbolo_grafico_catalogo ADD COLUMN IF NOT EXISTS clinica_id INTEGER"))
     conn.execute(text("ALTER TABLE simbolo_grafico_catalogo ADD COLUMN IF NOT EXISTS imagem_custom TEXT"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_simbolo_grafico_catalogo_clinica_id ON simbolo_grafico_catalogo (clinica_id)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_simbolo_grafico_catalogo_legacy_id ON simbolo_grafico_catalogo (legacy_id)"))
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_simbolo_grafico_catalogo_codigo ON simbolo_grafico_catalogo (codigo)"))
+    # Remove a unicidade global legada ANTES de replicar por clinica.
+    conn.execute(text("ALTER TABLE simbolo_grafico_catalogo DROP CONSTRAINT IF EXISTS uq_simbolo_grafico_catalogo_legacy_id"))
+    conn.execute(
+        text(
+            """
+            UPDATE simbolo_grafico_catalogo
+            SET clinica_id = (SELECT id FROM clinicas ORDER BY id LIMIT 1)
+            WHERE clinica_id IS NULL
+            """
+        )
+    )
+    conn.execute(
+        text(
+            """
+            INSERT INTO simbolo_grafico_catalogo (
+                clinica_id, legacy_id, codigo, descricao, especialidade, tipo_marca, tipo_simbolo,
+                bitmap1, bitmap2, bitmap3, icone, imagem_custom, sobreposicao, ativo
+            )
+            SELECT
+                c.id, s.legacy_id, s.codigo, s.descricao, s.especialidade, s.tipo_marca, s.tipo_simbolo,
+                s.bitmap1, s.bitmap2, s.bitmap3, s.icone, s.imagem_custom, s.sobreposicao, s.ativo
+            FROM clinicas c
+            JOIN simbolo_grafico_catalogo s
+              ON s.clinica_id = (SELECT id FROM clinicas ORDER BY id LIMIT 1)
+            LEFT JOIN simbolo_grafico_catalogo t
+              ON t.clinica_id = c.id
+             AND (
+                 (s.legacy_id IS NOT NULL AND t.legacy_id = s.legacy_id)
+                 OR (
+                     s.legacy_id IS NULL
+                     AND lower(coalesce(t.codigo, '')) = lower(coalesce(s.codigo, ''))
+                     AND lower(coalesce(t.descricao, '')) = lower(coalesce(s.descricao, ''))
+                 )
+             )
+            WHERE c.id <> (SELECT id FROM clinicas ORDER BY id LIMIT 1)
+              AND t.id IS NULL
+            """
+        )
+    )
     conn.execute(
         text(
             """
@@ -921,12 +966,20 @@ with engine.begin() as conn:
                 END IF;
                 IF NOT EXISTS (
                     SELECT 1
+                    FROM pg_indexes
+                    WHERE schemaname = current_schema()
+                      AND indexname = 'uq_simbolo_grafico_catalogo_clinica_legacy'
+                ) THEN
+                    CREATE UNIQUE INDEX uq_simbolo_grafico_catalogo_clinica_legacy
+                    ON simbolo_grafico_catalogo (clinica_id, legacy_id);
+                END IF;
+                IF EXISTS (
+                    SELECT 1
                     FROM pg_constraint
                     WHERE conname = 'uq_simbolo_grafico_catalogo_legacy_id'
                 ) THEN
                     ALTER TABLE simbolo_grafico_catalogo
-                    ADD CONSTRAINT uq_simbolo_grafico_catalogo_legacy_id
-                    UNIQUE (legacy_id);
+                    DROP CONSTRAINT uq_simbolo_grafico_catalogo_legacy_id;
                 END IF;
             END$$;
             """

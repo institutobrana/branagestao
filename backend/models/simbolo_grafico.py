@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, Integer, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
 
 from database import Base
 
@@ -7,7 +7,8 @@ class SimboloGrafico(Base):
     __tablename__ = "simbolo_grafico_catalogo"
 
     id = Column(Integer, primary_key=True, index=True)
-    legacy_id = Column(Integer, nullable=True, unique=True, index=True)
+    clinica_id = Column(Integer, ForeignKey("clinicas.id", ondelete="CASCADE"), nullable=True, index=True)
+    legacy_id = Column(Integer, nullable=True, index=True)
     codigo = Column(String(30), nullable=False, index=True)
     descricao = Column(String(120), nullable=False)
     especialidade = Column(Integer, nullable=True)

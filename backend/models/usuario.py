@@ -19,6 +19,7 @@ class Usuario(Base):
     ativo = Column(Boolean, default=True, nullable=False)
     online = Column(Boolean, default=False, nullable=False)
     forcar_troca_senha = Column(Boolean, default=False, nullable=False)
+    setup_completed = Column(Boolean, default=False, nullable=False)
     is_system_user = Column(Boolean, default=False, nullable=False)
 
     is_admin = Column(Boolean, default=False)

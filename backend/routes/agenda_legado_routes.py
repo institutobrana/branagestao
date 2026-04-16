@@ -1406,13 +1406,43 @@ def proximo_agendado(
     return _to_dict(item) if item else None
 
 
+def _prestadores_com_usuario_associado(db: Session, clinica_id: int) -> set[int]:
+    associados: set[int] = set()
+    rows_prestador = (
+        db.query(PrestadorOdonto.id)
+        .filter(
+            PrestadorOdonto.clinica_id == int(clinica_id),
+            PrestadorOdonto.usuario_id.isnot(None),
+        )
+        .all()
+    )
+    for (prestador_id,) in rows_prestador:
+        pid = int(prestador_id or 0)
+        if pid > 0:
+            associados.add(pid)
+
+    rows_usuario = (
+        db.query(Usuario.prestador_id)
+        .filter(
+            Usuario.clinica_id == int(clinica_id),
+            Usuario.prestador_id.isnot(None),
+        )
+        .all()
+    )
+    for (prestador_id,) in rows_usuario:
+        pid = int(prestador_id or 0)
+        if pid > 0:
+            associados.add(pid)
+    return associados
+
+
 @router.get("/prestadores")
 def listar_prestadores(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     clinica_id = int(current_user.clinica_id)
-    current_prestador_id = int(current_user.prestador_id or 0) or None
+    elegiveis_com_usuario = _prestadores_com_usuario_associado(db, clinica_id)
     rows = (
         db.query(PrestadorOdonto)
         .filter(PrestadorOdonto.clinica_id == clinica_id)
@@ -1422,8 +1452,10 @@ def listar_prestadores(
     itens: list[dict] = []
     for item in rows:
         prestador_id = int(item.id)
+        if prestador_id not in elegiveis_com_usuario:
+            continue
         ativo = not bool(item.inativo)
-        if not ativo and (current_prestador_id is None or prestador_id != current_prestador_id):
+        if not ativo:
             continue
         nome = str(item.nome or "").strip()
         if not nome:

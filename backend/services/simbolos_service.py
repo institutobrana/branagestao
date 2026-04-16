@@ -7,6 +7,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from models.clinica import Clinica
 from models.simbolo_grafico import SimboloGrafico
 
 
@@ -354,59 +355,67 @@ def garantir_catalogo_simbolos(db: Session) -> int:
     if not seed:
         return 0
 
-    existentes = list(db.query(SimboloGrafico).all())
-    existentes_por_legacy = {
-        int(item.legacy_id): item
-        for item in existentes
-        if int(getattr(item, "legacy_id", 0) or 0) > 0
-    }
-    existentes_sem_legacy: dict[tuple[str, str], SimboloGrafico] = {}
-    existentes_sem_legacy_por_codigo: dict[str, list[SimboloGrafico]] = {}
-    for item in existentes:
-        if int(getattr(item, "legacy_id", 0) or 0) > 0:
-            continue
-        codigo = str(item.codigo or "").strip().lower()
-        descricao = str(item.descricao or "").strip().lower()
-        if codigo and descricao:
-            existentes_sem_legacy.setdefault((codigo, descricao), item)
-        if codigo:
-            existentes_sem_legacy_por_codigo.setdefault(codigo, []).append(item)
-
     alterados = 0
-    for row in seed:
-        codigo = str(row["codigo"]).strip()
-        chave = codigo.lower()
-        descricao = str(row.get("descricao") or "").strip()
-        legacy_id = int(row.get("legacy_id") or 0)
-        item = None
-        if legacy_id > 0:
-            item = existentes_por_legacy.get(legacy_id)
-            if item is None:
-                item = existentes_sem_legacy.get((chave, descricao.lower()))
-            if item is None:
-                candidatos = existentes_sem_legacy_por_codigo.get(chave) or []
-                if len(candidatos) == 1:
-                    item = candidatos[0]
-        else:
-            item = existentes_sem_legacy.get((chave, descricao.lower()))
+    clinica_ids = [int(row[0]) for row in db.query(Clinica.id).all() if row and row[0]]
+    for clinica_id in clinica_ids:
+        existentes = list(
+            db.query(SimboloGrafico)
+            .filter(SimboloGrafico.clinica_id == int(clinica_id))
+            .all()
+        )
+        existentes_por_legacy = {
+            int(item.legacy_id): item
+            for item in existentes
+            if int(getattr(item, "legacy_id", 0) or 0) > 0
+        }
+        existentes_sem_legacy: dict[tuple[str, str], SimboloGrafico] = {}
+        existentes_sem_legacy_por_codigo: dict[str, list[SimboloGrafico]] = {}
+        for item in existentes:
+            if int(getattr(item, "legacy_id", 0) or 0) > 0:
+                continue
+            codigo = str(item.codigo or "").strip().lower()
+            descricao = str(item.descricao or "").strip().lower()
+            if codigo and descricao:
+                existentes_sem_legacy.setdefault((codigo, descricao), item)
+            if codigo:
+                existentes_sem_legacy_por_codigo.setdefault(codigo, []).append(item)
 
-        if item is None:
-            item = SimboloGrafico(**row)
-            db.add(item)
+        for row in seed:
+            codigo = str(row["codigo"]).strip()
+            chave = codigo.lower()
+            descricao = str(row.get("descricao") or "").strip()
+            legacy_id = int(row.get("legacy_id") or 0)
+            item = None
             if legacy_id > 0:
-                existentes_por_legacy[legacy_id] = item
+                item = existentes_por_legacy.get(legacy_id)
+                if item is None:
+                    item = existentes_sem_legacy.get((chave, descricao.lower()))
+                if item is None:
+                    candidatos = existentes_sem_legacy_por_codigo.get(chave) or []
+                    if len(candidatos) == 1:
+                        item = candidatos[0]
             else:
-                existentes_sem_legacy[(chave, descricao.lower())] = item
-                existentes_sem_legacy_por_codigo.setdefault(chave, []).append(item)
-            alterados += 1
-            continue
+                item = existentes_sem_legacy.get((chave, descricao.lower()))
 
-        mudou = False
-        for campo, valor in row.items():
-            if getattr(item, campo) != valor:
-                setattr(item, campo, valor)
-                mudou = True
-        if mudou:
-            alterados += 1
+            if item is None:
+                payload = dict(row)
+                payload["clinica_id"] = int(clinica_id)
+                item = SimboloGrafico(**payload)
+                db.add(item)
+                if legacy_id > 0:
+                    existentes_por_legacy[legacy_id] = item
+                else:
+                    existentes_sem_legacy[(chave, descricao.lower())] = item
+                    existentes_sem_legacy_por_codigo.setdefault(chave, []).append(item)
+                alterados += 1
+                continue
+
+            mudou = False
+            for campo, valor in row.items():
+                if getattr(item, campo) != valor:
+                    setattr(item, campo, valor)
+                    mudou = True
+            if mudou:
+                alterados += 1
 
     return alterados
