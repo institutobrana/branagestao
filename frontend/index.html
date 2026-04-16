@@ -105,6 +105,23 @@
         width: 100%;
         font-size: 14px;
       }
+      .setup-info {
+        background: #f5f7fb;
+        border: 1px solid #e0e6ef;
+        padding: 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      }
+      .setup-info h2 {
+        margin: 0 0 8px;
+      }
+      .setup-info p {
+        margin: 0 0 10px;
+      }
+      .setup-info ul {
+        margin: 0;
+        padding-left: 18px;
+      }
       .login-actions {
         display: grid;
         gap: 8px;
@@ -2482,6 +2499,34 @@
           <div class="login-actions">
             <button id="btn-forgot-reset" class="btn primary" type="button">Redefinir senha</button>
             <button id="btn-back-login-from-forgot" class="btn" type="button">Voltar</button>
+          </div>
+        </section>
+
+        <section id="panel-setup" class="login-panel hidden">
+          <div class="setup-info">
+            <h2>Bem-vindo ao BranaCloud 👏</h2>
+            <p>Estamos quase prontos para começar.</p>
+            <p>
+              Você está acessando sua conta como administrador da clínica.
+              Antes de entrar no sistema, é necessário definir uma senha de segurança interna.
+            </p>
+            <ul>
+              <li>Esta NÃO é sua senha de login</li>
+              <li>Ela será usada para proteger ações importantes no sistema</li>
+              <li>Será solicitada apenas em operações sensíveis</li>
+              <li>Você poderá alterá-la posteriormente nas configurações</li>
+              <li>Esta etapa ocorre apenas no primeiro acesso</li>
+            </ul>
+          </div>
+          <label for="setup-email">E-mail</label>
+          <input id="setup-email" type="email" readonly>
+          <label for="setup-senha">Defina sua senha interna</label>
+          <input id="setup-senha" type="password" autocomplete="new-password">
+          <label for="setup-confirma">Confirme a senha</label>
+          <input id="setup-confirma" type="password" autocomplete="new-password">
+          <div class="login-actions">
+            <button id="btn-setup-complete" class="btn primary" type="button">Concluir primeiro acesso</button>
+            <button id="btn-setup-logout" class="btn" type="button">Sair</button>
           </div>
         </section>
       </div>

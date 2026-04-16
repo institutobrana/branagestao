@@ -55,3 +55,9 @@ git_remote.txt
 backups/
 *.sqlite
 *.sqlite3
+
+# =========================
+# Scripts e dados temporários
+# =========================
+scripts/
+*.csv
