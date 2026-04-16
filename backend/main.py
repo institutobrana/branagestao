@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from database import Base, SessionLocal, engine
 from models.access_profile import AccessProfile  # noqa: F401
@@ -141,9 +142,36 @@ def _run_runtime_bootstrap_in_thread() -> None:
         print(f"[startup] runtime bootstrap falhou: {exc}")
 
 
+def _garantir_colunas_criticas_usuarios() -> None:
+    """Hotfix seguro para ambientes sem shell (Render).
+
+    Garante colunas exigidas pelo fluxo atual de autenticacao sem
+    reintroduzir bootstrap pesado de schema no startup HTTP.
+    """
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS usuarios "
+                    "ADD COLUMN IF NOT EXISTS setup_completed BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS usuarios "
+                    "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+    except Exception as exc:
+        # Nao bloquear subida da API por causa do hotfix.
+        print(f"[startup] aviso: nao foi possivel garantir colunas criticas de usuarios: {exc}")
+
+
 @app.on_event("startup")
 def _iniciar_bootstrap():
     import threading
+
+    _garantir_colunas_criticas_usuarios()
 
     if str(os.getenv("BRANA_SKIP_BOOTSTRAP", "")).strip().lower() in {"1", "true", "yes", "sim"}:
         return
