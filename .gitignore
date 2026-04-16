@@ -60,4 +60,8 @@ backups/
 # Scripts e dados temporários
 # =========================
 scripts/
+!backend/scripts/
+backend/scripts/*
+!backend/scripts/aplicar_compatibilidade_schema.py
+!backend/scripts/executar_bootstrap_runtime_global.py
 *.csv

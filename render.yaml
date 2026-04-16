@@ -3,11 +3,22 @@ services:
     name: brana-saas
     runtime: python
     plan: free
+    healthCheckPath: /health
     buildCommand: pip install -r backend/requirements.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT}
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.13
+      - key: BRANA_RUNTIME_PROFILE
+        value: "prod"
+      - key: BRANA_ENABLE_SCHEMA_BOOTSTRAP
+        value: "0"
+      - key: BRANA_ENABLE_RUNTIME_BOOTSTRAP
+        value: "0"
+      - key: BRANA_ALLOW_HTTP_RUNTIME_BOOTSTRAP
+        value: "0"
+      - key: BRANA_ALLOW_SCHEMA_COMPAT_APPLY
+        value: "0"
       - key: BRANA_SKIP_BOOTSTRAP
         value: "1"
       - key: DATABASE_URL
