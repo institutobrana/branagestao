@@ -1,0 +1,73 @@
+{
+  "generated_at": "2026-04-17T16:00:37.283889",
+  "root": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas",
+  "scanned_files": 202,
+  "non_utf8_count": 3,
+  "mojibake_candidate_count": 12,
+  "missing_html_meta_utf8_count": 0,
+  "non_utf8_files": [
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\estrutura.txt",
+      "detail": "UnicodeDecodeError at pos=59: invalid start byte"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\base\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "detail": "UnicodeDecodeError at pos=1: invalid continuation byte"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\clinicas\\1\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "detail": "UnicodeDecodeError at pos=1: invalid continuation byte"
+    }
+  ],
+  "mojibake_candidates": [
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\auth_routes.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\cadastros_routes.py",
+      "detail": "mojibake_score=94"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\auditoria_encoding.py",
+      "detail": "mojibake_score=25"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\corrigir_encoding_arquivos.py",
+      "detail": "mojibake_score=23"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\gerar_sql_correcao_encoding.py",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\sincronizar_auxiliares_easydental.py",
+      "detail": "mojibake_score=10"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\permissions.py",
+      "detail": "mojibake_score=5"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\app.js",
+      "detail": "mojibake_score=3225"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_apresentacao_patch.js",
+      "detail": "mojibake_score=10"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_refino.js",
+      "detail": "mojibake_score=14"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_utf_fix.js",
+      "detail": "mojibake_score=8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_override.js",
+      "detail": "mojibake_score=11"
+    }
+  ],
+  "missing_html_meta_utf8": []
+}

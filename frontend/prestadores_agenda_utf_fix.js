@@ -8,14 +8,14 @@
       .replace(/conv[\?\uFFFD]nio/gi, function (m) {
         return m.charAt(0) === "C" ? "Conv\u00eanio" : "conv\u00eanio";
       })
-      .replace(/ConvÃªnio/g, "Conv\u00eanio")
-      .replace(/convÃªnio/g, "conv\u00eanio")
-      .replace(/ConvÃƒÂªnio/g, "Conv\u00eanio")
-      .replace(/convÃƒÂªnio/g, "conv\u00eanio")
+      .replace(/Convênio/g, "Conv\u00eanio")
+      .replace(/convênio/g, "conv\u00eanio")
+      .replace(/Convênio/g, "Conv\u00eanio")
+      .replace(/convênio/g, "conv\u00eanio")
       .replace(/Obl[\?\uFFFD]quo/g, "Obl\u00edquo")
-      .replace(/OblÃ­quo/g, "Obl\u00edquo")
+      .replace(/Oblíquo/g, "Obl\u00edquo")
       .replace(/Cl[\?\uFFFD]nica/g, "Cl\u00ednica")
-      .replace(/ClÃ­nica/g, "Cl\u00ednica");
+      .replace(/Clínica/g, "Cl\u00ednica");
   }
 
   function fixTree(root) {

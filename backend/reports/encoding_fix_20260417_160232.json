@@ -1,0 +1,37 @@
+{
+  "generated_at": "2026-04-17T16:02:32.431907",
+  "root": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas",
+  "dry_run": false,
+  "scanned_files": 206,
+  "changed_count": 4,
+  "changes": [
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\cadastros_routes.py",
+      "reason": "mojibake reparado",
+      "score_before": 185,
+      "score_after": 182,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\app.js",
+      "reason": "mojibake reparado",
+      "score_before": 1506,
+      "score_after": 1458,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_apresentacao_patch.js",
+      "reason": "mojibake reparado",
+      "score_before": 27,
+      "score_after": 25,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_override.js",
+      "reason": "mojibake reparado",
+      "score_before": 333,
+      "score_after": 326,
+      "original_encoding": "utf-8"
+    }
+  ]
+}

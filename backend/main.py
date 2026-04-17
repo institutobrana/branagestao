@@ -343,6 +343,20 @@ async def disable_frontend_cache(request: Request, call_next):
         response.headers["Expires"] = "0"
     return response
 
+
+@app.middleware("http")
+async def enforce_utf8_charset(request: Request, call_next):
+    response = await call_next(request)
+    ctype = response.headers.get("content-type", "")
+    ctype_lower = ctype.lower()
+    if "charset=" in ctype_lower:
+        return response
+    if ctype_lower.startswith("text/"):
+        response.headers["Content-Type"] = f"{ctype}; charset=utf-8" if ctype else "text/plain; charset=utf-8"
+    elif "application/json" in ctype_lower:
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
+
 if FRONTEND_DIR.exists():
     app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR)), name="frontend")
 

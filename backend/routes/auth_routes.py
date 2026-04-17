@@ -208,7 +208,7 @@ def login(
         raise HTTPException(status_code=400, detail="Usuario nao encontrado")
 
     if is_system_user(usuario):
-        raise HTTPException(status_code=403, detail="Conta sistÃªmica sem login interativo.")
+        raise HTTPException(status_code=403, detail="Conta sistêmica sem login interativo.")
 
     owner = _enforce_owner_access(usuario)
     changed = False

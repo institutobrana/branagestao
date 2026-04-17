@@ -91,16 +91,16 @@ AUX_TIPO_STORAGE_ALIASES = {
     "Tipos de cobrança": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
     "Tipos de apresentação": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
     "Tipos de indicação": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
-    "Tipos de usuário": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
+    "Tipos de usu�rio": ["Tipos de usu�rio", "Tipos de usu�rio", "Tipos de usu�rio"],
     "Símbolo gráfico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
-    "SituaÃ§Ã£o do paciente": ["Situação do paciente", "SituaÃ§Ã£o do paciente"],
-    "SituaÃ§Ã£o do agendamento": ["Situação do agendamento", "SituaÃ§Ã£o do agendamento"],
-    "Tipos de cobranÃ§a": ["Tipos de cobrança", "Tipos de cobranÃ§a"],
-    "Tipos de apresentaÃ§Ã£o": ["Tipos de apresentação", "Tipos de apresentaÃ§Ã£o"],
-    "Tipos de indicaÃ§Ã£o": ["Tipos de indicação", "Tipos de indicaÃ§Ã£o"],
-    "Tipos de usuÃ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
-    "Tipos de usuÃƒÂ¡rio": ["Tipos de usuário", "Tipos de usuÃ¡rio", "Tipos de usuÃƒÂ¡rio"],
-    "SÃ­mbolo grÃ¡fico": ["Símbolo gráfico", "SÃ­mbolo grÃ¡fico"],
+    "Situação do paciente": ["Situa��o do paciente", "Situação do paciente"],
+    "Situação do agendamento": ["Situa��o do agendamento", "Situação do agendamento"],
+    "Tipos de cobrança": ["Tipos de cobran�a", "Tipos de cobrança"],
+    "Tipos de apresentação": ["Tipos de apresenta��o", "Tipos de apresentação"],
+    "Tipos de indicação": ["Tipos de indica��o", "Tipos de indicação"],
+    "Tipos de usuário": ["Tipos de usu�rio", "Tipos de usuário", "Tipos de usuÃ¡rio"],
+    "Tipos de usu�rio": ["Tipos de usu�rio", "Tipos de usu�rio", "Tipos de usu�rio"],
+    "Símbolo gráfico": ["S�mbolo gr�fico", "Símbolo gráfico"],
 }
 
 SIMBOLO_TIPO_MARCA_LABELS = {
@@ -289,7 +289,7 @@ def _material_clinica_or_404(db: Session, clinica_id: int, material_id: int) -> 
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Material nÃ£o encontrado para esta clÃ­nica.")
+        raise HTTPException(status_code=404, detail="Material não encontrado para esta clínica.")
     return item
 
 
@@ -527,7 +527,7 @@ def _grupo_or_404(db: Session, clinica_id: int, grupo_id: int) -> GrupoFinanceir
         .first()
     )
     if not grupo:
-        raise HTTPException(status_code=404, detail="Grupo nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Grupo não encontrado.")
     return grupo
 
 
@@ -541,7 +541,7 @@ def _categoria_or_404(db: Session, clinica_id: int, categoria_id: int) -> Catego
         .first()
     )
     if not cat:
-        raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada.")
+        raise HTTPException(status_code=404, detail="Categoria não encontrada.")
     return cat
 
 
@@ -913,7 +913,7 @@ def _paciente_or_404(db: Session, clinica_id: int, paciente_id: int) -> Paciente
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Paciente nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
     return item
 
 
@@ -1257,7 +1257,7 @@ def criar_grupo(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe um grupo com este nome.")
+        raise HTTPException(status_code=400, detail="Já existe um grupo com este nome.")
     g = GrupoFinanceiro(clinica_id=current_user.clinica_id, nome=nome, tipo=tipo)
     db.add(g)
     db.commit()
@@ -1287,7 +1287,7 @@ def editar_grupo(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe um grupo com este nome.")
+        raise HTTPException(status_code=400, detail="Já existe um grupo com este nome.")
     grupo.nome = nome
     grupo.tipo = tipo
     db.commit()
@@ -1313,7 +1313,7 @@ def excluir_grupo(
         raise HTTPException(status_code=400, detail="Este grupo possui categorias vinculadas.")
     db.delete(grupo)
     db.commit()
-    return {"detail": "Grupo excluÃ­do."}
+    return {"detail": "Grupo excluído."}
 
 
 @router.post("/categorias", dependencies=[DEP_FINANCEIRO])
@@ -1337,7 +1337,7 @@ def criar_categoria(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="Categoria jÃ¡ existe neste grupo.")
+        raise HTTPException(status_code=400, detail="Categoria já existe neste grupo.")
     c = CategoriaFinanceira(
         clinica_id=current_user.clinica_id,
         nome=nome,
@@ -1381,7 +1381,7 @@ def editar_categoria(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe outra categoria com este nome.")
+        raise HTTPException(status_code=400, detail="Já existe outra categoria com este nome.")
     cat.nome = nome
     cat.tipo = tipo
     cat.grupo_id = int(payload.grupo_id)
@@ -1426,10 +1426,10 @@ def excluir_categoria(
         is not None
     )
     if em_uso:
-        raise HTTPException(status_code=409, detail="Categoria em uso por lanÃ§amentos.")
+        raise HTTPException(status_code=409, detail="Categoria em uso por lançamentos.")
     db.delete(cat)
     db.commit()
-    return {"detail": "Categoria excluÃ­da."}
+    return {"detail": "Categoria excluída."}
 
 
 @router.post("/categorias/{categoria_id}/migrar-e-excluir", dependencies=[DEP_FINANCEIRO])
@@ -1454,7 +1454,7 @@ def migrar_e_excluir_categoria(
     )
     db.delete(origem)
     db.commit()
-    return {"detail": "Categoria migrada e excluÃ­da."}
+    return {"detail": "Categoria migrada e excluída."}
 
 
 @router.get("/auxiliares/tipos", dependencies=[DEP_CONFIGURACAO])
@@ -1895,7 +1895,7 @@ def navegar_pacientes(
     base = db.query(Paciente).filter(Paciente.clinica_id == current_user.clinica_id)
     sentido_norm = (sentido or "").strip().lower()
     if sentido_norm not in {"first", "prev", "next", "last"}:
-        raise HTTPException(status_code=400, detail="Sentido invÃ¡lido. Use: first, prev, next ou last.")
+        raise HTTPException(status_code=400, detail="Sentido inválido. Use: first, prev, next ou last.")
 
     if sentido_norm == "first":
         item = base.order_by(Paciente.codigo.asc(), Paciente.id.asc()).first()
@@ -1951,7 +1951,7 @@ def obter_paciente_por_codigo(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Paciente nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Paciente não encontrado.")
     return _paciente_to_dict(item)
 
 
@@ -1973,7 +1973,7 @@ def criar_paciente(
 ):
     codigo = int(payload.codigo or _proximo_codigo_paciente(db, current_user.clinica_id))
     if codigo <= 0:
-        raise HTTPException(status_code=400, detail="CÃ³digo invÃ¡lido.")
+        raise HTTPException(status_code=400, detail="Código inválido.")
 
     existe = (
         db.query(Paciente.id)
@@ -1984,7 +1984,7 @@ def criar_paciente(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe paciente com este cÃ³digo.")
+        raise HTTPException(status_code=400, detail="Já existe paciente com este código.")
 
     item = Paciente(
         clinica_id=current_user.clinica_id,
@@ -2012,7 +2012,7 @@ def editar_paciente(
 
     novo_codigo = int(payload.codigo or item.codigo)
     if novo_codigo <= 0:
-        raise HTTPException(status_code=400, detail="CÃ³digo invÃ¡lido.")
+        raise HTTPException(status_code=400, detail="Código inválido.")
     if novo_codigo != item.codigo:
         existe = (
             db.query(Paciente.id)
@@ -2024,7 +2024,7 @@ def editar_paciente(
             .first()
         )
         if existe:
-            raise HTTPException(status_code=400, detail="JÃ¡ existe paciente com este cÃ³digo.")
+            raise HTTPException(status_code=400, detail="Já existe paciente com este código.")
         item.codigo = novo_codigo
 
     _apply_paciente_payload(item, payload)
@@ -2042,7 +2042,7 @@ def excluir_paciente(
     item = _paciente_or_404(db, current_user.clinica_id, paciente_id)
     db.delete(item)
     db.commit()
-    return {"detail": "Paciente excluÃ­do."}
+    return {"detail": "Paciente excluído."}
 
 
 @router.get("/procedimentos-genericos", dependencies=[DEP_PROCEDIMENTOS])
@@ -2085,7 +2085,7 @@ def detalhar_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
     return _procedimento_generico_to_dict(item, clinica_id=current_user.clinica_id, detalhado=True)
 
 
@@ -2112,7 +2112,7 @@ def detalhar_procedimento_generico_v2(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
     return _procedimento_generico_to_dict(item, clinica_id=current_user.clinica_id, detalhado=True)
 
 
@@ -2123,7 +2123,7 @@ def migrar_procedimentos_genericos(
 ):
     clinica_id = current_user.clinica_id
     if not TAB_GEN_ITEM_PATH.exists():
-        raise HTTPException(status_code=404, detail=f"Arquivo nÃ£o encontrado: {TAB_GEN_ITEM_PATH}")
+        raise HTTPException(status_code=404, detail=f"Arquivo não encontrado: {TAB_GEN_ITEM_PATH}")
 
     try:
         registros = _parse_tab_gen_item(TAB_GEN_ITEM_PATH.read_bytes())
@@ -2131,7 +2131,7 @@ def migrar_procedimentos_genericos(
         raise HTTPException(status_code=500, detail=f"Falha ao ler arquivo RAW: {exc}") from exc
 
     if not registros:
-        raise HTTPException(status_code=400, detail="Nenhum procedimento genÃ©rico foi encontrado no arquivo RAW.")
+        raise HTTPException(status_code=400, detail="Nenhum procedimento genérico foi encontrado no arquivo RAW.")
 
     metadados = carregar_metadados_genericos_legado()
     existentes = {
@@ -2184,7 +2184,7 @@ def migrar_procedimentos_genericos(
     db.commit()
     total_tabela = db.query(ProcedimentoGenerico.id).filter(ProcedimentoGenerico.clinica_id == clinica_id).count()
     detail = (
-        f"MigraÃ§Ã£o concluÃ­da: {len(registros)} lidos, "
+        f"Migração concluída: {len(registros)} lidos, "
         f"{inseridos} inseridos, {atualizados} atualizados."
     )
     return {
@@ -2207,7 +2207,7 @@ def criar_procedimento_generico(
     codigo = _norm_codigo_procedimento_generico(payload.codigo)
     descricao = (payload.descricao or "").strip()
     if not codigo or not descricao:
-        raise HTTPException(status_code=400, detail="Informe cÃ³digo e descriÃ§Ã£o.")
+        raise HTTPException(status_code=400, detail="Informe código e descrição.")
 
     existe = (
         db.query(ProcedimentoGenerico.id)
@@ -2218,7 +2218,7 @@ def criar_procedimento_generico(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe um procedimento genÃ©rico com este cÃ³digo.")
+        raise HTTPException(status_code=400, detail="Já existe um procedimento genérico com este código.")
 
     agora = datetime.now().strftime("%d/%m/%Y %H:%M")
     item = ProcedimentoGenerico(
@@ -2262,12 +2262,12 @@ def editar_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
 
     codigo = _norm_codigo_procedimento_generico(payload.codigo)
     descricao = (payload.descricao or "").strip()
     if not codigo or not descricao:
-        raise HTTPException(status_code=400, detail="Informe cÃ³digo e descriÃ§Ã£o.")
+        raise HTTPException(status_code=400, detail="Informe código e descrição.")
 
     existe = (
         db.query(ProcedimentoGenerico.id)
@@ -2279,7 +2279,7 @@ def editar_procedimento_generico(
         .first()
     )
     if existe:
-        raise HTTPException(status_code=400, detail="JÃ¡ existe outro procedimento genÃ©rico com este cÃ³digo.")
+        raise HTTPException(status_code=400, detail="Já existe outro procedimento genérico com este código.")
 
     item.codigo = codigo
     item.descricao = descricao
@@ -2318,7 +2318,7 @@ def excluir_procedimento_generico(
         .first()
     )
     if not item:
-        raise HTTPException(status_code=404, detail="Procedimento genÃ©rico nÃ£o encontrado.")
+        raise HTTPException(status_code=404, detail="Procedimento genérico não encontrado.")
     em_uso = (
         db.query(Procedimento.id)
         .filter(
@@ -2328,8 +2328,8 @@ def excluir_procedimento_generico(
         .first()
     )
     if em_uso:
-        raise HTTPException(status_code=409, detail="Este procedimento genÃƒÂ©rico estÃƒÂ¡ vinculado a procedimentos da tabela.")
+        raise HTTPException(status_code=409, detail="Este procedimento genérico está vinculado a procedimentos da tabela.")
     db.delete(item)
     db.commit()
-    return {"detail": "Procedimento genÃ©rico excluÃ­do."}
+    return {"detail": "Procedimento genérico excluído."}
 

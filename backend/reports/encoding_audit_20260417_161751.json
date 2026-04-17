@@ -1,0 +1,276 @@
+{
+  "generated_at": "2026-04-17T16:17:51.018837",
+  "root": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas",
+  "scanned_files": 208,
+  "non_utf8_count": 0,
+  "mojibake_candidate_count": 66,
+  "missing_html_meta_utf8_count": 0,
+  "non_utf8_files": [],
+  "mojibake_candidates": [
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\.gitignore",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\estrutura.txt",
+      "detail": "mojibake_score=27"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\README.md",
+      "detail": "mojibake_score=17"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\.env",
+      "detail": "mojibake_score=18"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\.gitignore",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\README.md",
+      "detail": "mojibake_score=37"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\agenda_legado_routes.py",
+      "detail": "mojibake_score=32"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\auth_routes.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\cadastros_routes.py",
+      "detail": "mojibake_score=170"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\cenario_routes.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\controle_proteticos_routes.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\convenios_planos_routes.py",
+      "detail": "mojibake_score=24"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\etiquetas_routes.py",
+      "detail": "mojibake_score=11"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\financeiro_routes.py",
+      "detail": "mojibake_score=18"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\indices_financeiros_routes.py",
+      "detail": "mojibake_score=22"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\preferences_routes.py",
+      "detail": "mojibake_score=17"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\prestadores_routes.py",
+      "detail": "mojibake_score=22"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\procedimentos_routes.py",
+      "detail": "mojibake_score=43"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\superadmin_routes.py",
+      "detail": "mojibake_score=10"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\system_options_routes.py",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\user_admin_routes.py",
+      "detail": "mojibake_score=7"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\aplicar_compatibilidade_schema.py",
+      "detail": "mojibake_score=11"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\auditoria_encoding.py",
+      "detail": "mojibake_score=25"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\comparar_pacientes_saas.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\corrigir_encoding_arquivos.py",
+      "detail": "mojibake_score=26"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\easy_simbolos_catalogo_atual_snapshot.json",
+      "detail": "mojibake_score=56"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\gerar_snapshot_simbolos.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\gerar_sql_correcao_encoding.py",
+      "detail": "mojibake_score=30"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_cid_csv.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_contatos_csv.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_conta_corrente_aliases.py",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_convenios_planos_easy.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_indices_financeiros_easy.py",
+      "detail": "mojibake_score=12"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_materiais_instituto_brana.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_permissoes_usuarios_eds70.py",
+      "detail": "mojibake_score=44"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_prestadores_easy_para_saas.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_proteticos_csv.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\migrar_usuarios_easy_para_saas.py",
+      "detail": "mojibake_score=8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\reimportar_cid_easydental.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\replicar_convenios_planos_todas_clinicas.py",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\sincronizar_auxiliares_easydental.py",
+      "detail": "mojibake_score=159"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\dependencies.py",
+      "detail": "mojibake_score=8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\permissions.py",
+      "detail": "mojibake_score=107"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\superadmin.py",
+      "detail": "mojibake_score=1"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\system_accounts.py",
+      "detail": "mojibake_score=4"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\tenant.py",
+      "detail": "mojibake_score=4"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\tenant_context.py",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\trial_middleware.py",
+      "detail": "mojibake_score=2"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\security\\trial_validator.py",
+      "detail": "mojibake_score=6"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\seeds\\procedimentos_genericos.py",
+      "detail": "mojibake_score=811"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\seeds\\procedimentos_padrao.py",
+      "detail": "mojibake_score=19"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\seeds\\simbolos_graficos.py",
+      "detail": "mojibake_score=56"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\services\\email_service.py",
+      "detail": "mojibake_score=32"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\services\\procedimentos_legado_service.py",
+      "detail": "mojibake_score=10"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\services\\signup_service.py",
+      "detail": "mojibake_score=45"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\services\\simbolos_service.py",
+      "detail": "mojibake_score=14"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\app.js",
+      "detail": "mojibake_score=1487"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\index.html",
+      "detail": "mojibake_score=229"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_apresentacao_force.js",
+      "detail": "mojibake_score=5"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_apresentacao_patch.js",
+      "detail": "mojibake_score=21"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_fonte_color_patch.js",
+      "detail": "mojibake_score=5"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_refino.js",
+      "detail": "mojibake_score=31"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_utf_fix.js",
+      "detail": "mojibake_score=6"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_override.js",
+      "detail": "mojibake_score=337"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\base\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "detail": "mojibake_score=3"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\clinicas\\1\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "detail": "mojibake_score=3"
+    }
+  ],
+  "missing_html_meta_utf8": []
+}

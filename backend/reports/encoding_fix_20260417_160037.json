@@ -1,0 +1,86 @@
+{
+  "generated_at": "2026-04-17T16:00:37.697612",
+  "root": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas",
+  "dry_run": false,
+  "scanned_files": 202,
+  "changed_count": 11,
+  "changes": [
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\estrutura.txt",
+      "reason": "encoding cp1252 -> utf-8",
+      "score_before": 0,
+      "score_after": 0,
+      "original_encoding": "cp1252"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\auth_routes.py",
+      "reason": "mojibake reparado",
+      "score_before": 1,
+      "score_after": 0,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\routes\\cadastros_routes.py",
+      "reason": "mojibake reparado",
+      "score_before": 94,
+      "score_after": 29,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\auditoria_encoding.py",
+      "reason": "mojibake reparado",
+      "score_before": 23,
+      "score_after": 2,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\corrigir_encoding_arquivos.py",
+      "reason": "mojibake reparado",
+      "score_before": 22,
+      "score_after": 2,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\backend\\scripts\\sincronizar_auxiliares_easydental.py",
+      "reason": "mojibake reparado",
+      "score_before": 10,
+      "score_after": 0,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\app.js",
+      "reason": "mojibake reparado",
+      "score_before": 3218,
+      "score_after": 127,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_refino.js",
+      "reason": "mojibake reparado",
+      "score_before": 14,
+      "score_after": 0,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\frontend\\prestadores_agenda_utf_fix.js",
+      "reason": "mojibake reparado",
+      "score_before": 8,
+      "score_after": 0,
+      "original_encoding": "utf-8"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\base\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "reason": "encoding cp1252 -> utf-8",
+      "score_before": 0,
+      "score_after": 0,
+      "original_encoding": "cp1252"
+    },
+    {
+      "path": "D:\\BRANA ARQUIVOS\\PROJETO_PRECIFICACAO\\saas\\storage\\modelos\\clinicas\\1\\whatsapp_agenda\\SMS Agendamento 1.txt",
+      "reason": "encoding cp1252 -> utf-8",
+      "score_before": 0,
+      "score_after": 0,
+      "original_encoding": "cp1252"
+    }
+  ]
+}

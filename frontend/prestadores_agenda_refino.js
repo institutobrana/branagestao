@@ -1,8 +1,8 @@
 ﻿(function prestAgendaRefinoInit() {
   if (window.__prestAgendaRefinoApplied) return;
   window.__prestAgendaRefinoApplied = true;
-  // O patch canÃ´nico da aba ApresentaÃ§Ã£o controla os combos de cor.
-  // O refino nÃ£o deve mais construir renderizador prÃ³prio.
+  // O patch canônico da aba Apresentação controla os combos de cor.
+  // O refino não deve mais construir renderizador próprio.
   window.__prestAgendaApresentacaoPatchApplied = true;
   const VISUALIZACAO_CAMPOS = [
     "Número do paciente",
@@ -357,8 +357,8 @@
     const pane = document.querySelector('#prest-agenda-backdrop [data-tab="apresentacao"]');
     if (!pane) return;
 
-    // Remove qualquer combo legado, evitando duplicidade/sobreposiÃ§Ã£o.
-    // O render canÃ´nico da aba ApresentaÃ§Ã£o fica no patch dedicado.
+    // Remove qualquer combo legado, evitando duplicidade/sobreposição.
+    // O render canônico da aba Apresentação fica no patch dedicado.
     pane.querySelectorAll(".easy-color-combo").forEach((node) => node.remove());
     pane.querySelectorAll(".easy-force-combo").forEach((node) => node.remove());
 
@@ -393,7 +393,7 @@
         opt.textContent = fixed;
         opt.dataset.easyColor = colorFromLabel(fixed);
       });
-      // Render custom desativado no refino; o patch canÃ´nico monta a UI final.
+      // Render custom desativado no refino; o patch canônico monta a UI final.
       el.classList.remove("hidden");
       el.dataset.easyComboReady = "0";
       syncApresentacaoSwatch(el);
@@ -521,7 +521,7 @@
       if (t.includes("script")) setText(lbl, "Script:");
     });
 
-    // MantÃ©m a Ã¡rea de cor da janela Fonte como no estado anterior estÃ¡vel.
+    // Mantém a área de cor da janela Fonte como no estado anterior estável.
   }
 
   function normalizeVisualizacaoPane() {
