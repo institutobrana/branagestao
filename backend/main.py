@@ -167,11 +167,109 @@ def _garantir_colunas_criticas_usuarios() -> None:
         print(f"[startup] aviso: nao foi possivel garantir colunas criticas de usuarios: {exc}")
 
 
+def _garantir_colunas_criticas_simbolos() -> None:
+    """Hotfix de compatibilidade para schema legado de simbolos no Render."""
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS clinica_id INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS legacy_id INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS especialidade INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS tipo_marca INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS tipo_simbolo INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS bitmap1 VARCHAR(30)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS bitmap2 VARCHAR(30)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS bitmap3 VARCHAR(30)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS icone VARCHAR(30)"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS imagem_custom TEXT"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS sobreposicao INTEGER"
+                )
+            )
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS simbolo_grafico_catalogo "
+                    "ADD COLUMN IF NOT EXISTS ativo BOOLEAN NOT NULL DEFAULT TRUE"
+                )
+            )
+            conn.execute(
+                text(
+                    "UPDATE simbolo_grafico_catalogo "
+                    "SET ativo = TRUE "
+                    "WHERE ativo IS NULL"
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE simbolo_grafico_catalogo
+                    SET clinica_id = (SELECT id FROM clinicas ORDER BY id LIMIT 1)
+                    WHERE clinica_id IS NULL
+                    """
+                )
+            )
+    except Exception as exc:
+        # Nao bloquear subida da API por causa do hotfix.
+        print(f"[startup] aviso: nao foi possivel garantir colunas criticas de simbolos: {exc}")
+
+
 @app.on_event("startup")
 def _iniciar_bootstrap():
     import threading
 
     _garantir_colunas_criticas_usuarios()
+    _garantir_colunas_criticas_simbolos()
 
     if str(os.getenv("BRANA_SKIP_BOOTSTRAP", "")).strip().lower() in {"1", "true", "yes", "sim"}:
         return
