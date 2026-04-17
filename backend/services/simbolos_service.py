@@ -11,13 +11,59 @@ from models.clinica import Clinica
 from models.simbolo_grafico import SimboloGrafico
 
 
-PROJECT_DIR = Path(__file__).resolve().parents[3]
-RAW_SIMBOLOS_PATH = PROJECT_DIR / "Dados" / "Dist" / "_SIMBOLO_ODONTO.raw"
-EASY_ASSETS_DIR = PROJECT_DIR / "assets" / "easy"
-SQL_SIMBOLOS_SNAPSHOT_PATH = PROJECT_DIR / "scripts" / "easy_simbolos_catalogo_atual_snapshot.json"
-PARTICULAR_SNAPSHOT_PATH = PROJECT_DIR / "scripts" / "easy_particular_atual_snapshot.json"
-ESPECIALIDADES_SNAPSHOT_PATH = PROJECT_DIR / "scripts" / "easy_especialidades_atual_snapshot.json"
-GENERICOS_SNAPSHOT_PATH = PROJECT_DIR / "scripts" / "easy_genericos_canonicos_snapshot.json"
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+PROJECT_DIR = BACKEND_DIR.parent
+
+
+def _project_root_candidates() -> list[Path]:
+    roots = [BACKEND_DIR, PROJECT_DIR]
+    legacy_root = PROJECT_DIR.parent
+    if legacy_root not in roots:
+        roots.append(legacy_root)
+    return roots
+
+
+PROJECT_ROOT_CANDIDATES = _project_root_candidates()
+_MISSING_PATH_WARNED: set[str] = set()
+_PATHS_LOGGED = False
+_SNAPSHOT_LOAD_LOGGED = False
+
+
+def _resolve_project_path(*parts: str) -> Path:
+    for root in PROJECT_ROOT_CANDIDATES:
+        candidate = root.joinpath(*parts)
+        if candidate.exists():
+            return candidate
+    return PROJECT_ROOT_CANDIDATES[0].joinpath(*parts)
+
+
+def _warn_missing_once(kind: str, path: Path) -> None:
+    key = f"{kind}:{path}"
+    if key in _MISSING_PATH_WARNED:
+        return
+    _MISSING_PATH_WARNED.add(key)
+    print(f"[simbolos-seed] aviso: {kind} nao encontrado em {path}")
+
+
+def _log_paths_once() -> None:
+    global _PATHS_LOGGED
+    if _PATHS_LOGGED:
+        return
+    _PATHS_LOGGED = True
+    print(
+        "[simbolos-seed] paths resolvidos: "
+        f"snapshot={SQL_SIMBOLOS_SNAPSHOT_PATH} "
+        f"raw={RAW_SIMBOLOS_PATH} "
+        f"assets={EASY_ASSETS_DIR}"
+    )
+
+
+RAW_SIMBOLOS_PATH = _resolve_project_path("Dados", "Dist", "_SIMBOLO_ODONTO.raw")
+EASY_ASSETS_DIR = _resolve_project_path("assets", "easy")
+SQL_SIMBOLOS_SNAPSHOT_PATH = _resolve_project_path("scripts", "easy_simbolos_catalogo_atual_snapshot.json")
+PARTICULAR_SNAPSHOT_PATH = _resolve_project_path("scripts", "easy_particular_atual_snapshot.json")
+ESPECIALIDADES_SNAPSHOT_PATH = _resolve_project_path("scripts", "easy_especialidades_atual_snapshot.json")
+GENERICOS_SNAPSHOT_PATH = _resolve_project_path("scripts", "easy_genericos_canonicos_snapshot.json")
 _TEXTO_SIMBOLOS_CACHE: str | None = None
 
 
@@ -84,13 +130,17 @@ def _normalizar_bitmap_nome(valor: str | None) -> str:
 
 
 def _carregar_snapshot_sql_simbolos() -> list[dict]:
+    global _SNAPSHOT_LOAD_LOGGED
     if not SQL_SIMBOLOS_SNAPSHOT_PATH.exists():
+        _warn_missing_once("snapshot de simbolos", SQL_SIMBOLOS_SNAPSHOT_PATH)
         return []
     try:
         data = json.loads(SQL_SIMBOLOS_SNAPSHOT_PATH.read_text(encoding="utf-8-sig"))
     except Exception:
+        print(f"[simbolos-seed] aviso: falha ao ler snapshot de simbolos em {SQL_SIMBOLOS_SNAPSHOT_PATH}")
         return []
     if not isinstance(data, list):
+        print(f"[simbolos-seed] aviso: snapshot de simbolos invalido em {SQL_SIMBOLOS_SNAPSHOT_PATH}")
         return []
     itens: list[dict] = []
     for row in data:
@@ -121,6 +171,13 @@ def _carregar_snapshot_sql_simbolos() -> list[dict]:
                 "sobreposicao": int(row.get("sobrepos") or 0) or None,
                 "ativo": True,
             }
+        )
+    if not _SNAPSHOT_LOAD_LOGGED:
+        _SNAPSHOT_LOAD_LOGGED = True
+        print(
+            "[simbolos-seed] snapshot carregado: "
+            f"path={SQL_SIMBOLOS_SNAPSHOT_PATH} "
+            f"itens_validos={len(itens)}"
         )
     return itens
 
@@ -279,8 +336,12 @@ def carregar_mapa_simbolos_por_legacy_id() -> dict[int, str]:
 
 
 def carregar_seed_simbolos() -> list[dict]:
+    _log_paths_once()
     texto_raw = _texto_raw_simbolos()
     seed_sql = _carregar_snapshot_sql_simbolos()
+    if not seed_sql:
+        print("[simbolos-seed] aviso: snapshot indisponivel; seed de simbolos retornou 0 itens.")
+        return []
     esp_por_simbolo = _carregar_mapa_especialidade_por_simbolo()
     esp_por_nome = _carregar_especialidades_por_nome()
     esp_padrao = esp_por_nome.get(_norm_texto("Gerais")) or 5
@@ -317,6 +378,8 @@ def carregar_seed_simbolos() -> list[dict]:
         itens.append(item)
 
     if not texto_raw:
+        _warn_missing_once("arquivo raw de simbolos", RAW_SIMBOLOS_PATH)
+        print(f"[simbolos-seed] seed carregado sem raw complementar: total={len(itens)}")
         return itens
 
     for bitmap in arquivos:
@@ -347,6 +410,7 @@ def carregar_seed_simbolos() -> list[dict]:
                 "ativo": True,
             }
         )
+    print(f"[simbolos-seed] seed carregado com total={len(itens)}")
     return itens
 
 

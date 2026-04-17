@@ -64,4 +64,6 @@ scripts/
 backend/scripts/*
 !backend/scripts/aplicar_compatibilidade_schema.py
 !backend/scripts/executar_bootstrap_runtime_global.py
+!backend/scripts/gerar_snapshot_simbolos.py
+!backend/scripts/easy_simbolos_catalogo_atual_snapshot.json
 *.csv
