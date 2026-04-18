@@ -181,7 +181,7 @@ def _montar_info(clinica: Clinica, current_user: Usuario | None = None) -> dict:
     status = _status_licenca(clinica)
     dias = _dias_restantes(clinica)
     plano = _plano_from_tipo_conta(clinica.tipo_conta)
-    owner = bool(current_user and is_owner_email(current_user.email))
+    owner = bool(is_owner_email(clinica.email) or (current_user and is_owner_email(current_user.email)))
     if owner:
         # Conta proprietaria nao segue janela DEMO/expiracao.
         status = "OWNER"

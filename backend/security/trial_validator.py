@@ -1,11 +1,12 @@
+﻿from datetime import datetime
+
 from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime
 
 from database import get_db
 from models.usuario import Usuario
 from security.jwt_handler import decode_token
-from security.superadmin import is_superadmin_account_type
+from security.superadmin import is_owner_email, is_superadmin_account_type
 
 
 def verify_trial_active(token: str, db: Session):
@@ -26,6 +27,9 @@ def verify_trial_active(token: str, db: Session):
 
     if not clinica:
         raise HTTPException(status_code=401, detail="Clínica não encontrada")
+
+    if is_owner_email(getattr(clinica, "email", None)):
+        return usuario
 
     if is_superadmin_account_type(clinica.tipo_conta):
         return usuario

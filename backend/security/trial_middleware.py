@@ -52,23 +52,28 @@ class TrialMiddleware(BaseHTTPMiddleware):
         if not payload:
             return JSONResponse(status_code=401, content={"detail": "Sessão expirada, faça login novamente!"})
 
-        clinica_id = payload.get("clinica_id")
-        if not clinica_id:
-            return JSONResponse(status_code=401, content={"detail": "Clinica invalida"})
-
         user_id = payload.get("user_id")
-        tenant_clinica_id.set(clinica_id)
+        if not user_id:
+            return JSONResponse(status_code=401, content={"detail": "Usuario invalido"})
 
         db = SessionLocal()
         try:
             usuario = db.query(Usuario).filter(Usuario.id == user_id).first()
-            owner = bool(usuario and is_owner_email(usuario.email))
-            if owner:
-                return await call_next(request)
+            if not usuario:
+                return JSONResponse(status_code=401, content={"detail": "Usuario invalido"})
 
+            clinica_id = int(usuario.clinica_id or 0)
+            if clinica_id <= 0:
+                return JSONResponse(status_code=401, content={"detail": "Clinica invalida"})
+
+            tenant_clinica_id.set(clinica_id)
             clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
             if not clinica:
                 return JSONResponse(status_code=401, content={"detail": "Clinica invalida"})
+            owner_user = bool(usuario and is_owner_email(usuario.email))
+            owner_clinica = bool(is_owner_email(clinica.email))
+            if owner_user or owner_clinica:
+                return await call_next(request)
 
             if not clinica.ativo and not path.startswith("/licenca"):
                 return JSONResponse(
