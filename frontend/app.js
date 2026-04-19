@@ -131,8 +131,168 @@ const protectedPassClose=(value)=>{if(protectedPassBackdrop)protectedPassBackdro
 const protectedPassSubmit=()=>{const senha=(protectedPassInput?.value||"").trim();protectedPassClose(senha||null)};
 const protectedPassDialog=(message)=>{if(!protectedPassBackdrop||!protectedPassInput)return Promise.reject(new Error("Janela de senha indisponível."));if(protectedPassPending)return protectedPassPending;if(message){/* reservado para futura mensagem */}protectedPassInput.value="";protectedPassBackdrop.classList.remove("hidden");protectedPassInput.focus();protectedPassPending=new Promise(resolve=>{protectedPassResolver=resolve});return protectedPassPending};
 const parseProtectedError=(res,data)=>{if(!res||res.status!==403)return null;const detail=data&&typeof data==="object"?data.detail:null;if(!detail||typeof detail!=="object")return null;const err=String(detail.error||"").trim();if(err!=="protected_password_required")return null;const moduleCode=String(detail.module_code||"*").trim().toLowerCase()||"*";const message=String(detail.message||"Módulo protegido.").trim();return{moduleCode,message}};
-const requestJsonBase=async(method,path,payload,auth=false,extraHeaders={})=>{const headers=auth?{Authorization:"Bearer "+getToken()}:{};if(payload!==undefined)headers["Content-Type"]="application/json";Object.assign(headers,extraHeaders||{});const res=await fetch(baseUrl+path,{method,headers,body:payload===undefined?undefined:JSON.stringify(payload)});let data={};try{data=await res.json()}catch{}return{res,data}};
-const unlockProtectedGrant=async(moduleCode,senha)=>{const token=getToken();if(!token)throw new Error("Sessão inválida para desbloqueio.");const body={senha:String(senha||""),module_code:moduleCode||"*"};const res=await fetch(baseUrl+"/auth/protected/unlock",{method:"POST",headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},body:JSON.stringify(body)});let data={};try{data=await res.json()}catch{}if(!res.ok)throw new Error((data&&data.detail)||"Falha ao desbloquear módulo protegido.");const grant=String(data.grant_token||"").trim();if(!grant)throw new Error("Grant de acesso protegido não retornado.");return grant};
+const SESSION_HEARTBEAT_MS=60*1000;
+let sessionHeartbeatTimer=null;
+let sessionGuardInProgress=false;
+const isPlainObject=value=>Object.prototype.toString.call(value)==="[object Object]";
+const canNormalizeMojibake=value=>typeof value==="string"||Array.isArray(value)||isPlainObject(value);
+const normalizeSessionText=value=>String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+const extractApiDetail=(data,fallback="")=>{
+  if(typeof data==="string")return data||fallback;
+  if(data&&typeof data==="object"){
+    if(typeof data.detail==="string")return data.detail||fallback;
+    if(data.detail&&typeof data.detail==="object"){
+      if(typeof data.detail.message==="string")return data.detail.message||fallback;
+      if(typeof data.detail.error==="string")return data.detail.error||fallback;
+    }
+    if(typeof data.message==="string")return data.message||fallback;
+  }
+  return fallback;
+};
+const stopSessionHeartbeat=()=>{
+  if(sessionHeartbeatTimer){
+    clearInterval(sessionHeartbeatTimer);
+    sessionHeartbeatTimer=null;
+  }
+};
+const hardResetSessionState=()=>{
+  stopSessionHeartbeat();
+  setToken("");
+  try{localStorage.removeItem("brana_token")}catch{}
+  try{sessionStorage.removeItem("brana_token")}catch{}
+  try{sessionStorage.clear()}catch{}
+  mpReturnPaymentId="";
+  sessaoAtual=null;
+  clearProtectedGrants();
+  usersStopRefresh();
+  if(btnOpenUsers)btnOpenUsers.classList.add("hidden");
+  if(menuSuperAdminAction)menuSuperAdminAction.classList.add("hidden");
+  if(menuSuperAdminSep)menuSuperAdminSep.classList.add("hidden");
+  licUpdateBadge(null);
+  userEmail.textContent="-";
+  userRole.textContent="Perfil: -";
+  hideAllPanels();
+};
+const blockAppAndShowLogin=(message)=>{
+  loginWrap.classList.remove("hidden");
+  shell.classList.add("hidden");
+  showPanel(panelLogin);
+  setLoginStatus(message||"Sessao expirada. Faca login novamente.",true);
+  footerMsg.textContent=message||"Sessao expirada. Faca login novamente.";
+  menuApplyPermissions();
+};
+const parseSessionIssue=(res,data)=>{
+  if(!res)return null;
+  const detail=String(extractApiDetail(data,"")||"").trim();
+  const detailNorm=normalizeSessionText(detail);
+  if(res.status===401){
+    return{type:"unauthorized",message:detail||"Sessao expirada. Faca login novamente."};
+  }
+  if(res.status!==403)return null;
+  if(detailNorm.includes("setup_required")){
+    return{type:"setup_required",message:"Primeiro acesso obrigatorio: defina a senha interna para continuar."};
+  }
+  if(detailNorm.includes("licenca expirada")||detailNorm.includes("licenca vencida")||detailNorm.includes("trial expirado")){
+    return{type:"license_expired",message:detail||"Licenca expirada. Regularize para continuar."};
+  }
+  if(detailNorm.includes("conta suspensa")){
+    return{type:"account_suspended",message:detail||"Conta suspensa. Contate o suporte da plataforma."};
+  }
+  return null;
+};
+const enforceSessionIssue=async(issue)=>{
+  if(!issue||sessionGuardInProgress)return;
+  sessionGuardInProgress=true;
+  try{
+    if(issue.type==="setup_required"){
+      stopSessionHeartbeat();
+      loginWrap.classList.remove("hidden");
+      shell.classList.add("hidden");
+      abrirTelaSetup(sessaoAtual||{email:userEmail?.textContent||""});
+      setLoginStatus(issue.message||"Primeiro acesso obrigatorio.",true);
+      footerMsg.textContent=issue.message||"Primeiro acesso obrigatorio.";
+      menuApplyPermissions();
+      return;
+    }
+    if(issue.type==="license_expired"||issue.type==="account_suspended"){
+      stopSessionHeartbeat();
+      sessaoAtual=null;
+      clearProtectedGrants();
+      blockAppAndShowLogin(issue.message);
+      return;
+    }
+    if(issue.type==="unauthorized"){
+      hardResetSessionState();
+      blockAppAndShowLogin(issue.message);
+      return;
+    }
+  }finally{
+    setTimeout(()=>{sessionGuardInProgress=false},250);
+  }
+};
+const startSessionHeartbeat=()=>{
+  stopSessionHeartbeat();
+  if(!getToken())return;
+  sessionHeartbeatTimer=setInterval(async()=>{
+    if(!getToken()){
+      stopSessionHeartbeat();
+      return;
+    }
+    try{
+      const {res,data}=await requestJson("GET","/me",undefined,true,{heartbeat:true});
+      if(res.ok&&data&&typeof data==="object"){
+        sessaoAtual={...(sessaoAtual||{}),...data};
+      }
+    }catch{}
+  },SESSION_HEARTBEAT_MS);
+};
+const requestJsonBase=async(method,path,payload,auth=false,options={})=>{
+  const opts=isPlainObject(options)?options:{};
+  const headers=auth?{Authorization:"Bearer "+getToken()}:{};
+  if(isPlainObject(opts.headers))Object.assign(headers,opts.headers);
+  let body;
+  if(Object.prototype.hasOwnProperty.call(opts,"rawBody")){
+    body=opts.rawBody;
+  }else if(payload!==undefined){
+    body=JSON.stringify(payload);
+    const hasContentType=Object.keys(headers).some(k=>String(k).toLowerCase()==="content-type");
+    if(!hasContentType)headers["Content-Type"]="application/json";
+  }
+  const res=await fetch(baseUrl+path,{method,headers,body});
+  let data={};
+  const responseType=String(opts.responseType||"json").toLowerCase();
+  if(responseType==="raw"){
+    data=null;
+  }else if(responseType==="blob"){
+    if(res.ok){
+      try{data=await res.blob()}catch{data=null}
+    }else{
+      try{data=await res.json()}catch{
+        try{
+          const text=await res.text();
+          data={detail:text||"Falha na requisicao."};
+        }catch{
+          data={};
+        }
+      }
+    }
+  }else if(responseType==="text"){
+    try{data=await res.text()}catch{data=""}
+  }else{
+    try{data=await res.json()}catch{data={}}
+  }
+  return{res,data};
+};
+const unlockProtectedGrant=async(moduleCode,senha)=>{
+  const token=getToken();
+  if(!token)throw new Error("Sessao invalida para desbloqueio.");
+  const body={senha:String(senha||""),module_code:moduleCode||"*"};
+  const {res,data}=await requestJson("POST","/auth/protected/unlock",body,true,{skipProtectedAutoUnlock:true});
+  if(!res.ok)throw new Error(extractApiDetail(data,"Falha ao desbloquear modulo protegido."));
+  const grant=String(data?.grant_token||"").trim();
+  if(!grant)throw new Error("Grant de acesso protegido nao retornado.");
+  return grant;
+};
 const ensureProtectedGrant=async(moduleCode,message)=>{const key=(moduleCode||"*").toLowerCase();if(protectedGrantCache.has(key))return protectedGrantCache.get(key)||"";if(protectedGrantCache.has("*"))return protectedGrantCache.get("*")||"";if(key==="usuarios"&&protectedGrantCache.has("configuracao"))return protectedGrantCache.get("configuracao")||"";if(protectedGrantPending.has(key))return protectedGrantPending.get(key);const promptMsg=(message||`O módulo '${key}' está protegido.`)+"\n\nDigite a senha do administrador para continuar:";const senha=await protectedPassDialog(promptMsg);if(!senha){throw new Error("Acesso protegido cancelado pelo usuário.")}const pending=(async()=>{const grant=await unlockProtectedGrant(key,senha);protectedGrantCache.set(key,grant);return grant})();protectedGrantPending.set(key,pending);try{return await pending}finally{protectedGrantPending.delete(key)}};
 // Corrige textos mojibake (UTF-8 lido como ANSI/Latin-1) sem alterar regras de negocio.
 function fixMojibakeText(value){
@@ -304,9 +464,32 @@ if(_nativeConfirm&&!window.__mojibakeConfirmWrap){
   window.__mojibakeConfirmWrap=true;
   window.confirm=(message)=>_nativeConfirm(fixMojibakeText(String(message??"")));
 }
-const requestJson=async(method,path,payload,auth=false)=>{let{res,data}=await requestJsonBase(method,path,payload,auth,{});
-if(data&&typeof data==="object")data=normalizeMojibakeValueDeep(data);
-const protectedErr=parseProtectedError(res,data);if(auth&&protectedErr){try{const grant=await ensureProtectedGrant(protectedErr.moduleCode,protectedErr.message);if(grant){protectedGrantCache.set(protectedErr.moduleCode,grant);({res,data}=await requestJsonBase(method,path,payload,auth,{"X-Protected-Grant":grant}));if(data&&typeof data==="object")data=normalizeMojibakeValueDeep(data);const protectedAfterRetry=parseProtectedError(res,data);if(protectedAfterRetry){protectedGrantCache.delete(protectedErr.moduleCode)}}}catch(err){return{res,data:{detail:err?.message||"Falha ao validar módulo protegido."}}}}return{res,data}};
+const requestJson=async(method,path,payload,auth=false,options={})=>{
+  const opts=isPlainObject(options)?options:{};
+  let{res,data}=await requestJsonBase(method,path,payload,auth,opts);
+  if(canNormalizeMojibake(data))data=normalizeMojibakeValueDeep(data);
+  const protectedErr=parseProtectedError(res,data);
+  if(auth&&protectedErr&&!opts.skipProtectedAutoUnlock){
+    try{
+      const grant=await ensureProtectedGrant(protectedErr.moduleCode,protectedErr.message);
+      if(grant){
+        protectedGrantCache.set(protectedErr.moduleCode,grant);
+        const retryOptions={...opts,headers:{...(isPlainObject(opts.headers)?opts.headers:{}),"X-Protected-Grant":grant}};
+        ({res,data}=await requestJsonBase(method,path,payload,auth,retryOptions));
+        if(canNormalizeMojibake(data))data=normalizeMojibakeValueDeep(data);
+        const protectedAfterRetry=parseProtectedError(res,data);
+        if(protectedAfterRetry)protectedGrantCache.delete(protectedErr.moduleCode);
+      }
+    }catch(err){
+      return{res,data:{detail:err?.message||"Falha ao validar modulo protegido."}};
+    }
+  }
+  if(auth&&!opts.skipSessionGuard){
+    const issue=parseSessionIssue(res,data);
+    if(issue)await enforceSessionIssue(issue);
+  }
+  return{res,data};
+};
 const postJson=async(path,payload,auth=false)=>requestJson("POST",path,payload,auth);
 const licSetStatus=(msg,erro=false,sucesso=false)=>{if(!licDlg.status)return;licDlg.status.textContent=msg||"";licDlg.status.style.color=erro?"#b00020":(sucesso?"#0a7a00":"#1f2937")};
 const licPlanoLabel=(info)=>{if(!info)return"Licença";if(info.status==="OWNER")return"Licença Vitalícia";if(info.status==="SUPERADMIN")return"Super Admin";if(info.status==="DEMO")return`Demo (${info.dias_restantes||0} dias)`;if(info.status==="MENSAL")return"Plano Mensal";if(info.status==="ANUAL")return"Plano Anual";if(info.status==="EXPIRADO")return"Licença Expirada";return"Licença"};
@@ -327,7 +510,7 @@ async function forgotRequestCode(){const email=forgotEmailEl.value.trim();if(!em
 async function forgotResetPassword(){const p={email:forgotEmailEl.value.trim(),codigo:forgotCodigoEl.value.trim(),nova_senha:forgotSenhaEl.value};if(!p.email||!p.codigo||!p.nova_senha){setLoginStatus("Preencha email, codigo e nova senha.",true);return}if((p.nova_senha||"").length<6){setLoginStatus("A senha deve ter no minimo 6 digitos.",true);return}try{const{res,data}=await postJson("/password/reset",p);if(!res.ok){setLoginStatus(data.detail||"Falha ao redefinir senha.",true);return}setLoginStatus(data.detail||"Senha redefinida. Faca login.",false);showPanel(panelLogin);emailEl.value=p.email}catch{setLoginStatus("Erro de conexao ao redefinir senha.",true)}}
 function abrirTelaSetup(user){if(setupEmailEl)setupEmailEl.value=String(user?.email||"");if(setupSenhaEl)setupSenhaEl.value="";if(setupConfirmaEl)setupConfirmaEl.value="";loginWrap.classList.remove("hidden");shell.classList.add("hidden");showPanel(panelSetup||panelLogin);setLoginStatus("Primeiro acesso: defina a senha interna para continuar.",false)}
 async function setupComplete(){const senha=String(setupSenhaEl?.value||"");const confirma=String(setupConfirmaEl?.value||"");if(!senha||!confirma){setLoginStatus("Informe e confirme a senha interna.",true);return}if(senha.length<6){setLoginStatus("A senha deve ter no minimo 6 digitos.",true);return}if(senha!==confirma){setLoginStatus("A confirmacao de senha nao confere.",true);return}try{const{res,data}=await postJson("/auth/setup/complete",{senha,confirma_senha:confirma},true);if(!res.ok){setLoginStatus(data.detail||"Falha ao concluir primeiro acesso.",true);return}setLoginStatus(data.detail||"Configuracao inicial concluida.",false);await carregarSessao()}catch{setLoginStatus("Erro de conexao ao concluir primeiro acesso.",true)}}
-async function setupLogout(){try{await postJson("/logout",{},true)}catch{}setToken("");sessaoAtual=null;if(setupSenhaEl)setupSenhaEl.value="";if(setupConfirmaEl)setupConfirmaEl.value="";setLoginStatus("Sessao encerrada.",false);showPanel(panelLogin)}
+async function setupLogout(){try{await postJson("/logout",{},true)}catch{}stopSessionHeartbeat();setToken("");sessaoAtual=null;if(setupSenhaEl)setupSenhaEl.value="";if(setupConfirmaEl)setupConfirmaEl.value="";setLoginStatus("Sessao encerrada.",false);showPanel(panelLogin)}
 const hideAllPanels=()=>{if(preserveProtectedGrantOnHide){preserveProtectedGrantOnHide=false}else{clearProtectedGrants()}usersDetachOverlay();cenarioPanel.classList.add("hidden");materiaisPanel.classList.add("hidden");proc.panel.classList.add("hidden");proc.novoPanel.classList.add("hidden");usersPanel.classList.add("hidden");if(sa&&sa.panel){sa.panel.classList.add("hidden")}if(prot&&prot.panel){prot.panel.classList.add("hidden")}if(ctrlProt&&ctrlProt.panel){ctrlProt.panel.classList.add("hidden")}if(convPlanCfg&&convPlanCfg.panel){convPlanCfg.panel.classList.add("hidden")}if(convPlanCalCfg&&convPlanCalCfg.panel){convPlanCalCfg.panel.classList.add("hidden")}if(prestCfg&&prestCfg.panel){prestCfg.panel.classList.add("hidden")}if(unidadeCfg&&unidadeCfg.panel){unidadeCfg.panel.classList.add("hidden")}if(pgen&&pgen.panel){pgen.panel.classList.add("hidden")}if(ficha&&ficha.panel){ficha.panel.classList.add("hidden")}if(fichaMenuPac)fichaMenuPacFechar();if(cc){cc.panel.classList.add("hidden")}if(rcc){rcc.panel.classList.add("hidden");rcc.viewPanel.classList.add("hidden")}if(fcx&&fcx.panel){fcx.panel.classList.add("hidden")}if(dash&&dash.panel){dash.panel.classList.add("hidden")}if(plano){plano.panel.classList.add("hidden")}if(aux){aux.panel.classList.add("hidden")}if(agendaContatos&&agendaContatos.panel){agendaContatos.panel.classList.add("hidden")}if(agendaLegado&&agendaLegado.panel){agendaLegado.panel.classList.add("hidden")}if(agendaSemana&&agendaSemana.panel){agendaSemanaDesconectarResizeObserver();agendaSemana.panel.classList.add("hidden")}if(cid&&cid.panel){cid.panel.classList.add("hidden")}usersStopRefresh();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();workspaceEmpty.classList.remove("hidden")};
 const showScenarioPanel=(s)=>{hideAllPanels();if(s){cenarioPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")}};
 const showMateriaisPanel=(s)=>{hideAllPanels();if(s){materiaisPanel.classList.remove("hidden");workspaceEmpty.classList.add("hidden")}};
@@ -6328,7 +6511,7 @@ function protPdfEscape(texto){return String(texto??"").replace(/\\/g,"\\\\").rep
 function protRelatorioPdfBlob(titulo,nomeTabela,rows){const header=["Serviço","Índice","Preço","Prazo"];const widths=header.map((h,i)=>Math.min(26,Math.max(h.length,...rows.map(r=>(r[i]||"").length),6)));const toLine=(arr)=>arr.map((v,i)=>String(v||"").padEnd(widths[i]," ").slice(0,widths[i])).join(" | ");const sep=widths.map(x=>"-".repeat(x)).join("-+-");const lines=[String(titulo||"Relatório"),`Tabela: ${nomeTabela||""}`,"",toLine(header),sep,...rows.map(toLine)];const pageHeight=842;const startY=800;const lh=13;const bottom=40;const perPage=Math.max(20,Math.floor((startY-bottom)/lh));const pages=[];for(let i=0;i<lines.length;i+=perPage)pages.push(lines.slice(i,i+perPage));const objs=[];const addObj=(id,body)=>objs.push({id,body});addObj(1,"<< /Type /Catalog /Pages 2 0 R >>");addObj(3,"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");let nextId=4;const kids=[];for(const pg of pages){const contentId=nextId++;const pageId=nextId++;const stream=["BT","/F1 10 Tf","13 TL",`40 ${startY} Td`,...pg.map((ln,idx)=>`${idx===0?"":"T* "}(${protPdfEscape(ln)}) Tj`),"ET"].join("\n");addObj(contentId,`<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`);addObj(pageId,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${contentId} 0 R >>`);kids.push(`${pageId} 0 R`)}addObj(2,`<< /Type /Pages /Count ${kids.length||1} /Kids [${kids.join(" ")}] >>`);objs.sort((a,b)=>a.id-b.id);let pdf="%PDF-1.4\n";const enc=new TextEncoder();const offsets={};for(const o of objs){offsets[o.id]=enc.encode(pdf).length;pdf+=`${o.id} 0 obj\n${o.body}\nendobj\n`}const xref=enc.encode(pdf).length;const maxId=Math.max(...objs.map(o=>o.id));pdf+=`xref\n0 ${maxId+1}\n0000000000 65535 f \n`;for(let i=1;i<=maxId;i++){const off=offsets[i]||0;pdf+=`${String(off).padStart(10,"0")} 00000 n \n`}pdf+=`trailer\n<< /Size ${maxId+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;return new Blob([pdf],{type:"application/pdf"})}
 function protFormatoInfo(formato){const f=String(formato||"").toUpperCase();if(f==="HTML")return{ext:"html",mime:"text/html"};if(f==="RTF")return{ext:"rtf",mime:"application/rtf"};if(f==="XLS")return{ext:"xls",mime:"application/vnd.ms-excel"};if(f==="TXT")return{ext:"txt",mime:"text/plain"};if(f==="CSV")return{ext:"csv",mime:"text/csv"};return{ext:"pdf",mime:"application/pdf"}}
 function protRelatorioBlob(formato,titulo,nomeTabela,rows){const fmt=String(formato||"PDF").toUpperCase();if(fmt==="HTML")return new Blob([protRelatorioHtml(titulo,nomeTabela,false)],{type:"text/html;charset=utf-8"});if(fmt==="RTF")return new Blob([protRelatorioRtf(titulo,nomeTabela,rows)],{type:"application/rtf"});if(fmt==="XLS")return new Blob(["\ufeff"+protRelatorioXlsHtml(titulo,nomeTabela,rows)],{type:"application/vnd.ms-excel;charset=utf-8"});if(fmt==="TXT")return new Blob([protRelatorioTxt(titulo,nomeTabela,rows)],{type:"text/plain;charset=utf-8"});if(fmt==="CSV")return new Blob([protRelatorioCsv(rows)],{type:"text/csv;charset=utf-8"});return protRelatorioPdfBlob(titulo,nomeTabela,rows)}
-async function protEnviarEmailRelatorio(formData){const token=getToken();if(!token)return{ok:false,message:"Sessão inválida. Faça login novamente."};const enviar=async(grant)=>{const headers={Authorization:"Bearer "+token};if(grant)headers["X-Protected-Grant"]=grant;const res=await fetch(baseUrl+"/relatorios/enviar-email",{method:"POST",headers,body:formData});let data={};try{data=await res.json()}catch{}return{res,data}};let{res,data}=await enviar("");const protErr=parseProtectedError(res,data);if(protErr){try{const grant=await ensureProtectedGrant(protErr.moduleCode,protErr.message);({res,data}=await enviar(grant))}catch(err){return{ok:false,message:err?.message||"Acesso protegido cancelado."}}}if(!res.ok)return{ok:false,message:data.detail||"Falha ao enviar e-mail."};return{ok:true,message:data.detail||"E-mail enviado."}}
+async function protEnviarEmailRelatorio(formData){if(!getToken())return{ok:false,message:"Sessao invalida. Faca login novamente."};const{res,data}=await requestJson("POST","/relatorios/enviar-email",undefined,true,{rawBody:formData});if(!res.ok)return{ok:false,message:extractApiDetail(data,"Falha ao enviar e-mail.")};return{ok:true,message:extractApiDetail(data,"E-mail enviado.")}}
 async function protSelecionarDestinoRelatorio(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=ctx.titulo||"Relatório";const formato=prot.relArquivoFormato?.value||"PDF";const info=protFormatoInfo(formato);const sugerido=prot.relArquivoPath?.value.trim()||`${protNomeArquivoBase(titulo)}.${info.ext}`;if(typeof window.showSaveFilePicker!=="function"){if(prot.relArquivoPath&&!prot.relArquivoPath.value.trim())prot.relArquivoPath.value=sugerido;if(!prot.relArquivoPickerWarned){window.alert("Seu navegador não permite escolher a pasta. O arquivo será baixado na pasta padrão de downloads.");prot.relArquivoPickerWarned=true}if(prot.relArquivoPath)prot.relArquivoPath.focus();return}try{const handle=await window.showSaveFilePicker({suggestedName:sugerido,types:[{description:"Arquivos PDF",accept:{"application/pdf":[".pdf"]}},{description:"Arquivos HTML",accept:{"text/html":[".html",".htm"]}},{description:"Arquivos RTF",accept:{"application/rtf":[".rtf"]}},{description:"Planilhas Excel",accept:{"application/vnd.ms-excel":[".xls",".xlsx"]}},{description:"Arquivos texto",accept:{"text/plain":[".txt"]}},{description:"Arquivos CSV",accept:{"text/csv":[".csv"]}}]});prot.relArquivoHandle=handle;if(prot.relArquivoPath)prot.relArquivoPath.value=handle?.name||sugerido;const nome=(handle?.name||"").toLowerCase();if(nome.endsWith(".pdf"))prot.relArquivoFormato.value="PDF";else if(nome.endsWith(".html")||nome.endsWith(".htm"))prot.relArquivoFormato.value="HTML";else if(nome.endsWith(".rtf"))prot.relArquivoFormato.value="RTF";else if(nome.endsWith(".xls")||nome.endsWith(".xlsx"))prot.relArquivoFormato.value="XLS";else if(nome.endsWith(".txt"))prot.relArquivoFormato.value="TXT";else if(nome.endsWith(".csv"))prot.relArquivoFormato.value="CSV"}catch(err){if(err&&err.name==="AbortError")return;window.alert("Não foi possível abrir o seletor de arquivos.")}}
 async function protSalvarRelatorioArquivo(){if(!prot)return;const ctx=prot.relArquivoContext||{};const titulo=String(ctx.titulo||"Tabela de serviços de protético");const nomeTabela=String(ctx.nomeTabela||"");const formato=String(prot.relArquivoFormato?.value||"PDF").toUpperCase();const info=protFormatoInfo(formato);let nomeArquivo=String(prot.relArquivoPath?.value||"").trim();if(!nomeArquivo)nomeArquivo=`${protNomeArquivoBase(titulo)}.${info.ext}`;if(!nomeArquivo.toLowerCase().endsWith(`.${info.ext}`))nomeArquivo=`${nomeArquivo}.${info.ext}`;const rows=protRelatorioRows();const blob=protRelatorioBlob(formato,titulo,nomeTabela,rows);if(!blob){window.alert("Não foi possível gerar o arquivo.");return}let salvo=false;let salvoPorDownload=false;if(prot.relArquivoHandle&&typeof prot.relArquivoHandle.createWritable==="function"){const handleName=(prot.relArquivoHandle.name||"").toLowerCase();if(handleName.endsWith(`.${info.ext}`)){try{const writable=await prot.relArquivoHandle.createWritable();await writable.write(blob);await writable.close();salvo=true}catch{salvo=false}}else{prot.relArquivoHandle=null}}if(!salvo){const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=nomeArquivo;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);salvo=true;salvoPorDownload=true}if(prot.relArquivoEmailCheck?.checked){const email=String(prot.relArquivoEmail?.value||"").trim();if(!email){window.alert("Informe o e-mail para envio.");return}const subject=String(prot.relArquivoAssunto?.value||"").trim()||`Relatório: ${titulo}`;const body=String(prot.relArquivoCorpo?.value||"").trim();const formData=new FormData();formData.append("to_email",email);formData.append("subject",subject);formData.append("body",body);formData.append("filename",nomeArquivo);formData.append("file",blob,nomeArquivo);const res=await protEnviarEmailRelatorio(formData);if(!res.ok){window.alert(res.message||"Falha ao enviar e-mail.");return}footerMsg.textContent=res.message||"E-mail enviado com sucesso."}else if(salvo){footerMsg.textContent=salvoPorDownload?"Relatório exportado em arquivo (download do navegador).":"Relatório exportado em arquivo."}protFecharRelatorioArquivo()}
 function protAbrirRelatorioArquivo(titulo,nomeTabela){if(!prot)return;prot.relArquivoContext={titulo,nomeTabela};const base=protNomeArquivoBase(titulo);if(prot.relArquivoFormato)prot.relArquivoFormato.value="PDF";if(prot.relArquivoPath)prot.relArquivoPath.value=`${base}.pdf`;if(prot.relArquivoAssunto)prot.relArquivoAssunto.value=`Relatório: ${titulo}`;if(prot.relArquivoCorpo)prot.relArquivoCorpo.value="";if(prot.relArquivoEmailCheck)prot.relArquivoEmailCheck.checked=false;protAtualizarEmailRelatorioUI();if(prot.relArquivoBackdrop)prot.relArquivoBackdrop.classList.remove("hidden");if(prot.relArquivoPath)prot.relArquivoPath.focus()}
@@ -8802,6 +8985,10 @@ function agendaSemanaEnsureUI(){
 .agenda-semana-event .linha-1{font-weight:700}
 .agenda-semana-event .linha-2{font-weight:600;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;word-break:break-word;line-height:1.08}
 .agenda-semana-event .linha-3,.agenda-semana-event .linha-4{font-size:.92em;opacity:.9}
+.agenda-semana-event.agenda-semana-event-dia{padding:0 4px;display:flex;align-items:flex-start}
+.agenda-semana-event-dia-cols{display:grid;grid-template-columns:minmax(0,56%) minmax(0,20%) minmax(0,24%);gap:6px;align-items:start;align-content:start;height:100%;width:100%;box-sizing:border-box;padding-top:1px}
+.agenda-semana-event-dia-col{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agenda-semana-event-dia-col-paciente{font-weight:700}
 .agenda-semana-event small{display:block;font-size:10px}
 .agenda-semana-cal{position:absolute;top:60px;left:140px;min-width:220px;background:#f6f6f6;border:1px solid #bfc9d6;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:6px;z-index:1200}
 .agenda-semana-cal.hidden{display:none}
@@ -8998,6 +9185,12 @@ function agendaSemanaStartOfWeek(ref){
   d.setDate(d.getDate()-idx);
   return d;
 }
+function agendaSemanaResolveWeekStart(ref){
+  const d=new Date(ref||Date.now());
+  d.setHours(0,0,0,0);
+  if(d.getDay()===0)d.setDate(d.getDate()+1);
+  return agendaSemanaStartOfWeek(d);
+}
 function agendaSemanaAddDays(base,delta){
   const d=new Date(base);
   d.setDate(d.getDate()+delta);
@@ -9029,16 +9222,13 @@ function agendaSemanaResolveDataInicial(){
   const hoje=new Date();
   const d=new Date(hoje);
   d.setHours(0,0,0,0);
-  if(d.getDay()===0){
-    d.setDate(d.getDate()+1);
-  }
   return d;
 }
 function agendaSemanaSetFocusDate(dateObj){
   const d=new Date(dateObj||Date.now());
   d.setHours(0,0,0,0);
   agendaSemanaState.focusDate=d;
-  agendaSemanaState.weekStart=agendaSemanaStartOfWeek(d);
+  agendaSemanaState.weekStart=agendaSemanaResolveWeekStart(d);
   if(agendaSemanaModoAtual()==="dia"){
     agendaSemanaState.dayCalDate=new Date(d.getFullYear(),d.getMonth(),1);
   }
@@ -9066,6 +9256,13 @@ function agendaSemanaFormatDateBr(dateObj,full=false){
     return `${dd}/${mm}/${yy}`;
   }
   return `${dd}/${mm}`;
+}
+function agendaSemanaLabelDiaSemana(dateObj,short=false){
+  const d=new Date(dateObj);
+  const nomesShort=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  const nomesFull=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+  const idx=Math.max(0,Math.min(6,d.getDay()));
+  return short?nomesShort[idx]:nomesFull[idx];
 }
 function agendaSemanaDayIndex(dateObj){
   const d=new Date(dateObj);
@@ -9640,18 +9837,17 @@ function agendaSemanaRenderEstrutura(skipStablePass=false){
   }
   agendaSemana.timeCol.style.height=`${height}px`;
   const foco=agendaSemanaState.focusDate||new Date();
-  if(!agendaSemanaState.weekStart)agendaSemanaState.weekStart=agendaSemanaStartOfWeek(foco);
+  if(!agendaSemanaState.weekStart)agendaSemanaState.weekStart=agendaSemanaResolveWeekStart(foco);
   const weekStart=agendaSemanaState.weekStart;
   const daysSemana=AGENDA_SEMANA_DIAS.map((dia,idx)=>agendaSemanaAddDays(weekStart,idx));
-  const idxFoco=Math.max(0,Math.min(5,agendaSemanaDayIndex(foco)));
-  const days=(modoDia||modoClinica)?[daysSemana[idxFoco]]:daysSemana;
+  const days=(modoDia||modoClinica)?[new Date(foco)]:daysSemana;
   agendaSemanaState.weekDates=days;
   if(modoDia){
     const focoDia=days[0]||foco;
-    const diaInfo=AGENDA_SEMANA_DIAS[idxFoco]||AGENDA_SEMANA_DIAS[0];
+    const diaLabel=agendaSemanaLabelDiaSemana(focoDia,false);
     agendaSemana.headDays.style.gridTemplateColumns="1fr";
     agendaSemana.daysWrap.style.gridTemplateColumns="1fr";
-    agendaSemana.headDays.innerHTML=`<div class="agenda-semana-day-head agenda-semana-day-head-dia"><div class="agenda-semana-day-head-dia-data">${esc(`${diaInfo.label} - ${agendaSemanaFormatDateBr(focoDia,true)}`)}</div><div class="agenda-semana-day-head-dia-cols"><span>Paciente ou compromisso</span><span>Motivo</span><span>Telefones</span></div></div>`;
+    agendaSemana.headDays.innerHTML=`<div class="agenda-semana-day-head agenda-semana-day-head-dia"><div class="agenda-semana-day-head-dia-data">${esc(`${diaLabel} - ${agendaSemanaFormatDateBr(focoDia,true)}`)}</div><div class="agenda-semana-day-head-dia-cols"><span>Paciente ou compromisso</span><span>Motivo</span><span>Telefones</span></div></div>`;
     agendaSemana.daysWrap.innerHTML='<div class="agenda-semana-day" data-day="0"></div>';
     agendaSemanaState.clinicaCols=[];
   }else if(modoClinica){
@@ -9754,8 +9950,8 @@ function agendaSemanaFontStyle(cfg){
   const weight=f.bold?"700":"400";
   const style=f.italic?"italic":"normal";
   const deco=[f.underline?"underline":"",f.strike?"line-through":""].filter(Boolean).join(" ")||"none";
-  const size=Math.max(6,Number(f.size||8)||8);
-  return`font-family:${f.family||"MS Sans Serif"};font-size:${size}px;font-weight:${weight};font-style:${style};text-decoration:${deco};color:${f.color||"#000000"}`;
+  const sizePt=Math.max(6,Number(f.size||8)||8);
+  return`font-family:${f.family||"MS Sans Serif"};font-size:${sizePt}pt;font-weight:${weight};font-style:${style};text-decoration:${deco};color:${f.color||"#000000"}`;
 }
 function agendaSemanaNormalizarCampoVisualizacao(valor){
   return String(valor||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s+/g," ").trim();
@@ -9837,6 +10033,31 @@ function agendaSemanaEventoTexto(item,cfg){
     {classe:"linha linha-4",texto:linha4},
   ].filter(l=>l.texto);
   return linhas.map(l=>`<div class="${l.classe}">${esc(l.texto)}</div>`).join("");
+}
+function agendaSemanaEventoTextoDia(item,cfg){
+  const selecionados=agendaSemanaCamposVisualizacaoSelecionados(cfg);
+  const mostrarNumeroPaciente=agendaSemanaTemCampoVisualizacao(selecionados,"Número do paciente");
+  const hora=agendaLegadoFmtHora(item?.hora_inicio||0);
+  const codigoTxt=String(item?.nro_pac??"").trim();
+  const nomeBase=String(item?.nome||item?.motivo||"").trim();
+  const motivo=String(item?.motivo||"").trim();
+  const fones=[String(item?.fone1||"").trim(),String(item?.fone2||"").trim(),String(item?.fone3||"").trim()].filter(Boolean).join(" | ");
+
+  const primeiraColunaPartes=[];
+  if(hora)primeiraColunaPartes.push(hora);
+  const complementoPartes=[];
+  if(mostrarNumeroPaciente&&codigoTxt)complementoPartes.push(codigoTxt);
+  if(nomeBase)complementoPartes.push(nomeBase);
+  if(complementoPartes.length){
+    if(primeiraColunaPartes.length){
+      primeiraColunaPartes[0]=`${primeiraColunaPartes[0]} - ${complementoPartes.join(" ")}`;
+    }else{
+      primeiraColunaPartes.push(complementoPartes.join(" "));
+    }
+  }
+  const pacienteOuCompromisso=primeiraColunaPartes.join("").trim();
+
+  return `<div class="agenda-semana-event-dia-cols"><span class="agenda-semana-event-dia-col agenda-semana-event-dia-col-paciente">${esc(pacienteOuCompromisso)}</span><span class="agenda-semana-event-dia-col">${esc(motivo)}</span><span class="agenda-semana-event-dia-col">${esc(fones)}</span></div>`;
 }
 function agendaSemanaAdicionarBloqueios(eventos,cfg){
   const bloqueios=Array.isArray(cfg.bloqueios_itens)?cfg.bloqueios_itens:[];
@@ -9960,10 +10181,11 @@ function agendaSemanaRenderEventos(){
     const height=Math.max(slotHeight,(endMinReal-topMin)/step*slotHeight);
     const bg=agendaSemanaCorEvento(item,cfg);
     const fontStyle=agendaSemanaFontStyle(cfg);
-    const htmlEvento=agendaSemanaEventoTexto(item,cfg);
+    const htmlEvento=modoDia?agendaSemanaEventoTextoDia(item,cfg):agendaSemanaEventoTexto(item,cfg);
+    const classeExtra=modoDia?" agenda-semana-event-dia":"";
     const eventoIdNum=Number(item?.id||0)||0;
     const dataIdAttr=eventoIdNum>0?` data-id="${eventoIdNum}"`:"";
-    col.insertAdjacentHTML("beforeend",`<div class="agenda-semana-event"${dataIdAttr} style="top:${top}px;height:${height}px;background:${bg};${fontStyle}">${htmlEvento}</div>`);
+    col.insertAdjacentHTML("beforeend",`<div class="agenda-semana-event${classeExtra}"${dataIdAttr} style="top:${top}px;height:${height}px;background:${bg};${fontStyle}">${htmlEvento}</div>`);
   });
   agendaSemanaDiagLog("agendaSemanaRenderEventos","after",{eventos_cache:Array.isArray(agendaSemanaCache)?agendaSemanaCache.length:0});
 }
@@ -10288,8 +10510,9 @@ function agendaSemanaImprimir(){
 async function agendaSemanaCarregarEventos(){
   const modoAtual=agendaSemanaModoAtual();
   const foco=agendaSemanaState.focusDate||new Date();
-  const start=(modoAtual==="clinica")?foco:(agendaSemanaState.weekStart||agendaSemanaStartOfWeek(new Date()));
-  const end=(modoAtual==="clinica")?foco:agendaSemanaAddDays(start,5);
+  const modoDiaOuClinica=(modoAtual==="dia"||modoAtual==="clinica");
+  const start=modoDiaOuClinica?foco:(agendaSemanaState.weekStart||agendaSemanaResolveWeekStart(new Date()));
+  const end=modoDiaOuClinica?foco:agendaSemanaAddDays(start,5);
   const params=new URLSearchParams();
   params.set("start",start.toISOString().slice(0,10));
   params.set("end",end.toISOString().slice(0,10));
@@ -11386,7 +11609,7 @@ async function saCarregarOverview(){const{res,data}=await requestJson("GET","/su
 async function saCarregarClinicas(){const q=encodeURIComponent((sa.q?.value||"").trim());const st=encodeURIComponent(sa.statusFiltro?.value||"todas");const{res,data}=await requestJson("GET",`/superadmin/clinicas?q=${q}&status=${st}`,undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar clinicas.");saClinicasCache=Array.isArray(data)?data:[];saRenderClinicas()}
 function saUsuariosQueryParams(limit){const params=new URLSearchParams();params.set("limit",String(limit||200));const q=(sa.usuariosQ?.value||"").trim();if(q)params.set("q",q);const ativo=(sa.usuariosAtivo?.value||"todos").toLowerCase();if(ativo==="ativo")params.set("ativo","true");else if(ativo==="inativo")params.set("ativo","false");const admin=(sa.usuariosAdmin?.value||"todos").toLowerCase();if(admin==="admin")params.set("admin","true");else if(admin==="usuario")params.set("admin","false");const plano=(sa.usuariosPlano?.value||"TODOS").toUpperCase();if(plano!=="TODOS")params.set("plano",plano);const clinicaStatus=(sa.usuariosClinicaStatus?.value||"todas").toLowerCase();if(clinicaStatus!=="todas")params.set("clinica_status",clinicaStatus);return params}
 async function saCarregarUsuarios(){const qs=saUsuariosQueryParams(200).toString();const{res,data}=await requestJson("GET",`/superadmin/usuarios?${qs}`,undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar usuarios da plataforma.");saUsuariosCache=Array.isArray(data)?data:[];saRenderUsuarios()}
-async function saExportarUsuariosCsv(){if(!isSuperAdminSessao())return;try{const token=getToken();if(!token)throw new Error("Sessao invalida para exportar CSV.");const qs=saUsuariosQueryParams(5000).toString();const res=await fetch(`${baseUrl}/superadmin/usuarios/export.csv?${qs}`,{headers:{Authorization:"Bearer "+token}});if(!res.ok){let data={};try{data=await res.json()}catch{}throw new Error(data.detail||"Falha ao exportar CSV de usuarios.")}const blob=await res.blob();let fileName="usuarios_plataforma.csv";const cd=res.headers.get("content-disposition")||"";const m=cd.match(/filename\s*=\s*"?([^";]+)"?/i);if(m&&m[1])fileName=m[1];const blobUrl=URL.createObjectURL(blob);const a=document.createElement("a");a.href=blobUrl;a.download=fileName;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(blobUrl);setSaStatus("CSV exportado com sucesso.",false)}catch(err){setSaStatus(err.message||"Falha ao exportar usuarios.",true)}}
+async function saExportarUsuariosCsv(){if(!isSuperAdminSessao())return;try{if(!getToken())throw new Error("Sessao invalida para exportar CSV.");const qs=saUsuariosQueryParams(5000).toString();const{res,data}=await requestJson("GET",`/superadmin/usuarios/export.csv?${qs}`,undefined,true,{responseType:"blob"});if(!res.ok)throw new Error(extractApiDetail(data,"Falha ao exportar CSV de usuarios."));const blob=data instanceof Blob?data:null;if(!blob)throw new Error("Falha ao gerar arquivo CSV.");let fileName="usuarios_plataforma.csv";const cd=res.headers.get("content-disposition")||"";const m=cd.match(/filename\s*=\s*"?([^";]+)"?/i);if(m&&m[1])fileName=m[1];const blobUrl=URL.createObjectURL(blob);const a=document.createElement("a");a.href=blobUrl;a.download=fileName;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(blobUrl);setSaStatus("CSV exportado com sucesso.",false)}catch(err){setSaStatus(err.message||"Falha ao exportar usuarios.",true)}}
 async function saCarregarCobrancas(){const{res,data}=await requestJson("GET","/superadmin/cobrancas?limit=80",undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar cobrancas.");saRenderCobrancas(Array.isArray(data)?data:[])}
 async function saCarregarAuditoria(){const{res,data}=await requestJson("GET","/superadmin/auditoria?limit=80",undefined,true);if(!res.ok)throw new Error(data.detail||"Falha ao carregar auditoria.");saRenderAuditoria(Array.isArray(data)?data:[])}
 async function saRecarregarTudo(){if(!isSuperAdminSessao())return;setSaStatus("",false);try{await saCarregarOverview();await saCarregarClinicas();await saCarregarUsuarios();await saCarregarCobrancas();await saCarregarAuditoria();setSaStatus("Painel atualizado.",false)}catch(err){setSaStatus(err.message||"Falha ao carregar Painel ADM.",true)}}
@@ -11403,6 +11626,7 @@ async function saResetarSenhaUsuario(id){const novaSenha=window.prompt("Nova sen
 async function carregarSessao(){
   const token=getToken();
   if(!token){
+    stopSessionHeartbeat();
     loginWrap.classList.remove("hidden");
     shell.classList.add("hidden");
     showPanel(panelLogin);
@@ -11415,21 +11639,11 @@ async function carregarSessao(){
   }
   try{
     if(mpReturnPaymentId)await licConfirmarPagamentoRetorno();
-    const res=await fetch(baseUrl+"/me",{headers:{Authorization:"Bearer "+token}});
-    const data=await res.json();
+    const {res,data}=await requestJson("GET","/me",undefined,true);
     if(!res.ok){
-      const detail=data.detail||"Sessao invalida.";
-      if(res.status===403&&String(detail).toLowerCase().includes("expirada")){
-        sessaoAtual=null;
-        loginWrap.classList.remove("hidden");
-        shell.classList.add("hidden");
-        showPanel(panelLogin);
-        setLoginStatus(detail,true);
-        if(btnOpenUsers)btnOpenUsers.classList.add("hidden");
-        try{await abrirLicencaModal()}catch{}
-        menuApplyPermissions();
-        return;
-      }
+      const detail=extractApiDetail(data,"Sessao invalida.");
+      if(res.status===401||res.status===403)return;
+      stopSessionHeartbeat();
       setToken("");
       setLoginStatus(detail,true);
       loginWrap.classList.remove("hidden");
@@ -11452,6 +11666,7 @@ async function carregarSessao(){
     if(!data.is_superadmin&&sa&&sa.panel)sa.panel.classList.add("hidden");
 
     if(data.setup_completed===false){
+      stopSessionHeartbeat();
       abrirTelaSetup(data);
       menuApplyPermissions();
       return;
@@ -11462,7 +11677,9 @@ async function carregarSessao(){
     footerMsg.textContent="Sessao ativa para clinica_id "+(data.clinica_id??"-");
     try{await licCarregarInfo()}catch{licUpdateBadge(null)}
     menuApplyPermissions();
+    startSessionHeartbeat();
   }catch{
+    stopSessionHeartbeat();
     if(btnOpenUsers)btnOpenUsers.classList.add("hidden");
     setLoginStatus("Nao foi possivel validar a sessao.",true);
     menuApplyPermissions();
@@ -12905,7 +13122,7 @@ sobreDlg.btnFechar.addEventListener("click",fecharSobreModal);sobreDlg.backdrop.
 licDlg.btnFechar.addEventListener("click",fecharLicencaModal);licDlg.backdrop.addEventListener("click",ev=>{if(ev.target===licDlg.backdrop)fecharLicencaModal()});licDlg.btnCopiar.addEventListener("click",async()=>{try{await navigator.clipboard.writeText(licDlg.machine.value||"");licSetStatus("ID copiado.",false,true)}catch{licSetStatus("Não foi possível copiar o ID.",true,false)}});licDlg.btnMensal.addEventListener("click",()=>licIniciarCheckout("MENSAL"));licDlg.btnAnual.addEventListener("click",()=>licIniciarCheckout("ANUAL"));if(licDlg.btnAtualizar)licDlg.btnAtualizar.addEventListener("click",licSincronizarStatus);
 document.getElementById("btn-login").addEventListener("click",login);emailEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();login()}});senhaEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();login()}});document.getElementById("btn-open-signup").addEventListener("click",()=>showPanel(panelSignup));document.getElementById("btn-open-forgot").addEventListener("click",()=>showPanel(panelForgot));document.getElementById("btn-signup-code").addEventListener("click",signupRequestCode);document.getElementById("btn-signup-confirm").addEventListener("click",signupConfirm);document.getElementById("btn-forgot-code").addEventListener("click",forgotRequestCode);document.getElementById("btn-forgot-reset").addEventListener("click",forgotResetPassword);document.getElementById("btn-back-login-from-signup").addEventListener("click",()=>showPanel(panelLogin));document.getElementById("btn-back-login-from-forgot").addEventListener("click",()=>showPanel(panelLogin));if(document.getElementById("btn-setup-complete"))document.getElementById("btn-setup-complete").addEventListener("click",setupComplete);if(document.getElementById("btn-setup-logout"))document.getElementById("btn-setup-logout").addEventListener("click",setupLogout);if(setupSenhaEl)setupSenhaEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();setupComplete()}});if(setupConfirmaEl)setupConfirmaEl.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();setupComplete()}});
 document.getElementById("btn-google-login").addEventListener("click",()=>{window.location.href="/auth/google/login"});
-document.getElementById("btn-sair").addEventListener("click",async()=>{try{if(getToken())await requestJson("POST","/logout",{},true)}catch{}setToken("");mpReturnPaymentId="";sessaoAtual=null;menuApplyPermissions();usersCache=[];usersSelecionadoId=null;usersStopRefresh();usersPermSchema=null;usersPermEditId=null;materiaisCache=[];materialSelecionadoId=null;materialModalId=null;materiaisAuxTiposCache=[];materiaisAuxUndsCache=[];materiaisListasCache=[];materiaisIndicesCache=[];materiaisTabelaModalModo="nova";materiaisTabelaModalListaId=0;procedimentosCache=[];procedimentoSelecionadoId=null;procedimentoAtualId=null;procedimentoLinks=[];procMaterialSelecionadoId=null;procFiltros={tabelas:[],especialidades:[],tipos_tiss:[],indices:[]};pgenCache=[];pgenSelId=null;unidadesCache=[];unidadeSelId=null;fichaPacienteAtualId=null;fichaPacientesBuscaCache=[];fichaCodigoUltimoResolvido="";if(fichaMenuPac)fichaMenuPacFechar();fcxData=null;dashData=[];dashGrafico=[];dashTabela=[];dashSelecionadoId=null;gruposCache=[];grupoSelId=null;catSelId=null;auxItensCache=[];auxSelId=null;licInfoCache=null;saClinicasCache=[];saUsuariosCache=[];if(btnOpenUsers)btnOpenUsers.classList.add("hidden");if(menuSuperAdminAction)menuSuperAdminAction.classList.add("hidden");if(menuSuperAdminSep)menuSuperAdminSep.classList.add("hidden");userRole.textContent="Perfil: -";licUpdateBadge(null);hideAllPanels();materiaisFecharModal();materiaisTabelaFecharModal();procFecharVincular();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();if(prefCfg?.backdrop)prefCfg.backdrop.classList.add("hidden");if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");fecharSobreModal();fecharLicencaModal();const cadMb=document.getElementById("cad-modal-backdrop");if(cadMb)cadMb.classList.add("hidden");loginWrap.classList.remove("hidden");shell.classList.add("hidden");showPanel(panelLogin);setLoginStatus("Sessao encerrada.",false)});
+document.getElementById("btn-sair").addEventListener("click",async()=>{stopSessionHeartbeat();try{if(getToken())await requestJson("POST","/logout",{},true)}catch{}setToken("");mpReturnPaymentId="";sessaoAtual=null;menuApplyPermissions();usersCache=[];usersSelecionadoId=null;usersStopRefresh();usersPermSchema=null;usersPermEditId=null;materiaisCache=[];materialSelecionadoId=null;materialModalId=null;materiaisAuxTiposCache=[];materiaisAuxUndsCache=[];materiaisListasCache=[];materiaisIndicesCache=[];materiaisTabelaModalModo="nova";materiaisTabelaModalListaId=0;procedimentosCache=[];procedimentoSelecionadoId=null;procedimentoAtualId=null;procedimentoLinks=[];procMaterialSelecionadoId=null;procFiltros={tabelas:[],especialidades:[],tipos_tiss:[],indices:[]};pgenCache=[];pgenSelId=null;unidadesCache=[];unidadeSelId=null;fichaPacienteAtualId=null;fichaPacientesBuscaCache=[];fichaCodigoUltimoResolvido="";if(fichaMenuPac)fichaMenuPacFechar();fcxData=null;dashData=[];dashGrafico=[];dashTabela=[];dashSelecionadoId=null;gruposCache=[];grupoSelId=null;catSelId=null;auxItensCache=[];auxSelId=null;licInfoCache=null;saClinicasCache=[];saUsuariosCache=[];if(btnOpenUsers)btnOpenUsers.classList.add("hidden");if(menuSuperAdminAction)menuSuperAdminAction.classList.add("hidden");if(menuSuperAdminSep)menuSuperAdminSep.classList.add("hidden");userRole.textContent="Perfil: -";licUpdateBadge(null);hideAllPanels();materiaisFecharModal();materiaisTabelaFecharModal();procFecharVincular();usersFecharModal();usersFecharModalSenha();usersFecharPermissoes();if(prefCfg?.backdrop)prefCfg.backdrop.classList.add("hidden");if(sysOptCfg?.backdrop)sysOptCfg.backdrop.classList.add("hidden");fecharSobreModal();fecharLicencaModal();const cadMb=document.getElementById("cad-modal-backdrop");if(cadMb)cadMb.classList.add("hidden");loginWrap.classList.remove("hidden");shell.classList.add("hidden");showPanel(panelLogin);setLoginStatus("Sessao encerrada.",false)});
 document.getElementById("btn-sair").addEventListener("click",()=>{ccLancCache=[];ccSelecionadoId=null;ccEditId=null;if(cc)ccFecharModal()});
 document.getElementById("btn-open-cenario").addEventListener("click",abrirCenario);if(btnOpenUsers)btnOpenUsers.addEventListener("click",abrirPainelAdministradorToolbar);document.getElementById("btn-fechar-cenario").addEventListener("click",()=>showScenarioPanel(false));document.getElementById("btn-salvar-cenario").addEventListener("click",salvarCenario);document.getElementById("btn-calcular-fixos").addEventListener("click",calcularFixosAno);if(usersBtnNovo)usersBtnNovo.addEventListener("click",usersAbrirModalNovo);if(usersBtnEditar)usersBtnEditar.addEventListener("click",usersEditarSelecionado);if(usersBtnExcluir)usersBtnExcluir.addEventListener("click",usersExcluirSelecionado);if(usersBtnImpressos)usersBtnImpressos.addEventListener("click",usersAbrirImpressos);if(usersBtnPreferencias)usersBtnPreferencias.addEventListener("click",usersAbrirPreferencias);if(usersBtnPermissoes)usersBtnPermissoes.addEventListener("click",usersAbrirPermissoes);if(usersBtnFechar)usersBtnFechar.addEventListener("click",()=>showUsersPanel(false));if(usersModalOk)usersModalOk.addEventListener("click",usersSalvarNovo);if(usersModalCancelar)usersModalCancelar.addEventListener("click",usersFecharModal);if(usersModalShowSenha)usersModalShowSenha.addEventListener("change",usersToggleSenhaVisibilidade);if(usersPassOk)usersPassOk.addEventListener("click",usersSalvarSenha);if(usersPassCancelar)usersPassCancelar.addEventListener("click",usersFecharModalSenha);if(protectedPassOk)protectedPassOk.addEventListener("click",protectedPassSubmit);if(protectedPassCancelar)protectedPassCancelar.addEventListener("click",()=>protectedPassClose(null));if(protectedPassInput)protectedPassInput.addEventListener("keydown",ev=>{if(ev.key==="Enter"){ev.preventDefault();protectedPassSubmit()}if(ev.key==="Escape"){ev.preventDefault();protectedPassClose(null)}});if(usersPermOk)usersPermOk.addEventListener("click",usersSalvarPermissoes);if(usersPermCancelar)usersPermCancelar.addEventListener("click",usersFecharPermissoes);if(usersPermFechar)usersPermFechar.addEventListener("click",usersFecharPermissoes);if(usersPermTabAcessoBtn)usersPermTabAcessoBtn.addEventListener("click",()=>usersPermSetTab("acesso"));if(usersPermTabPerfisBtn)usersPermTabPerfisBtn.addEventListener("click",()=>usersPermSetTab("perfis"));if(usersPermProfileSelect)usersPermProfileSelect.addEventListener("change",()=>{usersPermSelectedProfileCode=String(usersPermProfileSelect.value||"").trim();usersPermRenderPerfilPreview()});if(usersPermProfileApply)usersPermProfileApply.addEventListener("click",usersPermAplicarPerfilSelecionado);const usersPermActionButtons=Array.from(document.querySelectorAll(".users-perm-action"));usersPermActionButtons.forEach(btn=>{btn.addEventListener("click",()=>{const level=String(btn.getAttribute("data-level")||"").trim();if(level)usersPermApplyLevel(level,"module")})});if(usersModalBackdrop)usersModalBackdrop.addEventListener("click",ev=>{if(ev.target===usersModalBackdrop)usersFecharModal()});if(usersPassBackdrop)usersPassBackdrop.addEventListener("click",ev=>{if(ev.target===usersPassBackdrop)usersFecharModalSenha()});if(usersPermBackdrop)usersPermBackdrop.addEventListener("click",ev=>{if(ev.target===usersPermBackdrop)usersFecharPermissoes()});
 if(protectedPassBackdrop)protectedPassBackdrop.addEventListener("click",ev=>{if(ev.target===protectedPassBackdrop)protectedPassClose(null)});
