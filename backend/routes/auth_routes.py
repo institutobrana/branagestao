@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.responses import RedirectResponse
+from fastapi import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -21,13 +22,20 @@ from models.email_code import EmailCode
 from models.usuario import Usuario
 from security.admin_password import verify_admin_password
 from security.hash import hash_password, verify_password
-from security.jwt_handler import create_access_token
+from security.jwt_handler import create_access_token, decode_token
 from security.dependencies import get_current_user
 from security.permissions import MODULE_PERMISSION_SCHEMA, get_module_access_level
 from security.system_accounts import is_system_user
 from security.superadmin import is_owner_email, is_platform_superadmin_user
 from security.user_context import build_user_context
 from services.email_service import EmailDeliveryError, send_verification_code
+from services.google_calendar_service import (
+    GoogleCalendarError,
+    decode_id_token_email,
+    exchange_google_calendar_code,
+    fetch_google_calendar_primary,
+    token_expires_at_utc,
+)
 from services.signup_service import criar_conta_saas
 
 router = APIRouter()
@@ -189,6 +197,53 @@ def _enforce_owner_access(usuario: Usuario) -> bool:
         usuario.ativo = True
         usuario.is_admin = True
     return owner
+
+
+def _load_user_prefs(usuario: Usuario) -> dict:
+    raw = str(usuario.preferencias_usuario_json or "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _popup_google_calendar_response(status: str, message: str) -> Response:
+    payload = json.dumps(
+        {
+            "type": "google_calendar_auth",
+            "status": str(status or "error"),
+            "message": str(message or ""),
+        },
+        ensure_ascii=False,
+    )
+    safe_message = (
+        str(message or "")
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    html = f"""<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Google Agenda</title></head>
+<body style="font-family:Tahoma,Arial,sans-serif;padding:18px">
+  <div>{safe_message}</div>
+  <script>
+    (function(){{
+      var payload={payload};
+      try {{
+        if (window.opener && !window.opener.closed) {{
+          window.opener.postMessage(payload, window.location.origin);
+        }}
+      }} catch (e) {{}}
+      setTimeout(function(){{ try{{ window.close(); }}catch(e){{}} }}, 120);
+    }})();
+  </script>
+</body>
+</html>"""
+    return Response(content=html, media_type="text/html; charset=utf-8")
 
 
 @router.post("/login")
@@ -448,6 +503,82 @@ def google_callback(
         redirect_url = "/app?oauth_error=unexpected_google_error"
         logger.error("Google OAuth excecao inesperada. redirect=%s", redirect_url)
         return RedirectResponse(url=redirect_url)
+
+
+@router.get("/auth/google/calendar/callback")
+def google_calendar_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        return _popup_google_calendar_response("error", f"Falha na autorização Google: {error}")
+
+    state_payload = decode_token(str(state or "").strip()) if state else None
+    if not isinstance(state_payload, dict):
+        return _popup_google_calendar_response("error", "Estado OAuth inválido ou expirado.")
+    if str(state_payload.get("type") or "") != "google_calendar_oauth":
+        return _popup_google_calendar_response("error", "Estado OAuth inválido para Google Agenda.")
+
+    user_id = int(state_payload.get("user_id") or 0)
+    clinica_id = int(state_payload.get("clinica_id") or 0)
+    if user_id <= 0 or clinica_id <= 0:
+        return _popup_google_calendar_response("error", "Sessão OAuth inválida.")
+    if not code:
+        return _popup_google_calendar_response("error", "Código OAuth ausente.")
+
+    usuario = (
+        db.query(Usuario)
+        .filter(Usuario.id == user_id, Usuario.clinica_id == clinica_id)
+        .first()
+    )
+    if not usuario:
+        return _popup_google_calendar_response("error", "Usuário não encontrado para conexão Google.")
+
+    try:
+        token_data = exchange_google_calendar_code(str(code or "").strip())
+        access_token = str(token_data.get("access_token") or "").strip()
+        refresh_token = str(token_data.get("refresh_token") or "").strip()
+        expires_in = int(token_data.get("expires_in") or 3600)
+        scope = str(token_data.get("scope") or "").strip()
+        id_token = str(token_data.get("id_token") or "").strip()
+        calendar = fetch_google_calendar_primary(access_token)
+        calendar_id = str(calendar.get("id") or "primary").strip() or "primary"
+        calendar_summary = str(calendar.get("summary") or "Agenda principal").strip()
+        calendar_tz = str(calendar.get("timeZone") or "America/Sao_Paulo").strip()
+        email_google = decode_id_token_email(id_token) or str(usuario.email or "").strip().lower()
+
+        prefs = _load_user_prefs(usuario)
+        cfg = prefs.get("google_calendar_sync") if isinstance(prefs.get("google_calendar_sync"), dict) else {}
+        cfg = dict(cfg or {})
+        if not refresh_token:
+            refresh_token = str(cfg.get("refresh_token") or "").strip()
+
+        cfg.update(
+            {
+                "connected": True,
+                "email": email_google,
+                "calendar_id": calendar_id,
+                "calendar_summary": calendar_summary,
+                "time_zone": calendar_tz,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "scope": scope,
+                "expires_at": token_expires_at_utc(expires_in),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+        )
+        prefs["google_calendar_sync"] = cfg
+        usuario.preferencias_usuario_json = json.dumps(prefs, ensure_ascii=False)
+        db.commit()
+        return _popup_google_calendar_response("ok", f"Google Agenda conectado: {calendar_summary}.")
+    except GoogleCalendarError as exc:
+        logger.error("Google Calendar OAuth callback error: %s", exc.message)
+        return _popup_google_calendar_response("error", exc.message)
+    except Exception as exc:
+        logger.exception("Falha inesperada no callback Google Calendar: %s", exc)
+        return _popup_google_calendar_response("error", "Falha inesperada ao conectar Google Agenda.")
 
 
 @router.post("/signup/request-code")

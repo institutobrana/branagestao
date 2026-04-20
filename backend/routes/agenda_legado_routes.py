@@ -23,7 +23,14 @@ from models.procedimento_tabela import ProcedimentoTabela
 from models.unidade_atendimento import UnidadeAtendimento
 from models.usuario import Usuario
 from security.dependencies import get_current_user, require_module_access
+from security.jwt_handler import create_access_token
 from services.email_service import EmailDeliveryError, enviar_email
+from services.google_calendar_service import (
+    GoogleCalendarError,
+    build_google_calendar_auth_url,
+    refresh_google_calendar_access_token,
+    upsert_google_calendar_event,
+)
 from services.signup_service import garantir_auxiliares_raw_clinica
 
 router = APIRouter(
@@ -120,6 +127,14 @@ class AvisoAgendaEnviarPayload(BaseModel):
     modelo_id: int | None = None
     itens: list[AvisoAgendaEnviarItemPayload] = []
     assunto: str | None = None
+
+
+class GoogleAgendaExportarPayload(BaseModel):
+    data_ini: str
+    data_fim: str
+    id_prestador: int | None = None
+    id_unidade: int | None = None
+    itens_ids: list[int] | None = None
 
 
 def _parse_date(value: str | None) -> date | None:
@@ -355,49 +370,91 @@ def _preferencias_usuario_json(usuario: Usuario) -> dict:
         return {}
 
 
-def _catalogo_modelos_para_aviso(db: Session, usuario: Usuario, tipo_modelo: str) -> list[dict]:
+def _catalogo_modelos_para_aviso(
+    db: Session,
+    usuario: Usuario,
+    tipos_modelo: str | tuple[str, ...] | None = None,
+) -> list[dict]:
+    tipos: tuple[str, ...]
+    if tipos_modelo is None:
+        tipos = ()
+    elif isinstance(tipos_modelo, str):
+        tipos = (str(tipos_modelo).strip(),)
+    else:
+        tipos = tuple(str(item or "").strip() for item in tipos_modelo if str(item or "").strip())
+
+    query = db.query(ModeloDocumento).filter(
+        ModeloDocumento.ativo.is_(True),
+        ((ModeloDocumento.clinica_id == usuario.clinica_id) | (ModeloDocumento.clinica_id.is_(None))),
+    )
+    if tipos:
+        query = query.filter(ModeloDocumento.tipo_modelo.in_(tipos))
+
     rows = (
-        db.query(ModeloDocumento)
-        .filter(
-            ModeloDocumento.ativo.is_(True),
-            ModeloDocumento.tipo_modelo == tipo_modelo,
-            ((ModeloDocumento.clinica_id == usuario.clinica_id) | (ModeloDocumento.clinica_id.is_(None))),
-        )
-        .order_by(
+        query.order_by(
             ModeloDocumento.clinica_id.is_(None).asc(),
             ModeloDocumento.nome_exibicao.asc(),
             ModeloDocumento.id.asc(),
-        )
-        .all()
+        ).all()
     )
-    return [
-        {
-            "id": int(item.id),
-            "nome": str(item.nome_exibicao or "").strip(),
-            "caminho": str(item.caminho_arquivo or "").strip(),
-        }
-        for item in rows
-    ]
+
+    permitidas = {".rtf", ".txt"}
+    catalogo: list[dict] = []
+    vistos: set[str] = set()
+    for item in rows:
+        nome_exibicao = str(item.nome_exibicao or "").strip()
+        nome_arquivo = str(item.nome_arquivo or "").strip()
+        nome = nome_arquivo or nome_exibicao
+        caminho = str(item.caminho_arquivo or "").strip()
+        ext = Path(nome_arquivo).suffix.lower()
+        if ext and ext not in permitidas:
+            continue
+        if not nome:
+            continue
+        chave = (nome_arquivo or nome_exibicao).casefold()
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        catalogo.append(
+            {
+                "id": int(item.id),
+                "nome": nome,
+                "caminho": caminho,
+            }
+        )
+    return catalogo
 
 
 def _modelo_documento_por_id(
     db: Session,
     clinica_id: int,
     modelo_id: int,
-    tipo_modelo: str,
+    tipos_modelo: str | tuple[str, ...] | None = None,
 ) -> ModeloDocumento | None:
     if int(modelo_id or 0) <= 0:
         return None
-    return (
-        db.query(ModeloDocumento)
-        .filter(
-            ModeloDocumento.id == int(modelo_id),
-            ModeloDocumento.ativo.is_(True),
-            ModeloDocumento.tipo_modelo == tipo_modelo,
-            ((ModeloDocumento.clinica_id == int(clinica_id)) | (ModeloDocumento.clinica_id.is_(None))),
-        )
-        .first()
+    tipos: tuple[str, ...]
+    if tipos_modelo is None:
+        tipos = ()
+    elif isinstance(tipos_modelo, str):
+        tipos = (str(tipos_modelo).strip(),)
+    else:
+        tipos = tuple(str(item or "").strip() for item in tipos_modelo if str(item or "").strip())
+
+    query = db.query(ModeloDocumento).filter(
+        ModeloDocumento.id == int(modelo_id),
+        ModeloDocumento.ativo.is_(True),
+        ((ModeloDocumento.clinica_id == int(clinica_id)) | (ModeloDocumento.clinica_id.is_(None))),
     )
+    if tipos:
+        query = query.filter(ModeloDocumento.tipo_modelo.in_(tipos))
+    item = query.first()
+    if not item:
+        return None
+    ext = Path(str(item.nome_arquivo or "").strip()).suffix.lower()
+    if ext and ext not in {".rtf", ".txt"}:
+        return None
+    return item
 
 
 def _ler_texto_modelo(item: ModeloDocumento | None) -> str:
@@ -417,10 +474,158 @@ def _ler_texto_modelo(item: ModeloDocumento | None) -> str:
         return ""
     for enc in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
         try:
-            return caminho_abs.read_text(encoding=enc).replace("\x00", "")
+            bruto = caminho_abs.read_text(encoding=enc).replace("\x00", "")
+            if _parece_rtf(bruto):
+                return _rtf_para_texto(bruto)
+            return bruto
         except Exception:
             continue
     return ""
+
+
+_RTF_DESTINOS_IGNORAR = {
+    "fonttbl",
+    "colortbl",
+    "datastore",
+    "themedata",
+    "stylesheet",
+    "info",
+    "pict",
+    "object",
+    "fldinst",
+    "fldrslt",
+    "xmlopen",
+    "xmlattrname",
+    "xmlattrvalue",
+}
+
+
+def _parece_rtf(conteudo: str) -> bool:
+    txt = str(conteudo or "").lstrip()
+    return txt.startswith("{\\rtf")
+
+
+def _rtf_para_texto(conteudo: str) -> str:
+    rtf = str(conteudo or "")
+    if not rtf:
+        return ""
+
+    out: list[str] = []
+    stack: list[tuple[bool, int]] = []
+    ignorable = False
+    ucskip = 1
+    curskip = 0
+    i = 0
+
+    while i < len(rtf):
+        ch = rtf[i]
+
+        if ch == "{":
+            stack.append((ignorable, ucskip))
+            i += 1
+            continue
+
+        if ch == "}":
+            if stack:
+                ignorable, ucskip = stack.pop()
+            i += 1
+            continue
+
+        if ch == "\\":
+            i += 1
+            if i >= len(rtf):
+                break
+            ctrl = rtf[i]
+
+            if ctrl in "\\{}":
+                if not ignorable and curskip <= 0:
+                    out.append(ctrl)
+                elif curskip > 0:
+                    curskip -= 1
+                i += 1
+                continue
+
+            if ctrl == "*":
+                ignorable = True
+                i += 1
+                continue
+
+            if ctrl == "'":
+                if i + 2 < len(rtf):
+                    hexcode = rtf[i + 1 : i + 3]
+                    try:
+                        decod = bytes.fromhex(hexcode).decode("cp1252", errors="ignore")
+                    except Exception:
+                        decod = ""
+                    if not ignorable and curskip <= 0:
+                        out.append(decod)
+                    elif curskip > 0:
+                        curskip -= 1
+                i += 3
+                continue
+
+            m = re.match(r"([a-zA-Z]+)(-?\d+)? ?", rtf[i:])
+            if m:
+                palavra = m.group(1) or ""
+                arg_txt = m.group(2)
+                i += len(m.group(0))
+
+                if palavra in {"par", "line"}:
+                    if not ignorable:
+                        out.append("\n")
+                elif palavra == "tab":
+                    if not ignorable:
+                        out.append("\t")
+                elif palavra == "emdash":
+                    if not ignorable:
+                        out.append("-")
+                elif palavra == "endash":
+                    if not ignorable:
+                        out.append("-")
+                elif palavra == "lquote":
+                    if not ignorable:
+                        out.append("'")
+                elif palavra == "rquote":
+                    if not ignorable:
+                        out.append("'")
+                elif palavra == "ldblquote":
+                    if not ignorable:
+                        out.append('"')
+                elif palavra == "rdblquote":
+                    if not ignorable:
+                        out.append('"')
+                elif palavra == "uc" and arg_txt:
+                    try:
+                        ucskip = max(0, int(arg_txt))
+                    except Exception:
+                        ucskip = 1
+                elif palavra == "u" and arg_txt:
+                    try:
+                        codepoint = int(arg_txt)
+                        if codepoint < 0:
+                            codepoint += 65536
+                        if not ignorable:
+                            out.append(chr(codepoint))
+                        curskip = ucskip
+                    except Exception:
+                        pass
+                elif palavra in _RTF_DESTINOS_IGNORAR:
+                    ignorable = True
+                continue
+
+            i += 1
+            continue
+
+        if curskip > 0:
+            curskip -= 1
+        elif not ignorable:
+            out.append(ch)
+        i += 1
+
+    txt = "".join(out).replace("\r", "")
+    txt = re.sub(r"[ \t]+\n", "\n", txt)
+    txt = re.sub(r"\n{3,}", "\n\n", txt)
+    return txt.strip()
 
 
 def _normalizar_chave_placeholder(valor: str) -> str:
@@ -508,6 +713,213 @@ def _render_template_mensagem(
         return str(contexto.get(chave, ""))
 
     return PLACEHOLDER_PATTERN.sub(_replace, texto)
+
+
+def _preferencias_dict_usuario(usuario: Usuario) -> dict:
+    raw = (usuario.preferencias_usuario_json or "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _save_preferencias_dict_usuario(usuario: Usuario, prefs: dict) -> None:
+    try:
+        usuario.preferencias_usuario_json = json.dumps(prefs or {}, ensure_ascii=False)
+    except Exception:
+        usuario.preferencias_usuario_json = "{}"
+
+
+def _google_calendar_cfg(usuario: Usuario) -> dict:
+    prefs = _preferencias_dict_usuario(usuario)
+    cfg = prefs.get("google_calendar_sync")
+    return dict(cfg) if isinstance(cfg, dict) else {}
+
+
+def _google_calendar_mark_disconnected(usuario: Usuario) -> None:
+    prefs = _preferencias_dict_usuario(usuario)
+    cfg = prefs.get("google_calendar_sync")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    cfg["connected"] = False
+    cfg["access_token"] = ""
+    prefs["google_calendar_sync"] = cfg
+    _save_preferencias_dict_usuario(usuario, prefs)
+
+
+def _google_calendar_ensure_access_token(usuario: Usuario, db: Session) -> tuple[str, dict]:
+    prefs = _preferencias_dict_usuario(usuario)
+    cfg = prefs.get("google_calendar_sync")
+    cfg = dict(cfg) if isinstance(cfg, dict) else {}
+    if not bool(cfg.get("connected")):
+        raise HTTPException(status_code=400, detail="Google Agenda não conectado para este usuário.")
+
+    access_token = str(cfg.get("access_token") or "").strip()
+    refresh_token = str(cfg.get("refresh_token") or "").strip()
+    expires_at_raw = str(cfg.get("expires_at") or "").strip()
+    exp_dt: datetime | None = None
+    if expires_at_raw:
+        try:
+            exp_dt = datetime.fromisoformat(expires_at_raw.replace("Z", "+00:00"))
+        except Exception:
+            exp_dt = None
+
+    now = datetime.utcnow()
+    exp_naive = exp_dt.replace(tzinfo=None) if exp_dt and exp_dt.tzinfo else exp_dt
+    precisa_renovar = (not access_token) or (exp_naive is not None and exp_naive <= now + timedelta(seconds=60))
+    if precisa_renovar:
+        if not refresh_token:
+            _google_calendar_mark_disconnected(usuario)
+            db.add(usuario)
+            db.commit()
+            raise HTTPException(status_code=400, detail="Conexão Google expirada. Conecte novamente.")
+        try:
+            refreshed = refresh_google_calendar_access_token(refresh_token)
+        except GoogleCalendarError as exc:
+            _google_calendar_mark_disconnected(usuario)
+            db.add(usuario)
+            db.commit()
+            raise HTTPException(status_code=400, detail=f"Falha ao renovar conexão Google: {exc.message}") from exc
+        access_token = str(refreshed.get("access_token") or "").strip()
+        expires_in = int(refreshed.get("expires_in") or 3600)
+        if access_token:
+            cfg["access_token"] = access_token
+            cfg["expires_at"] = (now + timedelta(seconds=max(60, expires_in))).isoformat()
+            if refreshed.get("scope"):
+                cfg["scope"] = str(refreshed.get("scope") or "").strip()
+            prefs["google_calendar_sync"] = cfg
+            _save_preferencias_dict_usuario(usuario, prefs)
+            db.add(usuario)
+            db.commit()
+            db.refresh(usuario)
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Token Google indisponível. Conecte novamente.")
+    return access_token, cfg
+
+
+def _agenda_google_periodo_rows(
+    *,
+    db: Session,
+    clinica_id: int,
+    dt_ini: date,
+    dt_fim: date,
+    id_prestador: int | None = None,
+    id_unidade: int | None = None,
+    itens_ids: list[int] | None = None,
+    limit: int = 5000,
+) -> list[tuple[AgendaLegadoEvento, Paciente | None, PrestadorOdonto | None]]:
+    query = (
+        db.query(AgendaLegadoEvento, Paciente, PrestadorOdonto)
+        .outerjoin(
+            Paciente,
+            and_(
+                Paciente.clinica_id == AgendaLegadoEvento.clinica_id,
+                or_(Paciente.codigo == AgendaLegadoEvento.nro_pac, Paciente.id == AgendaLegadoEvento.nro_pac),
+            ),
+        )
+        .outerjoin(
+            PrestadorOdonto,
+            and_(
+                PrestadorOdonto.clinica_id == AgendaLegadoEvento.clinica_id,
+                PrestadorOdonto.id == AgendaLegadoEvento.id_prestador,
+            ),
+        )
+        .filter(
+            AgendaLegadoEvento.clinica_id == int(clinica_id),
+            AgendaLegadoEvento.data >= datetime.combine(dt_ini, time.min),
+            AgendaLegadoEvento.data <= datetime.combine(dt_fim, time.max),
+            or_(AgendaLegadoEvento.status.is_(None), AgendaLegadoEvento.status != 2),
+        )
+    )
+    if int(id_prestador or 0) > 0:
+        query = query.filter(AgendaLegadoEvento.id_prestador == int(id_prestador))
+    if int(id_unidade or 0) > 0:
+        query = query.filter(AgendaLegadoEvento.id_unidade == int(id_unidade))
+    if itens_ids:
+        valid_ids = [int(x) for x in itens_ids if int(x or 0) > 0]
+        if valid_ids:
+            query = query.filter(AgendaLegadoEvento.id.in_(valid_ids))
+    return (
+        query.order_by(
+            AgendaLegadoEvento.data.asc(),
+            AgendaLegadoEvento.hora_inicio.asc(),
+            AgendaLegadoEvento.id.asc(),
+        )
+        .limit(max(1, min(10000, int(limit or 5000))))
+        .all()
+    )
+
+
+def _agenda_google_preview_item(evento: AgendaLegadoEvento, paciente: Paciente | None) -> dict:
+    data_base = evento.data.date() if evento.data else date.today()
+    nome_paciente = str((paciente.nome_completo if paciente and paciente.nome_completo else None) or (paciente.nome if paciente else "") or "").strip()
+    titulo = str(evento.nome or "").strip() or nome_paciente or str(evento.motivo or "").strip() or "Compromisso"
+    return {
+        "id": int(evento.id),
+        "data": data_base.isoformat(),
+        "hora": _hora_inicio_para_hhmm(evento.hora_inicio),
+        "titulo": titulo,
+        "motivo": str(evento.motivo or "").strip(),
+    }
+
+
+def _agenda_google_event_id(clinica_id: int, agenda_id: int) -> str:
+    return f"b{int(clinica_id)}e{int(agenda_id)}"
+
+
+def _agenda_google_payload(
+    *,
+    evento: AgendaLegadoEvento,
+    paciente: Paciente | None,
+    prestador: PrestadorOdonto | None,
+    timezone_name: str,
+    clinica_id: int,
+) -> tuple[str, dict]:
+    data_base = evento.data.date() if evento.data else date.today()
+    nome_paciente = str((paciente.nome_completo if paciente and paciente.nome_completo else None) or (paciente.nome if paciente else "") or "").strip()
+    titulo = str(evento.nome or "").strip() or nome_paciente or str(evento.motivo or "").strip() or "Compromisso"
+    inicio_ms = int(evento.hora_inicio or 0)
+    fim_ms = int(evento.hora_fim or 0)
+    if fim_ms <= inicio_ms:
+        fim_ms = inicio_ms + 300000
+    ini_h = max(0, inicio_ms // 3600000)
+    ini_m = max(0, (inicio_ms // 60000) % 60)
+    fim_h = max(0, fim_ms // 3600000)
+    fim_m = max(0, (fim_ms // 60000) % 60)
+    start_dt = datetime.combine(data_base, time(min(23, ini_h), min(59, ini_m)))
+    end_dt = datetime.combine(data_base, time(min(23, fim_h), min(59, fim_m)))
+    if end_dt <= start_dt:
+        end_dt = start_dt + timedelta(minutes=5)
+
+    prestador_nome = str((prestador.apelido if prestador and prestador.apelido else None) or (prestador.nome if prestador else "") or "").strip()
+    desc_lines = [
+        f"Origem SaaS agenda_id={int(evento.id)}",
+        f"Paciente/Compromisso: {titulo}",
+    ]
+    motivo = str(evento.motivo or "").strip()
+    if motivo:
+        desc_lines.append(f"Motivo: {motivo}")
+    if prestador_nome:
+        desc_lines.append(f"Cirurgião: {prestador_nome}")
+    for fone in (str(evento.fone1 or "").strip(), str(evento.fone2 or "").strip(), str(evento.fone3 or "").strip()):
+        if fone:
+            desc_lines.append(f"Telefone: {fone}")
+
+    payload = {
+        "summary": titulo,
+        "description": "\n".join(desc_lines).strip(),
+        "start": {"dateTime": start_dt.isoformat(), "timeZone": timezone_name},
+        "end": {"dateTime": end_dt.isoformat(), "timeZone": timezone_name},
+        "extendedProperties": {
+            "private": {
+                "brana_clinica_id": str(int(clinica_id)),
+                "brana_agenda_id": str(int(evento.id)),
+            }
+        },
+    }
+    return _agenda_google_event_id(clinica_id, int(evento.id)), payload
 
 
 def _enviar_whatsapp_meta(numero: str, mensagem: str) -> dict:
@@ -953,8 +1365,9 @@ def listar_opcoes_avisos_agendamento(
             return None
         return val if val > 0 else None
 
-    modelos_email = _catalogo_modelos_para_aviso(db, current_user, "email_agenda")
-    modelos_whatsapp = _catalogo_modelos_para_aviso(db, current_user, "whatsapp_agenda")
+    modelos_texto = _catalogo_modelos_para_aviso(db, current_user, None)
+    modelos_email = list(modelos_texto)
+    modelos_whatsapp = list(modelos_texto)
     default_email_id = _to_int(modelos_vals.get("modelo_texto_email_agenda_id"))
     default_whatsapp_id = _to_int(modelos_vals.get("modelo_texto_whatsapp_agenda_id"))
 
@@ -1096,8 +1509,7 @@ def enviar_avisos_agendamento(
             "links_whatsapp": [],
         }
 
-    modelo_tipo = "email_agenda" if tipo == "email" else "whatsapp_agenda"
-    modelo = _modelo_documento_por_id(db, int(current_user.clinica_id), int(payload.modelo_id or 0), modelo_tipo)
+    modelo = _modelo_documento_por_id(db, int(current_user.clinica_id), int(payload.modelo_id or 0), None)
     template_texto = _ler_texto_modelo(modelo).strip()
     if not template_texto:
         template_texto = (
@@ -1187,6 +1599,128 @@ def enviar_avisos_agendamento(
         "pendentes": int(pendentes),
         "falhas": falhas,
         "links_whatsapp": links_whatsapp,
+    }
+
+
+@router.get("/google-agenda/status")
+def google_agenda_status(
+    current_user: Usuario = Depends(get_current_user),
+):
+    cfg = _google_calendar_cfg(current_user)
+    connected = bool(cfg.get("connected")) and bool(str(cfg.get("refresh_token") or "").strip() or str(cfg.get("access_token") or "").strip())
+    return {
+        "connected": connected,
+        "email": str(cfg.get("email") or "").strip(),
+        "calendar_id": str(cfg.get("calendar_id") or "primary").strip() or "primary",
+        "calendar_summary": str(cfg.get("calendar_summary") or "Agenda principal").strip(),
+        "time_zone": str(cfg.get("time_zone") or "America/Sao_Paulo").strip() or "America/Sao_Paulo",
+        "updated_at": str(cfg.get("updated_at") or "").strip(),
+    }
+
+
+@router.get("/google-agenda/oauth/start")
+def google_agenda_oauth_start(
+    current_user: Usuario = Depends(get_current_user),
+):
+    state = create_access_token(
+        {
+            "type": "google_calendar_oauth",
+            "user_id": int(current_user.id),
+            "clinica_id": int(current_user.clinica_id),
+        },
+        expires_minutes=15,
+    )
+    try:
+        auth_url = build_google_calendar_auth_url(state)
+    except GoogleCalendarError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    return {"auth_url": auth_url}
+
+
+@router.get("/google-agenda/preview")
+def google_agenda_preview(
+    data_ini: str = Query(default=""),
+    data_fim: str = Query(default=""),
+    id_prestador: int | None = Query(default=None),
+    id_unidade: int | None = Query(default=None),
+    limit: int = Query(default=5000, ge=1, le=10000),
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    dt_ini = _parse_date(data_ini)
+    dt_fim = _parse_date(data_fim)
+    if not dt_ini or not dt_fim:
+        raise HTTPException(status_code=400, detail="Informe um período válido.")
+    if dt_fim < dt_ini:
+        raise HTTPException(status_code=400, detail="Período de exportação inválido.")
+    rows = _agenda_google_periodo_rows(
+        db=db,
+        clinica_id=int(current_user.clinica_id),
+        dt_ini=dt_ini,
+        dt_fim=dt_fim,
+        id_prestador=id_prestador,
+        id_unidade=id_unidade,
+        limit=limit,
+    )
+    return [_agenda_google_preview_item(evento, paciente) for evento, paciente, _ in rows]
+
+
+@router.post("/google-agenda/exportar")
+def google_agenda_exportar(
+    payload: GoogleAgendaExportarPayload,
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    dt_ini = _parse_date(payload.data_ini)
+    dt_fim = _parse_date(payload.data_fim)
+    if not dt_ini or not dt_fim:
+        raise HTTPException(status_code=400, detail="Informe um período válido.")
+    if dt_fim < dt_ini:
+        raise HTTPException(status_code=400, detail="Período de exportação inválido.")
+
+    access_token, cfg = _google_calendar_ensure_access_token(current_user, db)
+    calendar_id = str(cfg.get("calendar_id") or "primary").strip() or "primary"
+    tz = str(cfg.get("time_zone") or "America/Sao_Paulo").strip() or "America/Sao_Paulo"
+    rows = _agenda_google_periodo_rows(
+        db=db,
+        clinica_id=int(current_user.clinica_id),
+        dt_ini=dt_ini,
+        dt_fim=dt_fim,
+        id_prestador=payload.id_prestador,
+        id_unidade=payload.id_unidade,
+        itens_ids=payload.itens_ids or [],
+        limit=10000,
+    )
+
+    total = len(rows)
+    publicados = 0
+    falhas: list[dict] = []
+    for evento, paciente, prestador in rows:
+        try:
+            event_id, body = _agenda_google_payload(
+                evento=evento,
+                paciente=paciente,
+                prestador=prestador,
+                timezone_name=tz,
+                clinica_id=int(current_user.clinica_id),
+            )
+            upsert_google_calendar_event(
+                access_token=access_token,
+                calendar_id=calendar_id,
+                event_id=event_id,
+                payload=body,
+            )
+            publicados += 1
+        except GoogleCalendarError as exc:
+            falhas.append({"agenda_id": int(evento.id), "motivo": exc.message})
+        except Exception as exc:
+            falhas.append({"agenda_id": int(evento.id), "motivo": str(exc)})
+
+    return {
+        "total": total,
+        "publicados": int(publicados),
+        "falhas": falhas,
+        "calendar_id": calendar_id,
     }
 
 

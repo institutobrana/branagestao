@@ -680,6 +680,7 @@ if(typeof agendaSemanaRenderEventos==="function"){
   let agendaSemanaPesquisa=null;
   let agendaSemanaHorariosLivres=null;
   let agendaSemanaAviso=null;
+  let agendaSemanaPublicar=null;
 
   const agendaSemanaGetEventoById=(id)=>{
     const n=Number(id||0)||0;
@@ -2137,6 +2138,259 @@ if(typeof agendaSemanaRenderEventos==="function"){
     cfg.backdrop.classList.remove("hidden");
     requestAnimationFrame(()=>{try{cfg.dataIni.focus();cfg.dataIni.select()}catch{}});
   };
+
+  const agendaSemanaPublicarDataPadrao=()=>{
+    const foco=agendaSemanaState?.focusDate instanceof Date?agendaSemanaState.focusDate:new Date();
+    const d=new Date(foco.getFullYear(),foco.getMonth(),foco.getDate());
+    const ini=new Date(d);
+    const fim=new Date(d);
+    fim.setDate(fim.getDate()+5);
+    return {ini:agendaSemanaToIsoDate(ini),fim:agendaSemanaToIsoDate(fim)};
+  };
+  const agendaSemanaPublicarFechar=()=>{
+    if(!agendaSemanaPublicar?.backdrop)return;
+    agendaSemanaPublicar.backdrop.classList.add("hidden");
+  };
+  const agendaSemanaPublicarAtualizarBotoes=()=>{
+    if(!agendaSemanaPublicar)return;
+    const ini=String(agendaSemanaPublicar.dataIni?.value||"").trim();
+    const fim=String(agendaSemanaPublicar.dataFim?.value||"").trim();
+    const periodoOk=!!ini&&!!fim&&fim>=ini;
+    if(agendaSemanaPublicar.btnVisualizar)agendaSemanaPublicar.btnVisualizar.disabled=!periodoOk;
+    const temRows=(Array.isArray(agendaSemanaPublicar.rows)?agendaSemanaPublicar.rows:[]).length>0;
+    const conectado=!!agendaSemanaPublicar.connected;
+    if(agendaSemanaPublicar.btnExportar)agendaSemanaPublicar.btnExportar.disabled=!(periodoOk&&temRows&&conectado);
+  };
+  const agendaSemanaPublicarRenderRows=(rows)=>{
+    if(!agendaSemanaPublicar)return;
+    agendaSemanaPublicar.rows=Array.isArray(rows)?rows:[];
+    agendaSemanaPublicar.tbody.innerHTML=agendaSemanaPublicar.rows.map((row,idx)=>{
+      const selected=idx===0?" selected":"";
+      return `<tr class="${selected}"><td>${esc(agendaSemanaAvisoDataBr(row?.data))}</td><td>${esc(String(row?.hora||""))}</td><td>${esc(String(row?.titulo||""))}</td></tr>`;
+    }).join("")||'<tr class="agenda-semana-publicar-empty"><td colspan="3"></td></tr>';
+    agendaSemanaPublicarAtualizarBotoes();
+  };
+  const agendaSemanaPublicarAtualizarStatus=async()=>{
+    if(!agendaSemanaPublicar)return false;
+    const {res,data}=await requestJson("GET","/agenda-legado/google-agenda/status",undefined,true);
+    if(!res.ok){
+      agendaSemanaPublicar.connected=false;
+      agendaSemanaPublicar.login.value="";
+      agendaSemanaPublicar.status.textContent="Falha ao consultar conexão Google.";
+      agendaSemanaPublicarAtualizarBotoes();
+      return false;
+    }
+    const connected=!!data?.connected;
+    agendaSemanaPublicar.connected=connected;
+    agendaSemanaPublicar.login.value=String(data?.email||"").trim();
+    agendaSemanaPublicar.status.textContent=connected
+      ? `Conectado em: ${String(data?.calendar_summary||"Agenda principal")}`
+      : "Google Agenda não conectado.";
+    agendaSemanaPublicarAtualizarBotoes();
+    return true;
+  };
+  const agendaSemanaPublicarConectar=async()=>{
+    if(!agendaSemanaPublicar)return;
+    const {res,data}=await requestJson("GET","/agenda-legado/google-agenda/oauth/start",undefined,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao iniciar conexão com Google Agenda.");
+      return;
+    }
+    const authUrl=String(data?.auth_url||"").trim();
+    if(!authUrl){
+      window.alert("URL de autorização Google não disponível.");
+      return;
+    }
+    const popup=window.open(authUrl,"brana_google_calendar_oauth","width=580,height=700,resizable=yes,scrollbars=yes");
+    if(!popup){
+      window.alert("Não foi possível abrir a janela de autorização Google.");
+      return;
+    }
+    agendaSemanaPublicar.status.textContent="Aguardando autorização Google...";
+  };
+  const agendaSemanaPublicarVisualizar=async()=>{
+    if(!agendaSemanaPublicar)return;
+    const ini=String(agendaSemanaPublicar.dataIni.value||"").trim();
+    const fim=String(agendaSemanaPublicar.dataFim.value||"").trim();
+    const params=new URLSearchParams();
+    params.set("data_ini",ini);
+    params.set("data_fim",fim);
+    const prestador=Number(agendaSemana?.selectPrestador?.value||0)||0;
+    const unidade=Number(agendaSemana?.selectUnidade?.value||0)||0;
+    if(prestador>0)params.set("id_prestador",String(prestador));
+    if(unidade>0)params.set("id_unidade",String(unidade));
+    params.set("limit","10000");
+    if(agendaSemanaPublicar.btnVisualizar)agendaSemanaPublicar.btnVisualizar.disabled=true;
+    const {res,data}=await requestJson("GET",`/agenda-legado/google-agenda/preview?${params.toString()}`,undefined,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao visualizar agenda para exportação.");
+      agendaSemanaPublicarAtualizarBotoes();
+      return;
+    }
+    agendaSemanaPublicarRenderRows(Array.isArray(data)?data:[]);
+  };
+  const agendaSemanaPublicarExportar=async()=>{
+    if(!agendaSemanaPublicar)return;
+    const ini=String(agendaSemanaPublicar.dataIni.value||"").trim();
+    const fim=String(agendaSemanaPublicar.dataFim.value||"").trim();
+    const prestador=Number(agendaSemana?.selectPrestador?.value||0)||0;
+    const unidade=Number(agendaSemana?.selectUnidade?.value||0)||0;
+    const itensIds=(Array.isArray(agendaSemanaPublicar.rows)?agendaSemanaPublicar.rows:[])
+      .map(item=>Number(item?.id||0)||0)
+      .filter(n=>n>0);
+    if(!itensIds.length){
+      agendaSemanaPublicarAtualizarBotoes();
+      return;
+    }
+    const payload={
+      data_ini:ini,
+      data_fim:fim,
+      id_prestador:prestador>0?prestador:null,
+      id_unidade:unidade>0?unidade:null,
+      itens_ids:itensIds,
+    };
+    const {res,data}=await requestJson("POST","/agenda-legado/google-agenda/exportar",payload,true);
+    if(!res.ok){
+      window.alert(data?.detail||"Falha ao exportar para Google Agenda.");
+      return;
+    }
+    const total=Number(data?.total||0)||0;
+    const publicados=Number(data?.publicados||0)||0;
+    const falhas=Array.isArray(data?.falhas)?data.falhas:[];
+    if(falhas.length){
+      window.alert(`Exportação concluída. Total: ${total}. Publicados: ${publicados}. Falhas: ${falhas.length}.`);
+    }else{
+      window.alert(`Exportação concluída. Total: ${total}. Publicados: ${publicados}.`);
+    }
+    agendaSemanaPublicarFechar();
+  };
+  const agendaSemanaPublicarVincularEventos=()=>{
+    if(!agendaSemanaPublicar||agendaSemanaPublicar.bound)return;
+    agendaSemanaPublicar.bound=true;
+    [agendaSemanaPublicar.dataIni,agendaSemanaPublicar.dataFim].forEach(el=>{
+      if(el)el.addEventListener("change",agendaSemanaPublicarAtualizarBotoes);
+    });
+    agendaSemanaPublicar.btnConectar.addEventListener("click",agendaSemanaPublicarConectar);
+    agendaSemanaPublicar.btnVisualizar.addEventListener("click",agendaSemanaPublicarVisualizar);
+    agendaSemanaPublicar.btnExportar.addEventListener("click",agendaSemanaPublicarExportar);
+    agendaSemanaPublicar.btnFechar.addEventListener("click",agendaSemanaPublicarFechar);
+    agendaSemanaPublicar.backdrop.addEventListener("click",ev=>{
+      if(ev.target===agendaSemanaPublicar.backdrop)agendaSemanaPublicarFechar();
+    });
+    window.addEventListener("message",async(ev)=>{
+      const payload=ev?.data;
+      if(!payload||payload.type!=="google_calendar_auth")return;
+      if(String(payload.status||"")!=="ok"){
+        window.alert(String(payload.message||"Falha na autorização Google Agenda."));
+      }
+      await agendaSemanaPublicarAtualizarStatus();
+    });
+  };
+  const agendaSemanaPublicarEnsureUI=()=>{
+    if(agendaSemanaPublicar?.backdrop)return agendaSemanaPublicar;
+    if(!document.getElementById("agenda-semana-publicar-style")){
+      const style=document.createElement("style");
+      style.id="agenda-semana-publicar-style";
+      style.textContent=`
+        .agenda-semana-publicar-backdrop{position:fixed;inset:0;z-index:2700;background:rgba(0,0,0,.12);display:grid;place-items:center}
+        .agenda-semana-publicar-backdrop.hidden{display:none}
+        .agenda-semana-publicar-modal{width:min(720px,96vw);background:#efefef;border:1px solid #9ea9b5;box-shadow:2px 2px 8px rgba(0,0,0,.18);padding:8px;box-sizing:border-box;font:12px Tahoma,sans-serif;color:#111}
+        .agenda-semana-publicar-modal *{font-family:Tahoma,sans-serif}
+        .agenda-semana-publicar-title{font:400 33px/1 "Segoe UI Symbol","Arial Unicode MS",Tahoma,sans-serif;text-align:center;transform:translateY(-1px) scaleX(.72);transform-origin:center;margin:0 0 8px;color:#2a2a2a}
+        .agenda-semana-publicar-box{border:1px solid #bfc6ce;padding:8px;background:#efefef}
+        .agenda-semana-publicar-top{display:grid;grid-template-columns:1fr 1fr 96px;column-gap:8px;row-gap:6px;align-items:end}
+        .agenda-semana-publicar-top label{display:block;margin:0 0 1px}
+        .agenda-semana-publicar-top input{height:24px;border:1px solid #aeb9c6;padding:0 6px;box-sizing:border-box;background:#fff;font:12px Tahoma,sans-serif;border-radius:0}
+        .agenda-semana-publicar-periodo{display:flex;align-items:center;gap:5px}
+        #agenda-semana-publicar-data-ini,#agenda-semana-publicar-data-fim{width:100px;min-width:100px}
+        .agenda-semana-publicar-status{grid-column:1 / span 3;color:#3d4b5b;min-height:16px}
+        .agenda-semana-publicar-grid{margin-top:6px;border:1px solid #bfc6ce;background:#fff;height:312px;overflow:auto}
+        .agenda-semana-publicar-grid table{width:100%;border-collapse:collapse;table-layout:fixed}
+        .agenda-semana-publicar-grid th,.agenda-semana-publicar-grid td{height:22px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid #e7ebf0}
+        .agenda-semana-publicar-grid th{background:#eceff3;font:700 12px Tahoma,sans-serif;text-align:left;border-bottom:1px solid #c8d0da}
+        .agenda-semana-publicar-grid tr.selected{background:#2a72c9;color:#fff}
+        .agenda-semana-publicar-grid tr.agenda-semana-publicar-empty td{height:286px;border-bottom:none}
+        .agenda-semana-publicar-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+        .agenda-semana-publicar-modal .materiais-btn{height:30px;min-width:90px;padding:0 12px;border:1px solid #9ba9b9;border-radius:2px;background:#efefef;color:#111;box-shadow:none;font:700 12px Tahoma,sans-serif}
+        .agenda-semana-publicar-modal .materiais-btn:disabled{color:#8f8f8f;background:#ececec;opacity:1}
+        .agenda-semana-publicar-modal .materiais-btn:not(:disabled):hover{background:#e7ebf1}
+      `;
+      document.head.appendChild(style);
+    }
+    const backdrop=document.createElement("div");
+    backdrop.className="agenda-semana-publicar-backdrop hidden";
+    backdrop.innerHTML=`
+      <div class="agenda-semana-publicar-modal" role="dialog" aria-modal="true" tabindex="0">
+        <div class="agenda-semana-publicar-title">Publicar agenda no Google</div>
+        <div class="agenda-semana-publicar-box">
+          <div class="agenda-semana-publicar-top">
+            <div>
+              <label for="agenda-semana-publicar-login">Conta Google:</label>
+              <input id="agenda-semana-publicar-login" type="text" readonly>
+            </div>
+            <div>
+              <label>Período a exportar:</label>
+              <div class="agenda-semana-publicar-periodo">
+                <input id="agenda-semana-publicar-data-ini" type="date">
+                <span>a</span>
+                <input id="agenda-semana-publicar-data-fim" type="date">
+              </div>
+            </div>
+            <button id="agenda-semana-publicar-visualizar" class="materiais-btn" type="button">Visualiza</button>
+            <div class="agenda-semana-publicar-status" id="agenda-semana-publicar-status"></div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:4px">
+            <button id="agenda-semana-publicar-conectar" class="materiais-btn" type="button">Conectar Google</button>
+          </div>
+          <div class="agenda-semana-publicar-grid">
+            <table>
+              <colgroup>
+                <col style="width:110px">
+                <col style="width:80px">
+                <col>
+              </colgroup>
+              <thead><tr><th>Data</th><th>Hora</th><th>Paciente / compromisso</th></tr></thead>
+              <tbody id="agenda-semana-publicar-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="agenda-semana-publicar-actions">
+          <button id="agenda-semana-publicar-exportar" class="materiais-btn" type="button">Exporta</button>
+          <button id="agenda-semana-publicar-fechar" class="materiais-btn" type="button">Fecha</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    agendaSemanaPublicar={
+      backdrop,
+      modal:backdrop.querySelector(".agenda-semana-publicar-modal"),
+      login:backdrop.querySelector("#agenda-semana-publicar-login"),
+      status:backdrop.querySelector("#agenda-semana-publicar-status"),
+      dataIni:backdrop.querySelector("#agenda-semana-publicar-data-ini"),
+      dataFim:backdrop.querySelector("#agenda-semana-publicar-data-fim"),
+      btnConectar:backdrop.querySelector("#agenda-semana-publicar-conectar"),
+      btnVisualizar:backdrop.querySelector("#agenda-semana-publicar-visualizar"),
+      tbody:backdrop.querySelector("#agenda-semana-publicar-tbody"),
+      btnExportar:backdrop.querySelector("#agenda-semana-publicar-exportar"),
+      btnFechar:backdrop.querySelector("#agenda-semana-publicar-fechar"),
+      rows:[],
+      connected:false,
+      bound:false,
+    };
+    agendaSemanaPublicarVincularEventos();
+    agendaSemanaPublicarRenderRows([]);
+    return agendaSemanaPublicar;
+  };
+  const agendaSemanaPublicarAbrir=async()=>{
+    const cfg=agendaSemanaPublicarEnsureUI();
+    const padrao=agendaSemanaPublicarDataPadrao();
+    cfg.dataIni.value=padrao.ini;
+    cfg.dataFim.value=padrao.fim;
+    agendaSemanaPublicarRenderRows([]);
+    await agendaSemanaPublicarAtualizarStatus();
+    cfg.backdrop.classList.remove("hidden");
+    requestAnimationFrame(()=>{try{cfg.dataIni.focus();cfg.dataIni.select()}catch{}});
+  };
   if(_agendaSemanaRenderEstruturaOrig){
     agendaSemanaRenderEstrutura=function(skipStablePass=false){
       _agendaSemanaRenderEstruturaOrig(skipStablePass);
@@ -2366,6 +2620,15 @@ if(typeof agendaSemanaRenderEventos==="function"){
         agendaSemana.btnAviso.dataset.avisoPatchBound="1";
         agendaSemana.btnAviso.addEventListener("click",()=>{
           agendaSemanaAvisoAbrir();
+        });
+      }
+      if(agendaSemana?.btnPublicar&&agendaSemana.btnPublicar.dataset.publicarPatchBound!=="1"){
+        const novoBtnPublicar=agendaSemana.btnPublicar.cloneNode(true);
+        agendaSemana.btnPublicar.replaceWith(novoBtnPublicar);
+        agendaSemana.btnPublicar=novoBtnPublicar;
+        agendaSemana.btnPublicar.dataset.publicarPatchBound="1";
+        agendaSemana.btnPublicar.addEventListener("click",()=>{
+          agendaSemanaPublicarAbrir();
         });
       }
     };

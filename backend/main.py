@@ -54,6 +54,7 @@ from routes.materiais_routes import router as materiais_router
 from routes.procedimentos_routes import router as procedimentos_router
 from routes.relatorios_routes import router as relatorios_router
 from routes.etiquetas_routes import router as etiquetas_router
+from routes.editor_textos_routes import router as editor_textos_router
 from routes.preferences_routes import router as preferences_router
 from routes.system_options_routes import router as system_options_router
 from routes.proteticos_routes import router as proteticos_router
@@ -307,6 +308,7 @@ app.include_router(licenca_router)
 app.include_router(materiais_router)
 app.include_router(procedimentos_router)
 app.include_router(etiquetas_router)
+app.include_router(editor_textos_router)
 app.include_router(preferences_router)
 app.include_router(system_options_router)
 app.include_router(proteticos_router)
